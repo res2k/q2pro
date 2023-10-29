@@ -247,7 +247,7 @@ static void update_dynamic_lightmap(mface_t *surf)
     add_light_styles(surf, size);
 
     // add all the dynamic lights
-    if (surf->dlightframe == glr.dlightframe) {
+    if (surf->dlightframe == glr.dlightframe && !gl_static.backend.use_dlights()) {
         add_dynamic_lights(surf);
     } else {
         surf->dlightframe = 0;
@@ -512,7 +512,7 @@ static uint32_t color_for_surface(mface_t *surf)
     return U32_WHITE;
 }
 
-static void build_surface_poly(mface_t *surf, vec_t *vbo)
+static void build_surface_poly(mface_t *surf, vec_t *vbo, size_t normal_index)
 {
     bsp_t *bsp = gl_static.world.cache;
     msurfedge_t *src_surfedge;
@@ -586,6 +586,7 @@ static void build_surface_poly(mface_t *surf, vec_t *vbo)
     maxs[0] = maxs[1] = -99999;
 
     src_surfedge = surf->firstsurfedge;
+
     for (i = 0; i < surf->numsurfedges; i++) {
         src_edge = src_surfedge->edge;
         src_vert = src_edge->v[src_surfedge->vert];
@@ -619,7 +620,19 @@ static void build_surface_poly(mface_t *surf, vec_t *vbo)
             vbo[7] = tc[1] / 16;
         }
 
+        // normals
+        if (bsp->normals.normals)
+            VectorCopy(bsp->normals.normals[bsp->normals.normal_indices[normal_index]], vbo + 8);
+        else {
+            VectorCopy(surf->plane->normal, vbo + 8);
+
+            if (surf->drawflags & DSURF_PLANEBACK)
+                VectorInverse(vbo + 8);
+        }
+
         vbo += VERTEX_SIZE;
+
+        normal_index++;
     }
 
     if (bsp->lm_decoupled) {
@@ -825,7 +838,9 @@ static void upload_world_surfaces(void)
 
     currvert = 0;
     lastvert = 0;
-    for (i = 0, surf = bsp->faces; i < bsp->numfaces; i++, surf++) {
+    size_t normal_index = 0;
+
+    for (i = 0, surf = bsp->faces; i < bsp->numfaces; i++, normal_index += surf->numsurfedges, surf++) {
         if (surf->drawflags & (SURF_SKY | SURF_NODRAW))
             continue;
 
@@ -845,7 +860,7 @@ static void upload_world_surfaces(void)
         }
 
         surf->firstvert = currvert;
-        build_surface_poly(surf, vbo);
+        build_surface_poly(surf, vbo, normal_index);
         build_surface_light(surf, vbo);
 
         if (surf->texnum[1])

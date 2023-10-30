@@ -1168,6 +1168,8 @@ void R_Shutdown(bool total)
 
     GL_Unregister();
 
+    GL_ShutdownDebugDraw();
+
     memset(&gl_static, 0, sizeof(gl_static));
     memset(&gl_config, 0, sizeof(gl_config));
 }

@@ -545,23 +545,6 @@ void Sys_SetConsoleColor(color_index_t color)
     }
 }
 
-// hack'd version of OutputDebugStringA that can
-// be given a specific size rather than strlen'ing the input
-static void __stdcall QOutputDebugStringA(LPCSTR lpOutputString, size_t len)
-{
-    ULONG_PTR args[2];
-    args[0] = (ULONG_PTR)len;
-    args[1] = (ULONG_PTR)lpOutputString;
- 
-    __try
-    {
-        RaiseException(DBG_PRINTEXCEPTION_C, 0, 2, args);
-    }
-    __except(EXCEPTION_EXECUTE_HANDLER)
-    {
-    }
-}
-
 /*
 ================
 Sys_ConsoleOutput
@@ -572,8 +555,15 @@ Print text to the dedicated console
 void Sys_ConsoleOutput(const char *text, size_t len)
 {
     if (sys_debugprint && sys_debugprint->integer) {
-        QOutputDebugStringA(text, len);
-        QOutputDebugStringA("\r\n", 2);
+#if 0
+        // FIXME: this is ugly but it's technically safe...
+        size_t end = min(len, )
+        char backup[2] = { text[len], text[len + 1], text[len + 2] };
+        *((char *)(text + len - 1)) = '\r';
+        *((char *)(text + len - 1)) = '\r';
+        OutputDebugStringA(text, len);
+        OutputDebugStringA("\r\n", 2);
+#endif
     }
 
     if (houtput == INVALID_HANDLE_VALUE) {

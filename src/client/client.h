@@ -1052,6 +1052,9 @@ void    SCR_UnregisterStat(const char *name);
 void    SCR_StatTableSize(int key_width, int value_width);
 void    SCR_StatKeyValue(const char *key, const char *value);
 
+
+int     SCR_GetCinematicCrop(unsigned framenum, int64_t filesize);
+
 //
 // cin.c
 //

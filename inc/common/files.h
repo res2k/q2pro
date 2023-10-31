@@ -57,8 +57,6 @@ int FS_RenameFile(const char *from, const char *to);
 
 int FS_CreatePath(char *path);
 
-char    *FS_CopyExtraInfo(const char *name, const file_info_t *info);
-
 int64_t FS_OpenFile(const char *filename, qhandle_t *f, unsigned mode);
 int     FS_CloseFile(qhandle_t f);
 qhandle_t FS_EasyOpenFile(char *buf, size_t size, unsigned mode,
@@ -95,6 +93,8 @@ int64_t FS_Length(qhandle_t f);
 
 bool FS_WildCmp(const char *filter, const char *string);
 bool FS_ExtCmp(const char *extension, const char *string);
+
+const char *FS_NextPath(const char *path);
 
 #define FS_ReallocList(list, count) \
     Z_Realloc(list, ALIGN(count, MIN_LISTED_FILES) * sizeof(void *))

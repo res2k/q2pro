@@ -1017,7 +1017,7 @@ void *Sys_GetProcAddress(void *handle, const char *sym)
 }
 
 #if USE_MEMORY_TRACES
-void Sys_BackTrace(void *output, size_t count, size_t offset)
+void Sys_BackTrace(void **output, size_t count, size_t offset)
 {
     CaptureStackBackTrace(offset, count, output, NULL);
 }

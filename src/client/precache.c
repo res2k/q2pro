@@ -458,6 +458,7 @@ static void CL_LoadWheelEntry(int index, const char *s)
         cl.wheel.powerups[index].sort_id = values[3];
         cl.wheel.powerups[index].can_drop = values[4];
         cl.wheel.powerups[index].ammo_index = values[5];
+        cl.wheel.num_powerups = max(index, cl.wheel.num_powerups);
     } else if (index >= cl.csr.wheelweapons + MAX_WHEEL_ITEMS) {
         if (num_values != 2) {
             return;
@@ -467,6 +468,7 @@ static void CL_LoadWheelEntry(int index, const char *s)
         
         cl.wheel.ammo[index].item_index = values[0];
         cl.wheel.ammo[index].icon_index = values[1];
+        cl.wheel.num_ammo = max(index, cl.wheel.num_ammo);
     } else {
         if (num_values != 8) {
             return;
@@ -482,6 +484,7 @@ static void CL_LoadWheelEntry(int index, const char *s)
         cl.wheel.weapons[index].sort_id = values[5];
         cl.wheel.weapons[index].quantity_warn = values[6];
         cl.wheel.weapons[index].can_drop = values[7];
+        cl.wheel.num_weapons = max(index, cl.wheel.num_weapons);
     }
 }
 

@@ -434,6 +434,26 @@ static void IN_WheelUp(void) { KeyUp(&in_wheel); }
 static void IN_Wheel2Down(void) { KeyDown(&in_wheel2); }
 static void IN_Wheel2Up(void) { KeyUp(&in_wheel2); }
 
+static void IN_WeapNext(void)
+{
+    if (!cl.csr.extended) {
+        Cbuf_AddText(&cmd_buffer, "weapnext\n");
+        return;
+    }
+
+    CL_Wheel_WeapNext();
+}
+
+static void IN_WeapPrev(void)
+{
+    if (!cl.csr.extended) {
+        Cbuf_AddText(&cmd_buffer, "weapprev\n");
+        return;
+    }
+
+    CL_Wheel_WeapPrev();
+}
+
 /*
 ===============
 CL_KeyState
@@ -715,6 +735,8 @@ static const cmdreg_t c_input[] = {
     { "-wheel", IN_WheelUp },
     { "+wheel2", IN_Wheel2Down },
     { "-wheel2", IN_Wheel2Up },
+    { "cl_weapnext", IN_WeapNext },
+    { "cl_weapprev", IN_WeapPrev },
     { NULL }
 };
 
@@ -794,6 +816,10 @@ void CL_FinalizeCmd(void)
         cl.cmd.buttons |= BUTTON_USE;
     if (in_holster.state & 3)
         cl.cmd.buttons |= BUTTON_HOLSTER;
+    if (in_up.state & 3)
+        cl.cmd.buttons |= BUTTON_JUMP;
+    if (in_down.state & 3)
+        cl.cmd.buttons |= BUTTON_CROUCH;
 
     if (cls.key_dest == KEY_GAME && Key_AnyKeyDown()) {
         cl.cmd.buttons |= BUTTON_ANY;
@@ -819,6 +845,9 @@ void CL_FinalizeCmd(void)
     // store the movement vector
     cl.cmd.forwardmove = move[0];
     cl.cmd.sidemove = move[1];
+
+    // update wheels before we save it off
+    CL_Carousel_Input();
 
     // save this command off for prediction
     cl.cmdNumber++;
@@ -1198,6 +1227,8 @@ void CL_SendCmd(void)
     } else {
         CL_SendDefaultCmd();
     }
+
+    CL_Carousel_ClearInput();
 
     cl.sendPacketNow = false;
 }

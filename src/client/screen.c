@@ -1879,6 +1879,8 @@ static void SCR_Draw2D(void)
 
     CL_Carousel_Draw();
 
+    CL_Wheel_Draw();
+
     SCR_DrawNet();
 
     SCR_DrawObjects();

@@ -131,10 +131,10 @@ typedef struct {
 
 // variable server FPS
 #if USE_FPS
-#define CL_FRAMETIME    cl.frametime
+#define CL_FRAMETIME    cl.frametime.time
 #define CL_1_FRAMETIME  cl.frametime_inv
-#define CL_FRAMEDIV     cl.framediv
-#define CL_FRAMESYNC    !(cl.frame.number % cl.framediv)
+#define CL_FRAMEDIV     cl.frametime.div
+#define CL_FRAMESYNC    !(cl.frame.number % cl.frametime.div)
 #define CL_KEYPS        &cl.keyframe.ps
 #define CL_OLDKEYPS     &cl.oldkeyframe.ps
 #define CL_KEYLERPFRAC  cl.keylerpfrac
@@ -320,9 +320,8 @@ typedef struct client_state_s {
     pmoveParams_t pmp;
 
 #if USE_FPS
-    int         frametime;      // variable server frame time
+    frametime_t frametime;
     float       frametime_inv;  // 1/frametime
-    int         framediv;       // BASE_FRAMETIME/frametime
 #endif
 
     configstring_t  baseconfigstrings[MAX_CONFIGSTRINGS];
@@ -650,14 +649,14 @@ extern cvar_t   *cl_nolerp;
 
 #if USE_DEBUG
 #define SHOWNET(level, ...) \
-    if (cl_shownet->integer > level) \
-        Com_LPrintf(PRINT_DEVELOPER, __VA_ARGS__)
+    do { if (cl_shownet->integer > level) \
+        Com_LPrintf(PRINT_DEVELOPER, __VA_ARGS__); } while (0)
 #define SHOWCLAMP(level, ...) \
-    if (cl_showclamp->integer > level) \
-        Com_LPrintf(PRINT_DEVELOPER, __VA_ARGS__)
+    do { if (cl_showclamp->integer > level) \
+        Com_LPrintf(PRINT_DEVELOPER, __VA_ARGS__); } while (0)
 #define SHOWMISS(...) \
-    if (cl_showmiss->integer) \
-        Com_LPrintf(PRINT_DEVELOPER, __VA_ARGS__)
+    do { if (cl_showmiss->integer) \
+        Com_LPrintf(PRINT_DEVELOPER, __VA_ARGS__); } while (0)
 extern cvar_t   *cl_shownet;
 extern cvar_t   *cl_showmiss;
 extern cvar_t   *cl_showclamp;
@@ -1243,6 +1242,18 @@ int     SCR_GetCinematicCrop(unsigned framenum, int64_t filesize);
 //
 // cin.c
 //
+
+#if USE_AVCODEC
+
+typedef struct {
+    const char *ext;
+    const char *fmt;
+    int codec_id;
+} avformat_t;
+
+#endif
+
+void    SCR_InitCinematics(void);
 void    SCR_StopCinematic(void);
 void    SCR_FinishCinematic(void);
 void    SCR_RunCinematic(void);

@@ -61,8 +61,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #if USE_DEBUG
 #define SV_DPrintf(level,...) \
-    if (sv_debug && sv_debug->integer > level) \
-        Com_LPrintf(PRINT_DEVELOPER, __VA_ARGS__)
+    do { if (sv_debug && sv_debug->integer > level) \
+        Com_LPrintf(PRINT_DEVELOPER, __VA_ARGS__); } while (0)
 #else
 #define SV_DPrintf(...)
 #endif
@@ -140,9 +140,9 @@ typedef struct {
 // variable server FPS
 #if USE_FPS
 #define SV_FRAMERATE        sv.framerate
-#define SV_FRAMETIME        sv.frametime
-#define SV_FRAMEDIV         sv.framediv
-#define SV_FRAMESYNC        !(sv.framenum % sv.framediv)
+#define SV_FRAMETIME        sv.frametime.time
+#define SV_FRAMEDIV         sv.frametime.div
+#define SV_FRAMESYNC        !(sv.framenum % sv.frametime.div)
 #define SV_CLIENTSYNC(cl)   !(sv.framenum % (cl)->framediv)
 #else
 // TODO cache these
@@ -163,8 +163,7 @@ typedef struct {
 
 #if USE_FPS
     int         framerate;
-    int         frametime;
-    int         framediv;
+    frametime_t frametime;
 #endif
 
     int         framenum;

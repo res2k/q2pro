@@ -617,9 +617,8 @@ static void CL_ParseServerData(void)
 
 #if USE_FPS
     // setup default frame times
-    cl.frametime = BASE_FRAMETIME;
-    cl.frametime_inv = BASE_1_FRAMETIME;
-    cl.framediv = 1;
+    cl.frametime = Com_ComputeFrametime(BASE_FRAMERATE);
+    cl.frametime_inv = cl.frametime.div * BASE_1_FRAMETIME;
 #endif
     cl.sv_frametime = 100;
     cl.sv_frametime_inv = 1.0f / cl.sv_frametime;
@@ -1244,22 +1243,17 @@ static void CL_ParseZPacket(void)
 #if USE_FPS
 static void set_server_fps(int value)
 {
-    int framediv = value / BASE_FRAMERATE;
-
-    clamp(framediv, 1, MAX_FRAMEDIV);
-
-    cl.frametime = BASE_FRAMETIME / framediv;
-    cl.frametime_inv = framediv * BASE_1_FRAMETIME;
-    cl.framediv = framediv;
+    cl.frametime = Com_ComputeFrametime(value);
+    cl.frametime_inv = cl.frametime.div * BASE_1_FRAMETIME;
 
     // fix time delta
     if (cls.state == ca_active) {
-        int delta = cl.frame.number - cl.servertime / cl.frametime;
-        cl.serverdelta = Q_align(delta, framediv);
+        int delta = cl.frame.number - cl.servertime / cl.frametime.time;
+        cl.serverdelta = Q_align(delta, cl.frametime.div);
     }
 
     Com_DPrintf("client framediv=%d time=%d delta=%d\n",
-                framediv, cl.servertime, cl.serverdelta);
+                cl.frametime.div, cl.servertime, cl.serverdelta);
 }
 #endif
 

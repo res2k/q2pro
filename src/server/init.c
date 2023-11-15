@@ -41,18 +41,12 @@ void SV_ClientReset(client_t *client)
 static void set_frame_time(void)
 {
 #if USE_FPS
-    int framediv;
-
     if (g_features->integer & GMF_VARIABLE_FPS)
-        framediv = sv_fps->integer / BASE_FRAMERATE;
+        sv.frametime = Com_ComputeFrametime(sv_fps->integer);
     else
-        framediv = 1;
+        sv.frametime = Com_ComputeFrametime(BASE_FRAMERATE);
 
-    clamp(framediv, 1, MAX_FRAMEDIV);
-
-    sv.framerate = framediv * BASE_FRAMERATE;
-    sv.frametime = BASE_FRAMETIME / framediv;
-    sv.framediv = framediv;
+    sv.framerate = sv.frametime.div * BASE_FRAMERATE;
 
     Cvar_SetInteger(sv_fps, sv.framerate, FROM_CODE);
 #endif
@@ -226,31 +220,6 @@ void SV_SpawnServer(const mapcmd_t *cmd)
     Com_Printf("-------------------------------------\n");
 }
 
-static int check_cinematic(const char *expanded)
-{
-    int ret;
-
-#if USE_AVCODEC
-    // open from filesystem only
-    ret = FS_LoadFileEx(expanded, NULL, FS_TYPE_REAL, TAG_FREE);
-
-    // if .cin doesn't exist, check for .ogv
-    if (ret == Q_ERR(ENOENT)) {
-        char tmp[MAX_QPATH];
-        COM_StripExtension(tmp, expanded, sizeof(tmp));
-        Q_strlcat(tmp, ".ogv", sizeof(tmp));
-        ret = FS_LoadFileEx(tmp, NULL, FS_TYPE_REAL, TAG_FREE);
-    }
-#else
-    ret = FS_LoadFile(expanded, NULL);
-#endif
-
-    if (ret == Q_ERR(EFBIG))
-        ret = Q_ERR_SUCCESS;
-
-    return ret;
-}
-
 static bool check_server(mapcmd_t *cmd, const char *server, bool nextserver)
 {
     char        expanded[MAX_QPATH];
@@ -280,7 +249,7 @@ static bool check_server(mapcmd_t *cmd, const char *server, bool nextserver)
         if (!sv_cinematics->integer && nextserver)
             return false;   // skip it
         if (Q_concat(expanded, sizeof(expanded), "video/", s) < sizeof(expanded)) {
-            ret = COM_DEDICATED ? Q_ERR_SUCCESS : check_cinematic(expanded);
+            ret = SCR_CheckForCinematic(expanded);
         }
         cmd->state = ss_cinematic;
     } else {
@@ -391,7 +360,7 @@ void SV_InitGame(unsigned mvd_spawn)
 
 #if USE_FPS
         // set up default frametime for main loop
-        sv.frametime = BASE_FRAMETIME;
+        sv.frametime = Com_ComputeFrametime(BASE_FRAMERATE);
 #endif
     }
 

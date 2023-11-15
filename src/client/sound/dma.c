@@ -22,8 +22,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #define PAINTBUFFER_SIZE    2048
 
-#define MAX_RAW_SAMPLES     8192
-
 typedef struct {
     float   left;
     float   right;
@@ -154,9 +152,11 @@ static bool DMA_RawSamples(int samples, int rate, int width, int channels, const
 
 #undef RESAMPLE
 
-static bool DMA_NeedRawSamples(void)
+static int DMA_NeedRawSamples(void)
 {
-    return s_rawend - s_paintedtime < MAX_RAW_SAMPLES - 2048;
+    int avail = MAX_RAW_SAMPLES - (s_rawend - s_paintedtime);
+    clamp(avail, 0, MAX_RAW_SAMPLES);
+    return avail & ~127;
 }
 
 static void DMA_DropRawSamples(void)
@@ -857,7 +857,7 @@ static int DMA_GetTime(void)
         if (s_paintedtime > 0x40000000) {
             // time to chop things off to avoid 32 bit limits
             buffers = 0;
-            s_paintedtime = fullsamples;
+            s_rawend = s_paintedtime = fullsamples;
             S_StopAllSounds();
         }
     }
@@ -871,6 +871,7 @@ static void DMA_Update(void)
     int         i;
     channel_t   *ch;
     int         samples, soundtime, endtime;
+    float       sec;
 
     // update spatialization for dynamic sounds
     for (i = 0, ch = s_channels; i < s_numchannels; i++, ch++) {
@@ -923,7 +924,10 @@ static void DMA_Update(void)
     }
 
     // mix ahead of current position
-    endtime = soundtime + Cvar_ClampValue(s_mixahead, 0, 1) * dma.speed;
+    sec = Cvar_ClampValue(s_mixahead, 0, 1);
+    if (!cls.active)
+        sec = max(sec, 0.125f);
+    endtime = soundtime + sec * dma.speed;
 
     // mix to an even submission block size
     endtime = ALIGN(endtime, dma.submission_chunk);
@@ -933,6 +937,11 @@ static void DMA_Update(void)
     PaintChannels(endtime);
 
     snddma.submit();
+}
+
+static int DMA_GetSampleRate(void)
+{
+    return dma.speed;
 }
 
 const sndapi_t snd_dma = {
@@ -949,4 +958,5 @@ const sndapi_t snd_dma = {
     .get_begin_ofs = DMA_DriftBeginofs,
     .play_channel = DMA_Spatialize,
     .stop_all_sounds = DMA_ClearBuffer,
+    .get_sample_rate = DMA_GetSampleRate,
 };

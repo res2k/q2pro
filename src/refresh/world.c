@@ -486,14 +486,14 @@ void GL_DrawBspModel(mmodel_t *model)
             continue;
         }
 
+        if (gl_dynamic->integer) {
+            GL_PushLights(face);
+        }
+
         if (face->drawflags & SURF_TRANS_MASK) {
             if (model->drawframe != glr.drawframe)
                 GL_AddAlphaFace(face, ent);
             continue;
-        }
-
-        if (gl_dynamic->integer) {
-            GL_PushLights(face);
         }
 
         GL_DrawFace(face);
@@ -573,13 +573,13 @@ static inline void GL_DrawNode(mnode_t *node)
             continue;
         }
 
+        if (gl_dynamic->integer) {
+            GL_PushLights(face);
+        }
+
         if (face->drawflags & SURF_TRANS_MASK) {
             GL_AddAlphaFace(face, &gl_world);
             continue;
-        }
-
-        if (gl_dynamic->integer) {
-            GL_PushLights(face);
         }
 
         if (gl_hash_faces->integer) {

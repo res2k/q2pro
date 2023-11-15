@@ -25,7 +25,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <libswscale/swscale.h>
 
 #define MAX_PACKETS     2048    // max packets in queue
-#define MAX_SAMPLES     8192    // max audio samples in frame
 
 typedef struct {
     AVFifo      *pkt_list;
@@ -66,6 +65,35 @@ typedef struct {
 } cinematic_t;
 
 static cinematic_t  cin;
+
+static const avformat_t formats[] = {
+    { ".ogv", "ogg", AV_CODEC_ID_THEORA },
+    { ".mkv", "matroska", AV_CODEC_ID_NONE },
+    { ".mp4", "mp4", AV_CODEC_ID_H264 },
+    { ".cin", "idcin", AV_CODEC_ID_IDCIN },
+};
+
+static int  supported;
+
+/*
+==================
+SCR_InitCinematics
+==================
+*/
+void SCR_InitCinematics(void)
+{
+    for (int i = 0; i < q_countof(formats); i++) {
+        const avformat_t *f = &formats[i];
+        if (!av_find_input_format(f->fmt))
+            continue;
+        if (f->codec_id != AV_CODEC_ID_NONE &&
+            !avcodec_find_decoder(f->codec_id))
+            continue;
+        supported |= BIT(i);
+    }
+
+    Com_DPrintf("Supported cinematic formats: %#x\n", supported);
+}
 
 static void packet_queue_destroy(PacketQueue *q);
 
@@ -199,7 +227,7 @@ static int process_audio(void)
     AVFrame *out = cin.audio.frame;
     int ret;
 
-    out->nb_samples = MAX_SAMPLES;
+    out->nb_samples = MAX_RAW_SAMPLES;
     ret = swr_convert_frame(cin.swr_ctx, out, in);
     if (ret < 0) {
         Com_EPrintf("Error converting audio: %s\n", av_err2str(ret));
@@ -428,7 +456,7 @@ static bool open_codec_context(enum AVMediaType type)
 
     dec = avcodec_find_decoder(st->codecpar->codec_id);
     if (!dec) {
-        Com_EPrintf("Failed to find %s codec\n", av_get_media_type_string(type));
+        Com_EPrintf("Failed to find %s codec %s\n", av_get_media_type_string(type), avcodec_get_name(st->codecpar->codec_id));
         return false;
     }
 
@@ -506,13 +534,17 @@ static bool open_codec_context(enum AVMediaType type)
             return false;
         }
 
+        int sample_rate = S_GetSampleRate();
+        if (!sample_rate)
+            sample_rate = dec_ctx->sample_rate;
+
         if (dec_ctx->ch_layout.nb_channels >= 2)
             out->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO;
         else
             out->ch_layout = (AVChannelLayout)AV_CHANNEL_LAYOUT_MONO;
         out->format = AV_SAMPLE_FMT_S16;
-        out->sample_rate = dec_ctx->sample_rate;
-        out->nb_samples = MAX_SAMPLES;
+        out->sample_rate = sample_rate;
+        out->nb_samples = MAX_RAW_SAMPLES;
 
         ret = av_frame_get_buffer(out, 0);
         if (ret < 0) {
@@ -543,6 +575,7 @@ static bool SCR_StartCinematic(const char *name)
     int         ret;
 
     FS_NormalizePathBuffer(normalized, name, sizeof(normalized));
+    *COM_FileExtension(normalized) = 0;
 
     // open from filesystem only. since packfiles are downloadable, videos from
     // packfiles can pose security risk due to huge lavf/lavc attack surface.
@@ -553,26 +586,25 @@ static bool SCR_StartCinematic(const char *name)
             break;
         }
 
-        if (Q_snprintf(fullname, sizeof(fullname), "%s/video/%s", path, normalized) >= sizeof(fullname)) {
-            ret = AVERROR(ENAMETOOLONG);
-            break;
-        }
+        for (int i = 0; i < q_countof(formats); i++) {
+            if (!(supported & BIT(i)))
+                continue;
 
-        ret = avformat_open_input(&cin.fmt_ctx, fullname, NULL, NULL);
+            if (Q_snprintf(fullname, sizeof(fullname), "%s/video/%s%s",
+                           path, normalized, formats[i].ext) >= sizeof(fullname)) {
+                ret = AVERROR(ENAMETOOLONG);
+                goto done;
+            }
 
-        // if .cin doesn't exist, check for .ogv
-        if (ret == AVERROR(ENOENT)) {
-            *COM_FileExtension(fullname) = 0;
-            Q_strlcat(fullname, ".ogv", sizeof(fullname));
             ret = avformat_open_input(&cin.fmt_ctx, fullname, NULL, NULL);
+            if (ret != AVERROR(ENOENT))
+                goto done;
         }
-
-        if (ret != AVERROR(ENOENT))
-            break;
     }
 
+done:
     if (ret < 0) {
-        Com_EPrintf("Couldn't open video/%s: %s\n", normalized, av_err2str(ret));
+        Com_EPrintf("Couldn't open %s: %s\n", ret == AVERROR(ENOENT) ? name : fullname, av_err2str(ret));
         return false;
     }
 
@@ -657,4 +689,34 @@ void SCR_PlayCinematic(const char *name)
 
 finish:
     SCR_FinishCinematic();
+}
+
+/*
+==================
+SCR_CheckForCinematic
+
+Called by the server to check for cinematic existence.
+Name should be in format "video/<something>.cin".
+==================
+*/
+int SCR_CheckForCinematic(const char *name)
+{
+    int len = strlen(name);
+    int ret = Q_ERR(ENOENT);
+
+    Q_assert(len >= 4);
+
+    for (int i = 0; i < q_countof(formats); i++) {
+        if (!(supported & BIT(i)))
+            continue;
+        ret = FS_LoadFileEx(va("%.*s%s", len - 4, name, formats[i].ext),
+                            NULL, FS_TYPE_REAL, TAG_FREE);
+        if (ret != Q_ERR(ENOENT))
+            break;
+    }
+
+    if (ret == Q_ERR(EFBIG))
+        ret = Q_ERR_SUCCESS;
+
+    return ret;
 }

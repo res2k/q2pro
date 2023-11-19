@@ -338,17 +338,11 @@ typedef struct {
 
 /* Vertex */
 typedef struct {
-    vec2_t st;
     vec3_t normal;
 
     uint32_t start; /* start weight */
     uint32_t count; /* weight count */
 } md5_vertex_t;
-
-/* Triangle */
-typedef struct {
-    int index[3];
-} md5_triangle_t;
 
 /* Weight */
 typedef struct {
@@ -365,6 +359,7 @@ typedef struct {
     int num_weights;
 
     md5_vertex_t *vertices;
+    maliastc_t *tcoords;
     QGL_INDEX_TYPE *indices;
     md5_weight_t *weights;
 } md5_mesh_t;
@@ -649,7 +644,7 @@ void GL_ForceTexture(GLuint tmu, GLuint texnum);
 void GL_BindTexture(GLuint tmu, GLuint texnum);
 void GL_CommonStateBits(GLbitfield bits);
 void GL_ScrollSpeed(vec2_t scroll, GLbitfield bits);
-void GL_DrawOutlines(GLsizei count, QGL_INDEX_TYPE *indices);
+void GL_DrawOutlines(GLsizei count, const QGL_INDEX_TYPE *indices);
 void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat znear, GLfloat zfar);
 void GL_Frustum(GLfloat fov_x, GLfloat fov_y, GLfloat reflect_x);
 void GL_Setup2D(void);

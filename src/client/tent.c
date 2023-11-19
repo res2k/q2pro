@@ -21,6 +21,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/mdfour.h"
 
 static cvar_t *cl_compass_time;
+static cvar_t *cl_muzzleflashes;
 
 qhandle_t   cl_sfx_ric1;
 qhandle_t   cl_sfx_ric2;
@@ -47,8 +48,7 @@ qhandle_t   cl_mod_bfg_explo;
 qhandle_t   cl_mod_powerscreen;
 qhandle_t   cl_mod_laser;
 qhandle_t   cl_mod_dmspot;
-
-qhandle_t   cl_img_flare;
+static qhandle_t   cl_mod_marker;
 
 qhandle_t   cl_mod_lightning;
 qhandle_t   cl_mod_heatbeam;
@@ -56,11 +56,9 @@ qhandle_t   cl_mod_explo4_big;
 
 qhandle_t   cl_mod_muzzles[MFLASH_TOTAL];
 
-static qhandle_t   cl_mod_marker;
-
 qhandle_t   cl_img_flare;
 
-#define MAX_FOOTSTEP_SFX    16
+#define MAX_FOOTSTEP_SFX    9
 
 typedef struct {
     int         num_sfx;
@@ -88,13 +86,17 @@ static int CL_FindFootstepSurface(int entnum)
         return footstep_id;
 
     // not in our frame so don't bother doing calculations
-    if (cent->serverframe != cl.frame.number) {
+    if (cent->serverframe != cl.frame.number)
         return footstep_id;
-    }
 
-    // use an X/Y only mins/maxs copy of the entity , since we don't want it to get caught inside of any geometry above or below
-    const vec3_t trace_mins = {cent->mins[0], cent->mins[1], 0};
-    const vec3_t trace_maxs = {cent->maxs[0], cent->maxs[1], 0};
+    // allow custom footsteps to be disabled
+    if (cl_footsteps->integer >= 2)
+        return footstep_id;
+
+    // use an X/Y only mins/maxs copy of the entity,
+    // since we don't want it to get caught inside of any geometry above or below
+    const vec3_t trace_mins = { cent->mins[0], cent->mins[1], 0 };
+    const vec3_t trace_maxs = { cent->maxs[0], cent->maxs[1], 0 };
 
     //trace start position is the entity's current interpolated origin + { 0 0 1 }, so that entities with their mins at 0 won't get caught in the floor
     vec3_t trace_start;
@@ -293,14 +295,6 @@ void CL_RegisterTEntModels(void)
     cl_mod_heatbeam = R_RegisterModel("models/proj/beam/tris.md2");
     cl_mod_explo4_big = R_RegisterModel("models/objects/r_explode2/tris.md2");
 
-    cl_mod_marker = R_RegisterModel("models/objects/pointer/tris.md2");
-
-    cl_img_flare = R_RegisterSprite("misc/flare.tga");
-
-    // check for remaster powerscreen model (ugly!)
-    len = FS_LoadFile("models/items/armor/effect/tris.md2", &data);
-    cl.need_powerscreen_scale = len == 2300 && Com_BlockChecksum(data, len) == 0x19fca65b;
-    FS_FreeFile(data);
     
     cl_mod_muzzles[MFLASH_MACHN] = R_RegisterModel("models/weapons/v_machn/flash/tris.md2");
     cl_mod_muzzles[MFLASH_SHOTG2] = R_RegisterModel("models/weapons/v_shotg2/flash/tris.md2");
@@ -314,6 +308,13 @@ void CL_RegisterTEntModels(void)
     cl_mod_muzzles[MFLASH_BLAST] = R_RegisterModel("models/weapons/v_blast/flash/tris.md2");
     cl_mod_muzzles[MFLASH_BFG] = R_RegisterModel("models/weapons/v_bfg/flash/tris.md2");
     cl_mod_muzzles[MFLASH_BEAMER] = R_RegisterModel("models/weapons/v_beamer/flash/tris.md2");
+
+    cl_img_flare = R_RegisterSprite("misc/flare.tga");
+
+    // check for remaster powerscreen model (ugly!)
+    len = FS_LoadFile("models/items/armor/effect/tris.md2", &data);
+    cl.need_powerscreen_scale = len == 2300 && Com_BlockChecksum(data, len) == 0x19fca65b;
+    FS_FreeFile(data);
 }
 
 /*
@@ -329,7 +330,6 @@ EXPLOSION MANAGEMENT
 typedef struct {
     enum {
         ex_free,
-        ex_explosion,
         ex_misc,
         ex_flash,
         ex_mflash,
@@ -416,24 +416,38 @@ static void CL_BFGExplosion(const vec3_t pos)
     ex->frames = 4;
 }
 
-// muzzleflashes
-void CL_AddWeaponMuzzleFX(cl_muzzlefx_t fx, const vec3_t offset, int skin, float scale, float rotate)
+void CL_AddWeaponMuzzleFX(cl_muzzlefx_t fx, const vec3_t offset, float scale, float rotate)
 {
-    Q_assert(fx > MFLASH_NONE && fx < MFLASH_TOTAL);
+    if (!cl_muzzleflashes->integer)
+        return;
+    if (mz.entity != cl.frame.clientNum + 1)
+        return;
 
-    cl.weapon.muzzle_model = cl_mod_muzzles[fx];
-    cl.weapon.muzzle_skin = skin;
-    cl.weapon.muzzle_scale = scale;
-    cl.weapon.muzzle_roll = rotate;
-    VectorCopy(offset, cl.weapon.muzzle_offset);
-    cl.weapon.muzzle_time = cl.time + 50;
+    Q_assert(fx < q_countof(cl_mod_muzzles));
+
+    if (!cl_mod_muzzles[fx])
+        return;
+
+    cl.weapon.muzzle.model = cl_mod_muzzles[fx];
+    cl.weapon.muzzle.scale = scale;
+    cl.weapon.muzzle.roll = rotate;
+    VectorCopy(offset, cl.weapon.muzzle.offset);
+    cl.weapon.muzzle.time = cl.servertime - CL_FRAMETIME;
 }
 
 void CL_AddMuzzleFX(const vec3_t origin, const vec3_t angles, cl_muzzlefx_t fx, int skin, float scale, float rotate)
 {
-    Q_assert(fx > MFLASH_NONE && fx < MFLASH_TOTAL);
+    explosion_t *ex;
 
-    explosion_t *ex = CL_AllocExplosion();
+    if (!cl_muzzleflashes->integer)
+        return;
+
+    Q_assert(fx < q_countof(cl_mod_muzzles));
+
+    if (!cl_mod_muzzles[fx])
+        return;
+
+    ex = CL_AllocExplosion();
     VectorCopy(origin, ex->ent.origin);
     VectorCopy(angles, ex->ent.angles);
     ex->type = ex_mflash;
@@ -511,21 +525,21 @@ static void CL_AddExplosions(void)
     for (i = 0, ex = cl_explosions; i < MAX_EXPLOSIONS; i++, ex++) {
         if (ex->type == ex_free)
             continue;
+
+        if (ex->type == ex_mflash) {
+            if (cl.time - ex->start > 50)
+                ex->type = ex_free;
+            else
+                V_AddEntity(&ex->ent);
+            continue;
+        }
+
         frac = (cl.time - ex->start) * BASE_1_FRAMETIME;
         f = floor(frac);
 
         ent = &ex->ent;
 
         switch (ex->type) {
-        case ex_mflash:
-            if (cl.time - ex->start > 50) {
-                ex->type = ex_free;
-                break;
-            }
-
-            ent->alpha = 1.0f;
-            f = 0.0f;
-            break;
         case ex_misc:
         case ex_light:
             if (f >= ex->frames - 1) {
@@ -599,7 +613,7 @@ static void CL_AddExplosions(void)
             break;
         }
         default:
-            break;
+            Q_assert(!"bad type");
         }
 
         if (ex->type == ex_free)
@@ -1674,6 +1688,7 @@ void CL_ClearTEnts(void)
 
 void CL_InitTEnts(void)
 {
+    cl_muzzleflashes = Cvar_Get("cl_muzzleflashes", "1", 0);
     cl_railtrail_type = Cvar_Get("cl_railtrail_type", "0", 0);
     cl_railtrail_time = Cvar_Get("cl_railtrail_time", "1.0", 0);
     cl_railtrail_time->changed = cl_timeout_changed;

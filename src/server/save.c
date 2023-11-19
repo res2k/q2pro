@@ -580,7 +580,7 @@ void SV_CheckForSavegame(const mapcmd_t *cmd)
         return;
     }
 
-    if (cmd->loadgame) {
+    if (cmd->loadgame == LOAD_NORMAL) {
         // called from SV_Loadgame_f
         ge->RunFrame(false);
         ge->RunFrame(false);

@@ -1169,31 +1169,33 @@ static void CL_AddViewWeapon(void)
     }
 
     // add muzzle flash
-    if (cl.weapon.muzzle_model) {
-        if (cl.weapon.muzzle_time < cl.time) {
-            cl.weapon.muzzle_model = 0;
-        } else {
-            gun.flags = RF_FULLBRIGHT | RF_DEPTHHACK | RF_WEAPONMODEL | RF_TRANSLUCENT;
-            gun.alpha = 1.0f;
-            gun.model = cl.weapon.muzzle_model;
-            gun.skin = cl.weapon.muzzle_skin;
-            gun.scale = cl.weapon.muzzle_scale;
-            gun.backlerp = 0.f;
-            gun.frame = gun.oldframe = 0;
+    if (!cl.weapon.muzzle.model)
+        return;
 
-            vec3_t forward, right, up;
-            AngleVectors(gun.angles, forward, right, up);
-
-            VectorMA(gun.origin, cl.weapon.muzzle_offset[0], forward, gun.origin);
-            VectorMA(gun.origin, cl.weapon.muzzle_offset[1], right, gun.origin);
-            VectorMA(gun.origin, cl.weapon.muzzle_offset[2], up, gun.origin);
-
-            VectorCopy(cl.refdef.viewangles, gun.angles);
-            gun.angles[2] += cl.weapon.muzzle_roll;
-            
-            V_AddEntity(&gun);
-        }
+    if (cl.time - cl.weapon.muzzle.time > 50) {
+        cl.weapon.muzzle.model = 0;
+        return;
     }
+
+    gun.flags = RF_FULLBRIGHT | RF_DEPTHHACK | RF_WEAPONMODEL | RF_TRANSLUCENT;
+    gun.alpha = 1.0f;
+    gun.model = cl.weapon.muzzle.model;
+    gun.skinnum = 0;
+    gun.scale = cl.weapon.muzzle.scale;
+    gun.backlerp = 0.0f;
+    gun.frame = gun.oldframe = 0;
+
+    vec3_t forward, right, up;
+    AngleVectors(gun.angles, forward, right, up);
+
+    VectorMA(gun.origin, cl.weapon.muzzle.offset[0], forward, gun.origin);
+    VectorMA(gun.origin, cl.weapon.muzzle.offset[1], right, gun.origin);
+    VectorMA(gun.origin, cl.weapon.muzzle.offset[2], up, gun.origin);
+
+    VectorCopy(cl.refdef.viewangles, gun.angles);
+    gun.angles[2] += cl.weapon.muzzle.roll;
+
+    V_AddEntity(&gun);
 }
 
 static void CL_SetupFirstPersonView(void)

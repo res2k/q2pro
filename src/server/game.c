@@ -554,7 +554,7 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
         MSG_WriteByte(ofs);
 
     MSG_WriteShort(sendchan);
-    MSG_WritePos(origin, svs.csr.extended);
+    MSG_WritePos(origin, true);
 
     // if the sound doesn't attenuate, send it to everyone
     // (global radio chatter, voiceovers, etc)
@@ -898,7 +898,7 @@ static size_t PF_Info_ValueForKey (const char *s, const char *key, char *buffer,
 
 static void PF_MSG_WritePos (const vec3_t p)
 {
-    MSG_WritePos(p, svs.csr.extended);
+    MSG_WritePos(p, true);
 }
 
 //==============================================
@@ -1082,6 +1082,7 @@ void SV_InitGameProgs(void)
     game_entry_ex_t entry_ex = Sys_GetProcAddress(game_library, "GetGameAPIEx");
 
     if (ge->apiversion != GAME_API_VERSION) {
+        svs.is_game_rerelease = false;
         if (ge->apiversion == 3) {
             Com_DPrintf("Detected version 3 game library, using proxy game\n");
             ge = GetGame3Proxy(&import, &game_import_ex, entry, entry_ex);
@@ -1090,17 +1091,25 @@ void SV_InitGameProgs(void)
                       ge->apiversion, GAME_API_VERSION);
         }
     } else {
+        svs.is_game_rerelease = true;
         Cvar_SetInteger(g_features, GMF_PROTOCOL_EXTENSIONS | GMF_ENHANCED_SAVEGAMES | GMF_PROPERINUSE | GMF_WANT_ALL_DISCONNECTS, FROM_CODE);
     }
-
-    svs.csr = cs_remap_rerelease;
 
     if (entry_ex)
         gex = entry_ex(&game_import_ex);
 
     // initialize
+    /* Note: Those functions may already call configstring(). They also decide the features...
+     * So start with an extended csr, and possible choose a smaller one later. */
+    if (svs.is_game_rerelease)
+        svs.csr = cs_remap_rerelease;
+    else
+        svs.csr = cs_remap_q2pro_new;
     ge->PreInit(); // FIXME: When to call PreInit(), when Init()?
     ge->Init();
+
+    if (!svs.is_game_rerelease && (g_features->integer & GMF_PROTOCOL_EXTENSIONS) == 0)
+        svs.csr = cs_remap_old;
 
     // sanitize edict_size
     unsigned min_size = sizeof(edict_t);

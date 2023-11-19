@@ -17,9 +17,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 */
 
 #include "../server.h"
-#include "common/game3_shared.h"
+#include "shared/game3_shared.h"
+#include "shared/game3.h"
 #include "game3_proxy.h"
-#include "game3.h"
 #include "game3_pmove.h"
 #include "shared/base85.h"
 
@@ -262,26 +262,14 @@ static void wrap_local_sound(game3_edict_t *target, const vec3_t origin, game3_e
     game_import.local_sound(translate_edict_from_game(target), origin, translate_edict_from_game(ent), channel, soundindex, volume, attenuation, timeofs, 0);
 }
 
-// Map configstring IDs from "old" to "new"
-static int map_configstring_id(int index)
-{
-    return remap_cs_index(index, game_csr, &cs_remap_rerelease);
-}
-
 static void wrap_configstring(int index, const char* str)
 {
-    int mapped_idx = map_configstring_id(index);
-    if (mapped_idx < 0)
-        return;
-    game_import.configstring(mapped_idx, str);
+    game_import.configstring(index, str);
 }
 
 static const char *wrap_get_configstring(int index)
 {
-    int mapped_idx = map_configstring_id(index);
-    if (mapped_idx < 0)
-        return "";
-    return game_import.get_configstring(mapped_idx);
+    return game_import.get_configstring(index);
 }
 
 static trace_t wrap_clip(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, game3_edict_t *clip, int contentmask)
@@ -388,7 +376,7 @@ static void sync_single_edict_server_to_game(int index)
     if(game_edict->client)
         game_edict->client->ping = server_edict->client->ping;
     game_edict->linkcount = server_edict->linkcount;
-    game_edict->area.prev = server_edict->linked ? &game_edict->area : NULL; // emulate entity being linked
+    game_edict->area.next = game_edict->area.prev = server_edict->linked ? &game_edict->area : NULL; // emulate entity being linked
     game_edict->num_clusters = sent->num_clusters;
     memcpy(&game_edict->clusternums, &sent->clusternums, sizeof(game_edict->clusternums));
     game_edict->headnode = sent->headnode;

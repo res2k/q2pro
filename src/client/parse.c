@@ -548,6 +548,24 @@ static void read_q2pro_protocol_flags(void)
         Com_DPrintf("Q2PRO protocol extensions enabled\n");
         cl.csr = cs_remap_q2pro_new;
     }
+    cl.is_rerelease_game = (i & Q2PRO_PF_GAME3_COMPAT) == 0;
+}
+
+static void set_server_fps(int value)
+{
+    cl.frametime = Com_ComputeFrametime(value);
+    cl.frametime_inv = cl.frametime.div * BASE_1_FRAMETIME;
+
+#if USE_FPS
+    // fix time delta
+    if (cls.state == ca_active) {
+        int delta = cl.frame.number - cl.servertime / cl.frametime;
+        cl.serverdelta = Q_align(delta, framediv);
+    }
+
+    Com_DPrintf("client framediv=%d time=%d delta=%d\n",
+                framediv, cl.servertime, cl.serverdelta);
+#endif
 }
 
 static void CL_ParseServerData(void)
@@ -615,14 +633,8 @@ static void CL_ParseServerData(void)
     // setup default pmove parameters
     PmoveInit(&cl.pmp);
 
-#if USE_FPS
     // setup default frame times
-    cl.frametime = Com_ComputeFrametime(BASE_FRAMERATE);
-    cl.frametime_inv = cl.frametime.div * BASE_1_FRAMETIME;
-#endif
-    cl.sv_frametime = 100;
-    cl.sv_frametime_inv = 1.0f / cl.sv_frametime;
-    cl.sv_framediv = 1;
+    set_server_fps(BASE_FRAMERATE);
 
     // setup default server state
     cl.serverstate = ss_game;
@@ -702,15 +714,14 @@ static void CL_ParseServerData(void)
         cls.protocolVersion = MSG_ReadWord();
         cl.serverstate = MSG_ReadByte();
         cinematic = cl.serverstate == ss_pic || cl.serverstate == ss_cinematic;
-        // FIXME: These shouldn't really matter, as pmove should be handled by the game/client library...
+        // FIXME: The pmove flags shouldn't really matter, as they should be handled by the game/client library...
         read_q2pro_protocol_flags();
-        cl.csr = cs_remap_rerelease;
-        cl.psFlags |= MSG_PS_RERELEASE;
-        cl.esFlags |= MSG_ES_RERELEASE;
+        if (cl.is_rerelease_game)
+            cl.csr = cs_remap_rerelease;
+        cl.psFlags |= MSG_PS_RERELEASE | MSG_PS_EXTENSIONS;
+        cl.esFlags |= MSG_ES_RERELEASE | CL_ES_EXTENDED_MASK;
         int32_t rate = MSG_ReadByte();
-        cl.sv_frametime = (1.0f / rate) * 1000;
-        cl.sv_frametime_inv = 1.0f / cl.sv_frametime;
-        cl.sv_framediv = rate / 10;
+        set_server_fps(rate);
 
         cl.pmp.speedmult = 2;
         cl.pmp.flyhack = true; // fly hack is unconditionally enabled
@@ -727,7 +738,7 @@ static void CL_ParseServerData(void)
     cls.demo.esFlags = cl.csr.extended ? CL_ES_EXTENDED_MASK : 0;
 
     // Load cgame (after we know all the timings)
-    CG_Load(cl.gamedir);
+    CG_Load(cl.gamedir, cl.is_rerelease_game);
     cgame->Init();
 
     if (cinematic) {
@@ -1239,23 +1250,6 @@ static void CL_ParseZPacket(void)
               "but no zlib support linked in.");
 #endif
 }
-
-#if USE_FPS
-static void set_server_fps(int value)
-{
-    cl.frametime = Com_ComputeFrametime(value);
-    cl.frametime_inv = cl.frametime.div * BASE_1_FRAMETIME;
-
-    // fix time delta
-    if (cls.state == ca_active) {
-        int delta = cl.frame.number - cl.servertime / cl.frametime.time;
-        cl.serverdelta = Q_align(delta, cl.frametime.div);
-    }
-
-    Com_DPrintf("client framediv=%d time=%d delta=%d\n",
-                cl.frametime.div, cl.servertime, cl.serverdelta);
-}
-#endif
 
 static void CL_ParseSetting(void)
 {

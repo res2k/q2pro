@@ -182,6 +182,9 @@ static const al_reverb_environment_t  *s_reverb_active_environment;
 
 static bool AL_EstimateDimensions(void)
 {
+    if (!s_reverb_environments)
+        return false;
+
     if (s_reverb_probe_time > cl.time)
         return false;
 
@@ -232,6 +235,9 @@ static bool AL_EstimateDimensions(void)
 
 static void AL_UpdateReverb(void)
 {
+    if (!s_reverb_environments)
+        return;
+
     if (!cl.bsp)
         return;
 
@@ -581,6 +587,11 @@ static void AL_LoadReverbEnvironments(void)
     t++;
 
     n = t->size;
+    if (n == 0) {
+        s_reverb_environments = NULL;
+        s_num_reverb_environments = 0;
+        goto free_temp;
+    }
     JSON_ENSURE_NEXT(JSMN_ARRAY);
 
     environments = Z_TagMallocz(sizeof(al_reverb_environment_t) * n, TAG_SOUND);
@@ -1202,7 +1213,10 @@ static void AL_EndRegistration(void)
     s_num_reverb_environments = 0;
 
     AL_LoadReverbEnvironments();
-    
+
+    if (!s_reverb_environments)
+        return;
+
     s_reverb_current_preset = 19;
     memcpy(&s_active_reverb, &s_reverb_parameters[s_reverb_current_preset], sizeof(s_active_reverb));
     AL_LoadEffect(&s_active_reverb);

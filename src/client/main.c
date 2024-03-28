@@ -19,6 +19,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "client.h"
 
+#include "q2proto/q2proto.h"
+
 cvar_t  *rcon_address;
 
 cvar_t  *cl_noskins;
@@ -1214,7 +1216,7 @@ static void CL_ConnectionlessPacket(void)
 {
     char    string[MAX_STRING_CHARS];
     char    *s, *c;
-    int     i, j, k;
+    int     i, j;
 
     MSG_BeginReading();
     MSG_ReadLong(); // skip the -1
@@ -1232,8 +1234,6 @@ static void CL_ConnectionlessPacket(void)
 
     // challenge from the server we are connecting to
     if (!strcmp(c, "challenge")) {
-        int mask = 0;
-
         if (cls.state < ca_challenging) {
             Com_DPrintf("Challenge received while not connecting.  Ignored.\n");
             return;
@@ -1247,54 +1247,31 @@ static void CL_ConnectionlessPacket(void)
             return;
         }
 
-        cls.challenge = Q_atoi(Cmd_Argv(1));
         cls.state = ca_connecting;
         cls.connect_time -= CONNECT_INSTANT; // fire immediately
         //cls.connect_count = 0;
 
-        // parse additional parameters
-        j = Cmd_Argc();
-        for (i = 2; i < j; i++) {
-            s = Cmd_Argv(i);
-            if (!strncmp(s, "p=", 2)) {
-                s += 2;
-                while (*s) {
-                    k = strtoul(s, &s, 10);
-                    if (k == PROTOCOL_VERSION_R1Q2) {
-                        mask |= 1;
-                    } else if (k == PROTOCOL_VERSION_Q2PRO) {
-                        mask |= 2;
-                    }
-                    s = strchr(s, ',');
-                    if (s == NULL) {
-                        break;
-                    }
-                    s++;
-                }
+        q2proto_challenge_t challenge;
+        q2proto_error_t parse_err;
+        if (cls.serverProtocol != 0) {
+            // Restrict accepted protocols if one was explicitly specified
+            q2proto_protocol_t accepted_protocol = q2proto_protocol_from_netver(cls.serverProtocol);
+            if (accepted_protocol == Q2P_PROTOCOL_INVALID) {
+                Com_EPrintf("Invalid protocol %d\n", cls.serverProtocol);
+                return;
             }
+            parse_err = q2proto_parse_challenge(Cmd_Args(), &accepted_protocol, 1, &challenge);
+        } else {
+            parse_err = q2proto_parse_challenge(Cmd_Args(), q2proto_vanilla_protocols, q2proto_num_vanilla_protocols, &challenge);
+        }
+        if (parse_err != Q2P_ERR_SUCCESS) {
+            Com_DPrintf("Challenge parse error %d.  Ignored.\n", parse_err);
+            return;
         }
 
-        if (!cls.serverProtocol) {
-            cls.serverProtocol = PROTOCOL_VERSION_Q2PRO;
-        }
+        cls.challenge = challenge.challenge;
+        cls.serverProtocol = q2proto_get_protocol_netver(challenge.server_protocol);
 
-        // choose supported protocol
-        switch (cls.serverProtocol) {
-        case PROTOCOL_VERSION_Q2PRO:
-            if (mask & 2) {
-                break;
-            }
-            cls.serverProtocol = PROTOCOL_VERSION_R1Q2;
-            // fall through
-        case PROTOCOL_VERSION_R1Q2:
-            if (mask & 1) {
-                break;
-            }
-            // fall through
-        default:
-            cls.serverProtocol = PROTOCOL_VERSION_DEFAULT;
-            break;
-        }
         Com_DPrintf("Selected protocol %d\n", cls.serverProtocol);
 
         CL_CheckForResend();

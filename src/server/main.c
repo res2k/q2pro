@@ -19,6 +19,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "server.h"
 #include "client/input.h"
 #include "server/nav.h"
+#include "q2proto/q2proto.h"
 
 master_t    sv_masters[MAX_MASTERS];   // address of group servers
 
@@ -111,6 +112,8 @@ cvar_t  *sv_tick_rate;
 cvar_t  *g_features;
 
 static bool     sv_registered;
+
+static const q2proto_protocol_t q2repro_accepted_protocols[] = {Q2P_PROTOCOL_Q2REPRO};
 
 //============================================================================
 
@@ -605,9 +608,12 @@ static void SVC_GetChallenge(void)
         svs.challenges[i].time = com_eventTime;
     }
 
+    char challenge_extra[64];
+    q2proto_get_challenge_extras(challenge_extra, sizeof(challenge_extra), q2repro_accepted_protocols, q_countof(q2repro_accepted_protocols));
+
     // send it back
     Netchan_OutOfBand(NS_SERVER, &net_from,
-                      "challenge %u p=%d", challenge, PROTOCOL_VERSION_RERELEASE);
+                      "challenge %u %s", challenge, challenge_extra);
 }
 
 /*

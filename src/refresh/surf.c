@@ -639,7 +639,6 @@ static void build_surface_poly(mface_t *surf, vec_t *vbo, size_t normal_index)
     maxs[0] = maxs[1] = -99999;
 
     src_surfedge = surf->firstsurfedge;
-
     for (i = 0; i < surf->numsurfedges; i++) {
         src_edge = bsp->edges + src_surfedge->edge;
         src_vert = bsp->vertices + src_edge->v[src_surfedge->vert];

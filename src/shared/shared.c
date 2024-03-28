@@ -488,6 +488,7 @@ char *COM_ParseEx(const char **data_p, int32_t flags, char *output, size_t outpu
     char        *s = output;
 
     data = *data_p;
+    len = 0;
     s[0] = 0;
 
     if (!data) {
@@ -525,8 +526,6 @@ skipwhite:
         }
         goto skipwhite;
     }
-
-    len = 0;
 
 // handle quoted strings specially
     if (c == '\"') {

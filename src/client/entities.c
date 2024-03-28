@@ -1069,6 +1069,21 @@ static int shell_effect_hack(void)
     return flags;
 }
 
+static float player_alpha_hack(void)
+{
+    centity_t   *ent;
+    int         flags = 0;
+
+    ent = &cl_entities[cl.frame.clientNum + 1];
+    if (ent->serverframe != cl.frame.number)
+        return 1.0f;
+
+    if (!ent->current.modelindex || !ent->current.alpha)
+        return 1.0f;
+
+    return LERP(ent->prev.alpha, ent->current.alpha, cl.lerpfrac);
+}
+
 /*
 ==============
 CL_AddViewWeapon
@@ -1155,6 +1170,12 @@ static void CL_AddViewWeapon(void)
     if (cl_gunalpha->value != 1) {
         gun.alpha = Cvar_ClampValue(cl_gunalpha, 0.1f, 1.0f);
         gun.flags |= RF_TRANSLUCENT;
+    } else {
+        gun.alpha = player_alpha_hack();
+
+        if (gun.alpha != 1.0f) {
+            gun.flags |= RF_TRANSLUCENT;
+        }
     }
 
     V_AddEntity(&gun);
@@ -1174,30 +1195,30 @@ static void CL_AddViewWeapon(void)
     if (cl.time - cl.weapon.muzzle.time > 50) {
         cl.weapon.muzzle.model = 0;
         return;
-}
+    }
 
-            gun.flags = RF_FULLBRIGHT | RF_DEPTHHACK | RF_WEAPONMODEL | RF_TRANSLUCENT;
-            gun.alpha = 1.0f;
+    gun.flags = RF_FULLBRIGHT | RF_DEPTHHACK | RF_WEAPONMODEL | RF_TRANSLUCENT;
+    gun.alpha = 1.0f;
     gun.model = cl.weapon.muzzle.model;
     gun.skinnum = 0;
     gun.scale = cl.weapon.muzzle.scale;
     gun.backlerp = 0.0f;
     gun.frame = gun.oldframe = 0;
-            gun.backlerp = 0.f;
-            gun.frame = gun.oldframe = 0;
+    gun.backlerp = 0.f;
+    gun.frame = gun.oldframe = 0;
 
-            vec3_t forward, right, up;
-            AngleVectors(gun.angles, forward, right, up);
+    vec3_t forward, right, up;
+    AngleVectors(gun.angles, forward, right, up);
 
     VectorMA(gun.origin, cl.weapon.muzzle.offset[0], forward, gun.origin);
     VectorMA(gun.origin, cl.weapon.muzzle.offset[1], right, gun.origin);
     VectorMA(gun.origin, cl.weapon.muzzle.offset[2], up, gun.origin);
 
-            VectorCopy(cl.refdef.viewangles, gun.angles);
+    VectorCopy(cl.refdef.viewangles, gun.angles);
     gun.angles[2] += cl.weapon.muzzle.roll;
             
-            V_AddEntity(&gun);
-        }
+    V_AddEntity(&gun);
+}
 
 static void CL_SetupFirstPersonView(void)
 {

@@ -558,7 +558,7 @@ static void draw_alias_mesh(const QGL_INDEX_TYPE *indices, int num_indices,
         GL_StateBits(GLS_DEFAULT);
         GL_ArrayBits(GLA_VERTEX);
         GL_BindTexture(0, TEXNUM_WHITE);
-        GL_VertexPointer(3, dotshading ? VERTEX_SIZE : 4, tess.vertices);
+        GL_VertexPointer(3, dotshading ? VERTEX_SIZE : 8, tess.vertices);
         qglColorMask(0, 0, 0, 0);
         qglDrawElements(GL_TRIANGLES, num_indices, QGL_INDEX_ENUM, indices);
         qglColorMask(1, 1, 1, 1);
@@ -667,6 +667,7 @@ static void tess_shade_skel(const md5_mesh_t *mesh, const md5_joint_t *skeleton)
         dst_vert[5] = color[1] * d;
         dst_vert[6] = color[2] * d;
         dst_vert[7] = color[3];
+
         dst_vert += VERTEX_SIZE;
     }
 }

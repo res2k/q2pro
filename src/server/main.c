@@ -18,6 +18,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "server.h"
 #include "client/input.h"
+#include "q2proto/q2proto.h"
 
 master_t    sv_masters[MAX_MASTERS];   // address of group servers
 
@@ -602,9 +603,12 @@ static void SVC_GetChallenge(void)
         svs.challenges[i].time = com_eventTime;
     }
 
+    char challenge_extra[64];
+    q2proto_get_challenge_extras(challenge_extra, sizeof(challenge_extra), q2proto_vanilla_protocols, q2proto_num_vanilla_protocols);
+
     // send it back
     Netchan_OutOfBand(NS_SERVER, &net_from,
-                      "challenge %u p=34,35,36", challenge);
+                      "challenge %u %s", challenge, challenge_extra);
 }
 
 /*

@@ -895,7 +895,6 @@ static bool MOD_LoadMD5Mesh(model_t *model, const char *path)
     MD5_ENSURE(num_joints, "no joints");
     MD5_ENSURE(num_joints <= MD5_MAX_JOINTS, "too many joints");
     OOM_CHECK(mdl->base_skeleton = MD5_Malloc(num_joints * sizeof(mdl->base_skeleton[0])));
-    OOM_CHECK(mdl->jointnames = MD5_Malloc(num_joints * sizeof(mdl->jointnames[0])));
     mdl->num_joints = num_joints;
 
     MD5_EXPECT("numMeshes");
@@ -911,7 +910,7 @@ static bool MOD_LoadMD5Mesh(model_t *model, const char *path)
     for (i = 0; i < num_joints; i++) {
         md5_joint_t *joint = &mdl->base_skeleton[i];
 
-        Q_strlcpy(mdl->jointnames[i], COM_Parse(&s), sizeof(mdl->jointnames[0]));
+        COM_Parse(&s); // ignore name
 
         uint32_t parent;
         MD5_UINT(&parent);
@@ -1029,6 +1028,7 @@ fail:
 }
 
 typedef struct {
+    char name[MD5_MAX_JOINTNAME];
     uint32_t parent;
     uint32_t flags;
     uint32_t start_index;
@@ -1119,7 +1119,7 @@ static void MOD_LoadMD5Scale(md5_model_t *model, const char *path, joint_info_t 
             break;
 
         for (int i = 0; i < model->num_joints; i++) {
-            if (!strcmp(tok, model->jointnames[i])) {
+            if (!strcmp(tok, joint_infos[i].name)) {
                 joint_id = i;
                 break;
             }
@@ -1222,7 +1222,7 @@ static bool MOD_LoadMD5Anim(model_t *model, const char *path, const char *base_p
     for (i = 0; i < mdl->num_joints; ++i) {
         joint_info_t *joint_info = &joint_infos[i];
 
-        COM_Parse(&s); // ignore name
+        Q_strlcpy(joint_info->name, COM_Parse(&s), sizeof(joint_info->name));
 
         MD5_UINT(&joint_info->parent);
         MD5_UINT(&joint_info->flags);

@@ -303,10 +303,17 @@ static int entitycmpfnc(const void *_a, const void *_b)
 {
     const entity_t *a = (const entity_t *)_a;
     const entity_t *b = (const entity_t *)_b;
+    
+    bool a_shell = a->flags & (RF_SHELL_MASK);
+    bool b_shell = b->flags & (RF_SHELL_MASK);
 
     // all other models are sorted by model then skin
-    if (a->model == b->model)
-        return a->skin - b->skin;
+    if (a->model == b->model) {
+        if (a_shell == b_shell)
+            return a->skin - b->skin;
+        else
+            return a_shell - b_shell;
+    }
     else
         return a->model - b->model;
 }

@@ -1032,7 +1032,7 @@ typedef struct {
     uint32_t parent;
     uint32_t flags;
     uint32_t start_index;
-    bool scale_positions;
+    bool scale_pos;
 } joint_info_t;
 
 typedef struct {
@@ -1053,7 +1053,6 @@ static void MD5_BuildFrameSkeleton(const joint_info_t *joint_infos,
 {
     for (int i = 0; i < num_joints; i++) {
         const baseframe_joint_t *baseJoint = &base_frame[i];
-        bool scale_positions = joint_infos[i].scale_positions;
         float components[7];
 
         float *animated_position = components + 0;
@@ -1073,12 +1072,12 @@ static void MD5_BuildFrameSkeleton(const joint_info_t *joint_infos,
         // parent should already be calculated
         md5_joint_t *thisJoint = &skeleton_frame[i];
 
+        if (joint_infos[i].scale_pos)
+            VectorScale(animated_position, thisJoint->scale, animated_position);
+
         int parent = thisJoint->parent = (int32_t)joint_infos[i].parent;
         if (parent < 0) {
             VectorCopy(animated_position, thisJoint->pos);
-            if (scale_positions) {
-                VectorScale(animated_position, thisJoint->scale, animated_position);
-            }
             Vector4Copy(animated_quat, thisJoint->orient);
             continue;
         }
@@ -1088,9 +1087,6 @@ static void MD5_BuildFrameSkeleton(const joint_info_t *joint_infos,
         // add positions
         vec3_t rotated_pos;
         Quat_RotatePoint(parentJoint->orient, animated_position, rotated_pos);
-        if (scale_positions) {
-            VectorScale(rotated_pos, thisJoint->scale, rotated_pos);
-        }
         VectorAdd(rotated_pos, parentJoint->pos, thisJoint->pos);
 
         // concat rotations
@@ -1099,9 +1095,10 @@ static void MD5_BuildFrameSkeleton(const joint_info_t *joint_infos,
     }
 }
 
-// icky icky ""JSON"" parser. it works for re-release *.md5scale files, and I
-// don't care about anything else...
-static void MOD_LoadMD5Scale(md5_model_t *model, joint_info_t *joint_infos, const char *path)
+/**
+ * Parse some JSON vomit. Don't ask.
+ */
+static void MOD_LoadMD5Scale(md5_model_t *model, const char *path, joint_info_t *joint_infos)
 {
     void *buffer;
     const char *s;
@@ -1115,7 +1112,7 @@ static void MOD_LoadMD5Scale(md5_model_t *model, joint_info_t *joint_infos, cons
     MD5_EXPECT("{");
     while (s) {
         int joint_id = -1;
-        char *tok;
+        char *tok, *tok2;
 
         tok = COM_Parse(&s);
         if (!strcmp(tok, "}"))
@@ -1140,36 +1137,22 @@ static void MOD_LoadMD5Scale(md5_model_t *model, joint_info_t *joint_infos, cons
                 break;
             MD5_EXPECT(":");
 
-            if (!strncmp(tok, "scale_positions", 15)) {
-                tok = COM_Parse(&s);
-                if (!strcmp(tok, "true") || !strcmp(tok, "true,")) {
-                    joint_infos[joint_id].scale_positions = true;
-                } else {
-                    MD5_ERROR(va("expected true, got %s", tok));
-                }
-                continue;
-            }
-
-            char *endptr;
-            unsigned frame_id = strtoul(tok, &endptr, 10);
-
-            // failed to parse number; check the key
-            if (endptr == tok) {
-                Com_WPrintf("Failed to parse a frame id in joint id %d in %s\n", joint_id, path);
-                continue;
-            }
-
-            float scale = strtof(COM_Parse(&s), NULL);
-
+            tok2 = COM_Parse(&s);
             if (joint_id == -1)
                 continue;
 
+            if (!strcmp(tok, "scale_positions")) {
+                joint_infos[joint_id].scale_pos = !strncmp(tok2, "true", 4);
+                continue;
+            }
+
+            unsigned frame_id = Q_atoi(tok);
             if (frame_id >= model->num_frames) {
                 Com_WPrintf("No such frame %d in %s\n", frame_id, path);
                 continue;
             }
 
-            model->skeleton_frames[(frame_id * model->num_joints) + joint_id].scale = scale;
+            model->skeleton_frames[frame_id * model->num_joints + joint_id].scale = strtof(tok2, NULL);
         }
     }
 
@@ -1195,7 +1178,6 @@ static bool MOD_LoadMD5Anim(model_t *model, const char *path, const char *base_p
     int i, j, ret;
     void *buffer;
     const char *s;
-    char scale_path[MAX_QPATH];
 
     ret = FS_LoadFile(path, &buffer);
     if (!buffer)
@@ -1245,7 +1227,8 @@ static bool MOD_LoadMD5Anim(model_t *model, const char *path, const char *base_p
         MD5_UINT(&joint_info->parent);
         MD5_UINT(&joint_info->flags);
         MD5_UINT(&joint_info->start_index);
-        joint_info->scale_positions = false;
+
+        joint_info->scale_pos = false;
 
         // validate animated components
         int num_components = 0;
@@ -1293,12 +1276,17 @@ static bool MOD_LoadMD5Anim(model_t *model, const char *path, const char *base_p
 
     OOM_CHECK(mdl->skeleton_frames = MD5_Malloc(sizeof(mdl->skeleton_frames[0]) * mdl->num_frames * mdl->num_joints));
 
-    // initialize scales & load
+    // initialize scales
     for (i = 0; i < mdl->num_frames * mdl->num_joints; i++)
         mdl->skeleton_frames[i].scale = 1.0f;
 
-    if (Q_concat(scale_path, sizeof(scale_path), base_path, "md5/", model_name, ".md5scale") < sizeof(scale_path))
-        MOD_LoadMD5Scale(model->skeleton, joint_infos, scale_path);
+    // load scales
+    char scale_path[MAX_QPATH];
+    if (COM_StripExtension(scale_path, path, sizeof(scale_path)) < sizeof(scale_path) &&
+        Q_strlcat(scale_path, ".md5scale", sizeof(scale_path)) < sizeof(scale_path))
+        MOD_LoadMD5Scale(model->skeleton, scale_path, joint_infos);
+    else
+        Com_WPrintf("MD5 scale path too long: %s\n", scale_path);
 
     for (i = 0; i < mdl->num_frames; i++) {
         MD5_EXPECT("frame");
@@ -1370,7 +1358,6 @@ static void MOD_LoadMD5(model_t *model)
     }
 
     Hunk_End(&model->skeleton_hunk);
-
     return;
 
 fail:

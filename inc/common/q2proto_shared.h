@@ -46,6 +46,7 @@ extern q2protoio_ioarg_t default_q2protoio_ioarg;
 
 #if USE_CLIENT
 #define Q2PROTO_IOARG_CLIENT_READ   _Q2PROTO_IOARG_DEFAULT
+#define Q2PROTO_IOARG_CLIENT_WRITE  _Q2PROTO_IOARG_DEFAULT
 #endif
 
 extern bool nonfatal_client_read_errors;

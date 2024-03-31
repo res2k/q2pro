@@ -929,6 +929,75 @@ static inline bool ready_to_send_hacked(void)
     return ready_to_send();
 }
 
+static void compute_buttons_upmove(int *buttons, short *upmove)
+{
+    int prev_buttons = *buttons;
+    *buttons = prev_buttons & ~(BUTTON_CROUCH | BUTTON_JUMP);
+    *upmove = 0;
+    if (prev_buttons & BUTTON_JUMP)
+        *upmove += 200; /* cl_upspeed */
+    if (prev_buttons & BUTTON_CROUCH)
+        *upmove -= 200; /* cl_upspeed */
+}
+
+static void build_delta_move(q2proto_clc_move_delta_t* delta_move, const usercmd_t *from, const usercmd_t *cmd, uint8_t lightlevel)
+{
+    Q_assert(cmd);
+
+    if (!from) {
+        from = &nullUserCmd;
+    }
+
+    bool needs_upmove = cls.q2proto_ctx.features.has_upmove;
+
+    int from_buttons = from->buttons;
+    short from_upmove = 0;
+    int new_buttons = cmd->buttons;
+    short new_upmove = 0;
+    if (needs_upmove) {
+        from_buttons &= ~BUTTON_HOLSTER;
+        new_buttons &= ~BUTTON_HOLSTER;
+        compute_buttons_upmove(&from_buttons, &from_upmove);
+        compute_buttons_upmove(&new_buttons, &new_upmove);
+    }
+
+//
+// send the movement message
+//
+    if (cmd->angles[0] != from->angles[0]) {
+        q2proto_var_angles_set_float_comp(&delta_move->angles, 0, cmd->angles[0]);
+        delta_move->delta_bits |= Q2P_CMD_ANGLE0;
+    }
+    if (cmd->angles[1] != from->angles[1]) {
+        q2proto_var_angles_set_float_comp(&delta_move->angles, 1, cmd->angles[1]);
+        delta_move->delta_bits |= Q2P_CMD_ANGLE1;
+    }
+    if (cmd->angles[2] != from->angles[2]) {
+        q2proto_var_angles_set_float_comp(&delta_move->angles, 2, cmd->angles[2]);
+        delta_move->delta_bits |= Q2P_CMD_ANGLE2;
+    }
+    if (cmd->forwardmove != from->forwardmove) {
+        q2proto_var_coords_set_float_comp(&delta_move->move, 0, cmd->forwardmove);
+        delta_move->delta_bits |= Q2P_CMD_MOVE_FORWARD;
+    }
+    if (cmd->sidemove != from->sidemove) {
+        q2proto_var_coords_set_float_comp(&delta_move->move, 1, cmd->sidemove);
+        delta_move->delta_bits |= Q2P_CMD_MOVE_SIDE;
+    }
+    // The next one can only happen when is_rerelease == false
+    if (new_upmove != from_upmove) {
+        q2proto_var_coords_set_float_comp(&delta_move->move, 2, new_upmove);
+        delta_move->delta_bits |= Q2P_CMD_MOVE_UP;
+    }
+    if (new_buttons != from_buttons) {
+        delta_move->buttons = new_buttons;
+        delta_move->delta_bits |= Q2P_CMD_BUTTONS;
+    }
+
+    delta_move->msec = cmd->msec;
+    delta_move->lightlevel = lightlevel;
+}
+
 /*
 =================
 CL_SendDefaultCmd
@@ -937,10 +1006,8 @@ CL_SendDefaultCmd
 static void CL_SendDefaultCmd(void)
 {
     int cursize q_unused;
-    uint32_t checksumIndex;
     usercmd_t *cmd, *oldcmd;
     client_history_t *history;
-    int version;
 
     // archive this packet
     history = &cl.history[cls.netchan.outgoing_sequence & CMD_MASK];
@@ -960,49 +1027,32 @@ static void CL_SendDefaultCmd(void)
     cl.lastTransmitCmdNumberReal = cl.cmdNumber;
 
     // begin a client move command
-    MSG_WriteByte(clc_move);
-
-    // save the position for a checksum byte
-    checksumIndex = 0;
-    version = 0;
-    if (cls.serverProtocol <= PROTOCOL_VERSION_DEFAULT) {
-        checksumIndex = msg_write.cursize;
-        SZ_GetSpace(&msg_write, 1);
-    } else if (cls.serverProtocol == PROTOCOL_VERSION_R1Q2) {
-        version = cls.protocolVersion;
-    }
+    q2proto_clc_message_t move_message = {.type = Q2P_CLC_MOVE};
 
     // let the server know what the last frame we
     // got was, so the next message can be delta compressed
     if (cl_nodelta->integer || !cl.frame.valid /*|| cls.demowaiting*/) {
-        MSG_WriteLong(-1);   // no compression
+        move_message.move.lastframe = -1;   // no compression
     } else {
-        MSG_WriteLong(cl.frame.number);
+        move_message.move.lastframe = cl.frame.number;
     }
 
     // send this and the previous cmds in the message, so
     // if the last packet was dropped, it can be recovered
     cmd = &cl.cmds[(cl.cmdNumber - 2) & CMD_MASK];
-    MSG_WriteDeltaUsercmd(NULL, cmd, cls.serverProtocol, version);
-    MSG_WriteByte(cl.lightlevel);
+    build_delta_move(&move_message.move.moves[0], NULL, cmd, cl.lightlevel);
     oldcmd = cmd;
 
     cmd = &cl.cmds[(cl.cmdNumber - 1) & CMD_MASK];
-    MSG_WriteDeltaUsercmd(oldcmd, cmd, cls.serverProtocol, version);
-    MSG_WriteByte(cl.lightlevel);
+    build_delta_move(&move_message.move.moves[1], oldcmd, cmd, cl.lightlevel);
     oldcmd = cmd;
 
     cmd = &cl.cmds[cl.cmdNumber & CMD_MASK];
-    MSG_WriteDeltaUsercmd(oldcmd, cmd, cls.serverProtocol, version);
-    MSG_WriteByte(cl.lightlevel);
+    build_delta_move(&move_message.move.moves[2], oldcmd, cmd, cl.lightlevel);
 
-    if (cls.serverProtocol <= PROTOCOL_VERSION_DEFAULT) {
-        // calculate a checksum over the move commands
-        msg_write.data[checksumIndex] = COM_BlockSequenceCRCByte(
-            msg_write.data + checksumIndex + 1,
-            msg_write.cursize - checksumIndex - 1,
-            cls.netchan.outgoing_sequence);
-    }
+    move_message.move.sequence = cls.netchan.outgoing_sequence;
+
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &move_message);
 
     P_FRAMES++;
 
@@ -1032,7 +1082,6 @@ static void CL_SendBatchedCmd(void)
     int cursize q_unused;
     usercmd_t *cmd, *oldcmd;
     client_history_t *history, *oldest;
-    byte *patch;
 
     // see if we are ready to send this packet
     if (!ready_to_send()) {
@@ -1050,36 +1099,24 @@ static void CL_SendBatchedCmd(void)
     cl.lastTransmitCmdNumber = cl.cmdNumber;
     cl.lastTransmitCmdNumberReal = cl.cmdNumber;
 
-    MSG_BeginWriting();
-
-    // begin a client move command
-    patch = SZ_GetSpace(&msg_write, 1);
-
-    // let the server know what the last frame we
-    // got was, so the next message can be delta compressed
+    q2proto_clc_message_t move_message = {.type = Q2P_CLC_BATCH_MOVE, .batch_move = {0}};
     if (cl_nodelta->integer || !cl.frame.valid /*|| cls.demowaiting*/) {
-        *patch = clc_move_nodelta; // no compression
+        move_message.batch_move.lastframe = -1; // no compression
     } else {
-        *patch = clc_move_batched;
-        MSG_WriteLong(cl.frame.number);
+        move_message.batch_move.lastframe = cl.frame.number;
     }
 
     Cvar_ClampInteger(cl_packetdup, 0, MAX_PACKET_FRAMES - 1);
     numDups = cl_packetdup->integer;
 
-    if(cls.serverProtocol == PROTOCOL_VERSION_RERELEASE)
-        MSG_WriteByte(numDups);
-    else
-        *patch |= numDups << SVCMD_BITS;
-
-    // send lightlevel
-    MSG_WriteByte(cl.lightlevel);
+    move_message.batch_move.num_dups = numDups;
 
     // send this and the previous cmds in the message, so
     // if the last packet was dropped, it can be recovered
     oldcmd = NULL;
     totalCmds = 0;
     totalMsec = 0;
+    q2proto_clc_batch_move_frame_t *frame = move_message.batch_move.batch_frames;
     for (i = seq - numDups; i <= seq; i++) {
         oldest = &cl.history[(i - 1) & CMD_MASK];
         history = &cl.history[i & CMD_MASK];
@@ -1091,21 +1128,20 @@ static void CL_SendBatchedCmd(void)
             break;
         }
         totalCmds += numCmds;
-        MSG_WriteBits(numCmds, 5);
+        frame->num_cmds = numCmds;
+        // MSG_WriteBits(numCmds, 5);
+        q2proto_clc_move_delta_t *move = frame->moves;
         for (j = oldest->cmdNumber + 1; j <= history->cmdNumber; j++) {
             cmd = &cl.cmds[j & CMD_MASK];
             totalMsec += cmd->msec;
-            bits = MSG_WriteDeltaUsercmd_Enhanced(oldcmd, cmd, cls.serverProtocol);
-#if USE_DEBUG
-            if (cl_showpackets->integer == 3) {
-                MSG_ShowDeltaUsercmdBits_Enhanced(bits);
-            }
-#endif
+            build_delta_move(move, oldcmd, cmd, cl.lightlevel);
             oldcmd = cmd;
+            ++move;
         }
+        ++frame;
     }
 
-    MSG_FlushBits();
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &move_message);
 
     P_FRAMES++;
 
@@ -1158,22 +1194,25 @@ static void CL_SendUserinfo(void)
     if (cls.userinfo_modified == MAX_PACKET_USERINFOS) {
         size_t len = Cvar_BitInfo(userinfo, CVAR_USERINFO);
         Com_DDPrintf("%s: %u: full update\n", __func__, com_framenum);
-        MSG_WriteByte(clc_userinfo);
-        MSG_WriteData(userinfo, len + 1);
+        q2proto_clc_message_t message = {.type = Q2P_CLC_USERINFO};
+        message.userinfo.str.str = userinfo;
+        message.userinfo.str.len = len;
+        q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
         MSG_FlushTo(&cls.netchan.message);
-    } else if (cls.serverProtocol == PROTOCOL_VERSION_Q2PRO || cls.serverProtocol == PROTOCOL_VERSION_RERELEASE) {
+    } else if (cls.q2proto_ctx.features.userinfo_delta) {
         Com_DDPrintf("%s: %u: %d updates\n", __func__, com_framenum,
                      cls.userinfo_modified);
+        q2proto_clc_message_t message = {.type = Q2P_CLC_USERINFO_DELTA};
         for (i = 0; i < cls.userinfo_modified; i++) {
             var = cls.userinfo_updates[i];
-            MSG_WriteByte(clc_userinfo_delta);
-            MSG_WriteString(var->name);
+            message.userinfo_delta.name = q2proto_make_string(var->name);
             if (var->flags & CVAR_USERINFO) {
-                MSG_WriteString(var->string);
+                message.userinfo_delta.value = q2proto_make_string(var->string);
             } else {
                 // no longer in userinfo
-                MSG_WriteString(NULL);
+                message.userinfo_delta.value.len = 0;
             }
+            q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
         }
         MSG_FlushTo(&cls.netchan.message);
     } else {
@@ -1231,7 +1270,7 @@ void CL_SendCmd(void)
     // send a userinfo update if needed
     CL_SendReliable();
 
-    if ((cls.serverProtocol == PROTOCOL_VERSION_Q2PRO || cls.serverProtocol == PROTOCOL_VERSION_RERELEASE) && cl_batchcmds->integer) {
+    if (cls.q2proto_ctx.features.batch_move && cl_batchcmds->integer) {
         CL_SendBatchedCmd();
     } else {
         CL_SendDefaultCmd();

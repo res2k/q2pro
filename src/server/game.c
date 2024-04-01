@@ -623,13 +623,14 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
         msg = LIST_FIRST(message_packet_t, &client->msg_free_list, entry);
 
         msg->cursize = SOUND_PACKET;
-        msg->flags = flags;
-        msg->index = soundindex;
-        msg->volume = vol;
-        msg->attenuation = att;
-        msg->timeofs = ofs;
-        msg->sendchan = sendchan;
-        VectorCopy(origin, msg->pos);
+        msg->sound.flags = flags;
+        msg->sound.index = soundindex;
+        msg->sound.volume = vol;
+        msg->sound.attenuation = att;
+        msg->sound.timeofs = ofs;
+        msg->sound.entity = ent;
+        msg->sound.channel = channel;
+        q2proto_var_coords_set_float(&msg->sound.pos, origin);
 
         List_Remove(&msg->entry);
         List_Append(&client->msg_unreliable_list, &msg->entry);

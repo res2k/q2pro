@@ -753,7 +753,6 @@ extern const game_q2pro_restart_filesystem_t *g_restart_fs;
 
 void SV_InitGameProgs(void);
 void SV_ShutdownGameProgs(void);
-void SV_InitEdict(edict_t *e);
 
 void PF_Pmove(pmove_t *pm);
 

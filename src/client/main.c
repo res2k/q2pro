@@ -1846,7 +1846,7 @@ typedef struct {
 static list_t   cl_ignore_text;
 static list_t   cl_ignore_nick;
 
-static ignore_t *find_ignore(list_t *list, const char *match)
+static ignore_t *find_ignore(const list_t *list, const char *match)
 {
     ignore_t *ignore;
 
@@ -1859,7 +1859,7 @@ static ignore_t *find_ignore(list_t *list, const char *match)
     return NULL;
 }
 
-static void list_ignores(list_t *list)
+static void list_ignores(const list_t *list)
 {
     ignore_t *ignore;
 

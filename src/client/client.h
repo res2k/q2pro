@@ -888,8 +888,8 @@ typedef enum
 void V_Init(void);
 void V_Shutdown(void);
 void V_RenderView(void);
-void V_AddEntity(entity_t *ent);
-void V_AddParticle(particle_t *p);
+void V_AddEntity(const entity_t *ent);
+void V_AddParticle(const particle_t *p);
 void V_AddLight(const vec3_t org, float intensity, float r, float g, float b);
 void V_AddLightStyle(int style, float value);
 void CL_UpdateBlendSetting(void);
@@ -1282,7 +1282,7 @@ void HTTP_CleanupDownloads(void);
 
 #if USE_CLIENT_GTV
 void CL_GTV_EmitFrame(void);
-void CL_GTV_WriteMessage(byte *data, size_t len);
+void CL_GTV_WriteMessage(const byte *data, size_t len);
 void CL_GTV_Resume(void);
 void CL_GTV_Suspend(void);
 void CL_GTV_Transmit(void);
@@ -1303,7 +1303,7 @@ void CL_GTV_Shutdown(void);
 //
 // crc.c
 //
-byte COM_BlockSequenceCRCByte(byte *base, size_t length, int sequence);
+byte COM_BlockSequenceCRCByte(const byte *base, size_t length, int sequence);
 
 //
 // cgame.c

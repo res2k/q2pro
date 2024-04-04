@@ -69,14 +69,13 @@ static void V_ClearScene(void)
     r_numparticles = 0;
 }
 
-
 /*
 =====================
 V_AddEntity
 
 =====================
 */
-void V_AddEntity(entity_t *ent)
+void V_AddEntity(const entity_t *ent)
 {
     if (r_numentities >= MAX_ENTITIES)
     {
@@ -96,14 +95,13 @@ void V_AddEntity(entity_t *ent)
     r_entities[r_numentities++] = *ent;
 }
 
-
 /*
 =====================
 V_AddParticle
 
 =====================
 */
-void V_AddParticle(particle_t *p)
+void V_AddParticle(const particle_t *p)
 {
     if (r_numparticles >= MAX_PARTICLES)
         return;

@@ -38,6 +38,30 @@ common_src = [
   'src/common/features.h',
   'src/shared/shared.c',
 
+  'q2proto/src/dummy_q2protoio_get_error.c',
+  'q2proto/src/dummy_q2protoio_read.c',
+  'q2proto/src/dummy_q2protoio_write.c',
+  'q2proto/src/q2proto_client.c',
+  'q2proto/src/q2proto_coords.c',
+  'q2proto/src/q2proto_crc.c',
+  'q2proto/src/q2proto_internal_common.c',
+  'q2proto/src/q2proto_internal_debug.c',
+  'q2proto/src/q2proto_internal_download.c',
+  'q2proto/src/q2proto_internal_fmt.c',
+  'q2proto/src/q2proto_internal_maybe_zpacket.c',
+  'q2proto/src/q2proto_internal_packing.c',
+  'q2proto/src/q2proto_multicast.c',
+  'q2proto/src/q2proto_proto_q2pro_extdemo.c',
+  'q2proto/src/q2proto_proto_q2pro.c',
+  'q2proto/src/q2proto_proto_q2repro.c',
+  'q2proto/src/q2proto_proto_r1q2.c',
+  'q2proto/src/q2proto_proto_vanilla.c',
+  'q2proto/src/q2proto_protocol.c',
+  'q2proto/src/q2proto_server.c',
+  'q2proto/src/q2proto_solid.c',
+  'q2proto/src/q2proto_sound.c',
+  'q2proto/src/q2proto_string.c',
+
   'inc/shared/atomic.h',
   'inc/shared/base85.h',
   'inc/shared/files.h',
@@ -300,6 +324,7 @@ if win32
 else
   common_args += '-D_GNU_SOURCE'
 endif
+common_args += '-DQ2PROTO_CONFIG_PROVIDED' # TEMPORARY to allow building
 
 engine_args = []
 if win32
@@ -540,7 +565,7 @@ endif
 
 executable('q2pro', common_src, client_src, refresh_src,
   dependencies:          common_deps + client_deps,
-  include_directories:   'inc',
+  include_directories:   ['inc', 'q2proto/inc'],
   gnu_symbol_visibility: 'hidden',
   win_subsystem:         'windows,6.0',
   link_args:             exe_link_args,
@@ -551,7 +576,7 @@ executable('q2pro', common_src, client_src, refresh_src,
 
 executable('q2proded', common_src, server_src,
   dependencies:          common_deps + server_deps,
-  include_directories:   'inc',
+  include_directories:   ['inc', 'q2proto/inc'],
   gnu_symbol_visibility: 'hidden',
   win_subsystem:         'console,6.0',
   link_args:             exe_link_args,

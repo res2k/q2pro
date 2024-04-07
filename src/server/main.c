@@ -1093,6 +1093,9 @@ static void SVC_DirectConnect(void)
     newcl->framediv = sv.frametime.div;
     newcl->settings[CLS_FPS] = BASE_FRAMERATE;
 #endif
+    newcl->q2proto_deflate.z_buffer = svs.z_buffer;
+    newcl->q2proto_deflate.z_buffer_size = svs.z_buffer_size;
+    newcl->q2proto_deflate.z = &svs.z;
 
     q2proto_error_t err = q2proto_init_servercontext(&newcl->q2proto_ctx, &svs.server_info, &parsed_connect);
     if (err != Q2P_ERR_SUCCESS) {

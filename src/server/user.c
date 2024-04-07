@@ -409,6 +409,7 @@ static void SV_BeginDownload_f(void)
     cvar_t  *allow;
     size_t  len;
     qhandle_t f;
+    q2proto_server_download_state_t *download_state_ptr = NULL;
 
     if (Cmd_ArgvBuffer(1, name, sizeof(name)) >= sizeof(name)) {
         goto fail1;
@@ -495,11 +496,16 @@ static void SV_BeginDownload_f(void)
         }
     }
 
-    int err = q2proto_server_download_begin(&sv_client->q2proto_ctx, downloadsize, Q2PROTO_DOWNLOAD_COMPRESS_NEVER, NULL, &sv_client->download_state);
+    q2protoio_deflate_args_t *deflate_args = NULL;
+#if USE_ZLIB
+    deflate_args = &sv_client->q2proto_deflate;
+#endif
+    int err = q2proto_server_download_begin(&sv_client->q2proto_ctx, downloadsize, Q2PROTO_DOWNLOAD_COMPRESS_AUTO, deflate_args, &sv_client->download_state);
     if (err != Q2P_ERR_SUCCESS) {
         Com_DPrintf("Couldn't download %s to %s: q2proto error %d\n", name, sv_client->name, err);
         goto fail1;
     }
+    download_state_ptr = &sv_client->download_state;
 
     maxdownloadsize = MAX_LOADFILE;
     if (sv_max_download_size->integer > 0) {
@@ -547,6 +553,7 @@ static void SV_BeginDownload_f(void)
 
     sv_client->download = download;
     sv_client->download_ptr = (uint8_t *)download + offset;
+    sv_client->download_remaining = downloadsize - offset;
     sv_client->downloadname = SV_CopyString(name);
     sv_client->downloadpending = true;
 
@@ -559,10 +566,10 @@ fail2:
     FS_CloseFile(f);
 fail1:
     q2proto_svc_message_t message = {.type = Q2P_SVC_DOWNLOAD};
-    q2proto_server_download_abort(&sv_client->download_state, &message.download);
+    q2proto_server_download_abort(download_state_ptr, &message.download);
     q2proto_server_write(&sv_client->q2proto_ctx, (uintptr_t)&sv_client->io_data, &message);
     SV_ClientAddMessage(sv_client, MSG_RELIABLE | MSG_CLEAR);
-    q2proto_server_download_end(&sv_client->download_state);
+    q2proto_server_download_end(download_state_ptr);
 }
 
 static void SV_StopDownload_f(void)

@@ -319,6 +319,9 @@ typedef struct client_s {
     char            *downloadname;      // name of the file
     bool            downloadpending;
     q2proto_server_download_state_t download_state;
+#if USE_ZLIB
+    q2protoio_deflate_args_t q2proto_deflate;
+#endif
 
     // protocol stuff
     int             challenge;  // challenge of this user, randomly generated

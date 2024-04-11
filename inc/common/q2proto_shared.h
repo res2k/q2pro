@@ -38,6 +38,7 @@ typedef struct q2protoio_ioarg_s {
     sizebuf_t *sz_read;
     sizebuf_t *sz_write;
     size_t max_msg_len;
+    struct q2protoio_deflate_args_s *deflate;
 } q2protoio_ioarg_t;
 
 extern q2protoio_ioarg_t default_q2protoio_ioarg;

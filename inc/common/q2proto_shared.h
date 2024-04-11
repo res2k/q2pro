@@ -20,10 +20,25 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "q2proto/q2proto.h"
 
+#if USE_ZLIB
+#include <zlib.h>
+
+struct q2protoio_deflate_args_s
+{
+    /// Buffer to store deflated data
+    byte *z_buffer;
+    /// Size of deflated data buffer
+    unsigned z_buffer_size;
+    /// Deflate stream
+    z_streamp z;
+};
+#endif // USE_ZLIB
+
 typedef struct q2protoio_ioarg_s {
     sizebuf_t *sz_read;
     sizebuf_t *sz_write;
     size_t max_msg_len;
+    struct q2protoio_deflate_args_s *deflate;
 } q2protoio_ioarg_t;
 
 extern q2protoio_ioarg_t default_q2protoio_ioarg;

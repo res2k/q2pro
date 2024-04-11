@@ -25,3 +25,4 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define Q2PROTO_RETURN_IO_ERROR_CODES   0
 #define Q2PROTO_ERROR_FEEDBACK          1
 #define Q2PROTO_SHOWNET                 USE_CLIENT && USE_DEBUG
+#define Q2PROTO_COMPRESSION_DEFLATE     USE_ZLIB

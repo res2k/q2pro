@@ -33,8 +33,9 @@ common_src = [
   'src/common/zone.c',
   'src/shared/shared.c',
 
-  'q2proto/src/dummy_q2protoio_get_error.c',
-  'q2proto/src/dummy_q2protoio_read.c',
+  'q2proto/src/dummy_q2protoerr_client_write.c',
+  'q2proto/src/dummy_q2protoerr_server_read.c',
+  'q2proto/src/dummy_q2protoerr_server_write.c',
   'q2proto/src/dummy_q2protoio_write.c',
   'q2proto/src/q2proto_client.c',
   'q2proto/src/q2proto_coords.c',
@@ -56,6 +57,8 @@ common_src = [
   'q2proto/src/q2proto_solid.c',
   'q2proto/src/q2proto_sound.c',
   'q2proto/src/q2proto_string.c',
+
+  'src/common/q2proto-glue.c',
 ]
 
 client_src = [
@@ -220,13 +223,12 @@ if system_wide
   homedir = get_option('homedir')
 endif
 
-common_args = ['-DHAVE_CONFIG_H']
+common_args = ['-DHAVE_CONFIG_H', '-DQ2PROTO_CONFIG_H="common/q2proto_config.h"']
 if win32
   common_args += '-D_USE_MATH_DEFINES'
 else
   common_args += '-D_GNU_SOURCE'
 endif
-common_args += '-DQ2PROTO_CONFIG_PROVIDED' # TEMPORARY to allow building
 
 engine_args = []
 if win32

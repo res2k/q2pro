@@ -1356,6 +1356,7 @@ static void CL_ConnectionlessPacket(void)
         Netchan_Close(&cls.netchan);
         Netchan_Setup(&cls.netchan, NS_CLIENT, type, &cls.serverAddress,
                       cls.quakePort, 1024, cls.serverProtocol);
+        q2proto_init_clientcontext(&cls.q2proto_ctx);
 
 #if USE_AC_CLIENT
         if (anticheat) {

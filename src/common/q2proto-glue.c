@@ -138,6 +138,19 @@ q2proto_error_t q2protoerr_client_read(uintptr_t io_arg, q2proto_error_t err, co
     Com_Error(ERR_DROP, "%s", buf);
 }
 
+q2proto_error_t q2protoerr_client_write(uintptr_t io_arg, q2proto_error_t err, const char *msg, ...)
+{
+    char buf[256];
+    va_list argptr;
+
+    va_start(argptr, msg);
+    Q_vsnprintf(buf, sizeof(buf), msg, argptr);
+    va_end(argptr);
+
+    Com_EPrintf("client write error: %s\n", buf);
+    return err;
+}
+
 q2proto_error_t q2protoerr_server_write(uintptr_t io_arg, q2proto_error_t err, const char *msg, ...)
 {
     char buf[256];

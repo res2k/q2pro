@@ -1491,9 +1491,9 @@ Called to get the sound spatialization origin
 */
 void CL_GetEntitySoundOrigin(unsigned entnum, vec3_t org)
 {
-    centity_t   *ent;
-    mmodel_t    *cm;
-    vec3_t      mid;
+    const centity_t *ent;
+    const mmodel_t  *mod;
+    vec3_t          mid;
 
     if (entnum >= cl.csr.max_edicts)
         Com_Error(ERR_DROP, "%s: bad entity", __func__);
@@ -1511,9 +1511,9 @@ void CL_GetEntitySoundOrigin(unsigned entnum, vec3_t org)
 
     // offset the origin for BSP models
     if (ent->current.solid == PACKED_BSP) {
-        cm = cl.model_clip[ent->current.modelindex];
-        if (cm) {
-            VectorAvg(cm->mins, cm->maxs, mid);
+        mod = cl.model_clip[ent->current.modelindex];
+        if (mod) {
+            VectorAvg(mod->mins, mod->maxs, mid);
             VectorAdd(org, mid, org);
         }
     }

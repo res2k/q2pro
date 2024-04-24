@@ -128,14 +128,12 @@ General purpose routine shared between game DLL and MVD code.
 Links entity to PVS leafs.
 ===============
 */
-void SV_LinkEdict(cm_t *cm, edict_t *ent, server_entity_t* sv_ent)
+void SV_LinkEdict(const cm_t *cm, edict_t *ent, server_entity_t* sv_ent)
 {
-    mleaf_t     *leafs[MAX_TOTAL_ENT_LEAFS];
-    int         clusters[MAX_TOTAL_ENT_LEAFS];
-    int         num_leafs;
-    int         i, j;
-    int         area;
-    mnode_t     *topnode;
+    const mleaf_t   *leafs[MAX_TOTAL_ENT_LEAFS];
+    int             clusters[MAX_TOTAL_ENT_LEAFS];
+    int             i, j, area, num_leafs;
+    const mnode_t   *topnode;
 
     // set the size
     VectorSubtract(ent->maxs, ent->mins, ent->size);
@@ -244,7 +242,7 @@ void PF_UnlinkEdict(edict_t *ent)
     ent->linked = sent->area.prev != NULL;
 }
 
-static uint32_t SV_PackSolid32(edict_t *ent)
+static uint32_t SV_PackSolid32(const edict_t *ent)
 {
     uint32_t solid32;
 
@@ -466,10 +464,10 @@ Returns a headnode that can be used for testing or clipping an
 object of mins/maxs size.
 ================
 */
-static mnode_t *SV_HullForEntity(edict_t *ent, bool triggers)
+static const mnode_t *SV_HullForEntity(const edict_t *ent, bool triggers)
 {
     if (ent->solid == SOLID_BSP || (triggers && ent->solid == SOLID_TRIGGER)) {
-        bsp_t *bsp = sv.cm.cache;
+        const bsp_t *bsp = sv.cm.cache;
         int i = ent->s.modelindex - 1;
 
         // account for "hole" in configstring namespace
@@ -493,7 +491,7 @@ static mnode_t *SV_HullForEntity(edict_t *ent, bool triggers)
 SV_WorldNodes
 =============
 */
-static mnode_t *SV_WorldNodes(void)
+static const mnode_t *SV_WorldNodes(void)
 {
     return sv.cm.cache ? sv.cm.cache->nodes : NULL;
 }

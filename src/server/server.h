@@ -609,7 +609,7 @@ typedef enum {RD_NONE, RD_CLIENT, RD_PACKET} redirect_t;
 
 extern char sv_outputbuf[SV_OUTPUTBUF_LENGTH];
 
-void SV_FlushRedirect(int redirected, char *outputbuf, size_t len);
+void SV_FlushRedirect(int redirected, const char *outputbuf, size_t len);
 
 void SV_SendClientMessages(void);
 void SV_SendAsyncPackets(void);
@@ -786,7 +786,7 @@ void PF_UnlinkEdict(edict_t *ent);
 // call before removing an entity, and before trying to move one,
 // so it doesn't clip against itself
 
-void SV_LinkEdict(cm_t *cm, edict_t *ent, server_entity_t* sv_ent);
+void SV_LinkEdict(const cm_t *cm, edict_t *ent, server_entity_t* sv_ent);
 void PF_LinkEdict(edict_t *ent);
 // Needs to be called any time an entity changes origin, mins, maxs,
 // or solid.  Automatically unlinks if needed.

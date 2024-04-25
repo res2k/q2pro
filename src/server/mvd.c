@@ -1111,10 +1111,13 @@ out-of-band data into the MVD stream.
 /*
 ==============
 SV_MvdMulticast
+
+`to' must be < MULTICAST_ALL_R.
 ==============
 */
-void SV_MvdMulticast(int leafnum, multicast_t to, bool reliable)
+void SV_MvdMulticast(const mleaf_t *leaf, multicast_t to, bool reliable)
 {
+    int         leafnum;
     mvd_ops_t   op;
     sizebuf_t   *buf;
     int         bits;
@@ -1123,17 +1126,27 @@ void SV_MvdMulticast(int leafnum, multicast_t to, bool reliable)
     if (!mvd.active) {
         return;
     }
+
     if (msg_write.cursize >= 2048) {
         Com_WPrintf("%s: overflow\n", __func__);
         return;
     }
-    if (leafnum >= UINT16_MAX) {
-        Com_WPrintf("%s: leafnum out of range\n", __func__);
-        return;
+
+    if (to) {
+        leafnum = CM_NumLeaf(&sv.cm, leaf);
+        if (leafnum >= UINT16_MAX) {
+            Com_WPrintf("%s: leafnum out of range\n", __func__);
+            return;
+        }
     }
 
-    op = mvd_multicast_all + to + (reliable ? 3 : 0);
-    buf = reliable ? &mvd.datagram : &mvd.message;
+    if (reliable) {
+        op = mvd_multicast_all_r + to;
+        buf = &mvd.datagram;
+    } else {
+        op = mvd_multicast_all + to;
+        buf = &mvd.message;
+    }
     bits = (msg_write.cursize >> 8) & 7;
 
     SZ_WriteByte(buf, op | (bits ? 128 : 0));
@@ -1141,7 +1154,7 @@ void SV_MvdMulticast(int leafnum, multicast_t to, bool reliable)
         SZ_WriteByte(buf, bits);
     SZ_WriteByte(buf, msg_write.cursize & 255);
 
-    if (op != mvd_multicast_all && op != mvd_multicast_all_r) {
+    if (to) {
         SZ_WriteShort(buf, leafnum);
     }
 

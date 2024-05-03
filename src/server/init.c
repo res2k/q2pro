@@ -49,7 +49,7 @@ static void set_frame_time(int rate, bool override)
 
 static void resolve_masters(void)
 {
-#if !USE_CLIENT
+#if USE_SERVER
     time_t now = time(NULL);
 
     for (int i = 0; i < MAX_MASTERS; i++) {
@@ -383,7 +383,7 @@ void SV_InitGame(unsigned mvd_spawn)
     // We need the time values before the game is loaded
     set_frame_time(sv_fps->integer, false);
 
-#if !USE_CLIENT
+#if USE_SERVER
     Cvar_Reset(sv_recycle);
 #endif
 

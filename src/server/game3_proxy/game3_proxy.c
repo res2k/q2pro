@@ -30,6 +30,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 static const cs_remap_t *game_csr;
 
+static game3_edict_t* translate_edict_to_game(edict_t* ent);
+static void game_entity_state_to_server(entity_state_t *server_state, const game3_entity_state_t *game_state);
+
 static void sync_single_edict_server_to_game(int index);
 static void sync_edicts_server_to_game(void);
 static void sync_single_edict_game_to_server(int index);
@@ -52,6 +55,25 @@ static const game_q2pro_restart_filesystem_t game_q2pro_restart_filesystem = {
     .api_version = 1,
 
     .RestartFilesystem = wrap_RestartFilesystem,
+};
+
+static customize_entity_result_t wrap_CustomizeEntity(edict_t *client, edict_t *ent, customize_entity_t *temp)
+{
+    game3_customize_entity_t new_temp;
+    customize_entity_result_t result = game3_export_ex->CustomizeEntity(translate_edict_to_game(client), translate_edict_to_game(ent), &new_temp);
+    if (result == CE_CUSTOMIZE)
+    {
+        game_entity_state_to_server(&temp->s, &new_temp.s);
+    }
+    return result;
+}
+
+const char *game_q2pro_customize_entity_ext = "q2pro:customize_entity";
+
+static const game_q2pro_customize_entity_t game_q2pro_customize_entity = {
+    .api_version = 1,
+
+    .CustomizeEntity = wrap_CustomizeEntity,
 };
 
 #define GAME_EDICT_NUM(n) ((game3_edict_t *)((byte *)game3_export->edicts + game3_export->edict_size*(n)))
@@ -843,6 +865,9 @@ static void *wrap_GetExtension_export(const char *name)
     if (game3_export_ex && strcmp(name, game_q2pro_restart_filesystem_ext) == 0) {
         return (void*)&game_q2pro_restart_filesystem;
     }
+    if (game3_export_ex && game3_export_ex->apiversion >= GAME3_API_VERSION_EX_CUSTOMIZE_ENTITY && game3_export_ex->CustomizeEntity && strcmp(name, game_q2pro_customize_entity_ext) == 0) {
+        return (void*)&game_q2pro_customize_entity;
+    }
     return NULL;
 }
 
@@ -950,7 +975,13 @@ game_export_t *GetGame3Proxy(game_import_t *import, void *game3_entry, void *gam
 
     game3_export = entry(&import3);
     if (game3_ex_entry)
+    {
         game3_export_ex = entry_ex(&game3_import_ex);
+        if (game3_export_ex->apiversion < GAME3_API_VERSION_EX_MINIMUM)
+            game3_export_ex = NULL;
+        else
+            Com_DPrintf("Game supports Q2PRO extended API version %d.\n", game3_export_ex->apiversion);
+    }
     else
         game3_export_ex = NULL;
 

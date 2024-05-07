@@ -42,6 +42,14 @@ typedef struct game3_entity_state_s {
                             // are automatically cleared each frame
 } game3_entity_state_t;
 
+typedef struct {
+    int         morefx;
+    float       alpha;
+    float       scale;
+    float       loop_volume;
+    float       loop_attenuation;
+} game3_entity_state_extension_t;
+
 #define MAX_STATS_GAME3 32
 
 typedef struct {
@@ -258,15 +266,32 @@ typedef struct {
  *
  * New fields can be safely added at the end of game_import_ex_t and
  * game_export_ex_t structures, provided GAME_API_VERSION_EX is also bumped.
+ *
+ * API version history:
+ * 1 - Initial release.
+ * 2 - Added CustomizeEntity().
  */
 
-#define GAME3_API_VERSION_EX     1
+#define GAME3_API_VERSION_EX_MINIMUM             1
+#define GAME3_API_VERSION_EX_CUSTOMIZE_ENTITY    2
+#define GAME3_API_VERSION_EX                     2
 
 typedef enum {
     VIS_PVS     = 0,
     VIS_PHS     = 1,
     VIS_NOAREAS = 2     // can be OR'ed with one of above
 } vis_t;
+
+typedef enum {
+    GAME3_CE_SKIP,            // don't send this entity to client
+    GAME3_CE_PASS,            // pass unmodified
+    GAME3_CE_CUSTOMIZE        // customize (game must fill `temp')
+} game3_customize_entity_result_t;
+
+typedef struct {
+    game3_entity_state_t s;
+    game3_entity_state_extension_t x;
+} game3_customize_entity_t;
 
 typedef struct {
     uint32_t    apiversion;
@@ -289,6 +314,7 @@ typedef struct {
     qboolean    (*CanSave)(void);
     void        (*PrepFrame)(void);
     void        (*RestartFilesystem)(void); // called when fs_restart is issued
+    game3_customize_entity_result_t   (*CustomizeEntity)(game3_edict_t *client, game3_edict_t *ent, game3_customize_entity_t *temp);
 } game3_export_ex_t;
 
 #endif // GAME3_H

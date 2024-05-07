@@ -30,6 +30,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 const game_export_t     *ge;
 const game_q2pro_restart_filesystem_t *g_restart_fs;
+const game_q2pro_customize_entity_t   *g_customize_entity;
 
 static void PF_configstring(int index, const char *val);
 
@@ -1089,6 +1090,7 @@ void SV_InitGameProgs(void)
     ge->Init();
 
     g_restart_fs = (game_q2pro_restart_filesystem_t *)ge->GetExtension(game_q2pro_restart_filesystem_ext);
+    g_customize_entity = (game_q2pro_customize_entity_t *)ge->GetExtension(game_q2pro_customize_entity_ext);
 
     if (!svs.is_game_rerelease && (g_features->integer & GMF_PROTOCOL_EXTENSIONS) == 0)
         svs.csr = cs_remap_old;

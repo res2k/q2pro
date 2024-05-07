@@ -750,6 +750,7 @@ void SV_WriteFrameToClient_Enhanced(client_t *client);
 //
 extern const game_export_t      *ge;
 extern const game_q2pro_restart_filesystem_t *g_restart_fs;
+extern const game_q2pro_customize_entity_t   *g_customize_entity;
 
 void SV_InitGameProgs(void);
 void SV_ShutdownGameProgs(void);

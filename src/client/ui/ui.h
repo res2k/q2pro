@@ -150,7 +150,7 @@ typedef struct menuCommon_s {
     menuSound_t (*focus)(struct menuCommon_s *, bool gain);
 } menuCommon_t;
 
-typedef struct menuField_s {
+typedef struct {
     menuCommon_t generic;
     inputField_t field;
     cvar_t *cvar;
@@ -159,7 +159,7 @@ typedef struct menuField_s {
 
 #define SLIDER_RANGE 10
 
-typedef struct menuSlider_s {
+typedef struct {
     menuCommon_t generic;
     cvar_t *cvar;
     bool modified;
@@ -182,7 +182,7 @@ typedef struct menuSlider_s {
 #define MLF_SCROLLBAR   BIT(1)
 #define MLF_COLOR       BIT(2)
 
-typedef struct menuListColumn_s {
+typedef struct {
     const char *name;
     int width;
     int uiFlags;
@@ -216,7 +216,7 @@ typedef struct menuList_s {
     menuSound_t (*sort)(struct menuList_s *);
 } menuList_t;
 
-typedef struct menuSpinControl_s {
+typedef struct {
     menuCommon_t generic;
     cvar_t *cvar;
 
@@ -233,27 +233,27 @@ typedef struct menuSpinControl_s {
     char *filter;
 } menuSpinControl_t;
 
-typedef struct menuAction_s {
+typedef struct {
     menuCommon_t generic;
     char *cmd;
 } menuAction_t;
 
-typedef struct menuSeparator_s {
+typedef struct {
     menuCommon_t generic;
 } menuSeparator_t;
 
-typedef struct menuStatic_s {
+typedef struct {
     menuCommon_t    generic;
     int             maxChars;
 } menuStatic_t;
 
-typedef struct menuBitmap_s {
+typedef struct {
     menuCommon_t generic;
     qhandle_t pics[2];
     char *cmd;
 } menuBitmap_t;
 
-typedef struct menuKeybind_s {
+typedef struct {
     menuCommon_t    generic;
     char            binding[32];
     char            altbinding[32];
@@ -263,7 +263,7 @@ typedef struct menuKeybind_s {
 
 #define MAX_PLAYERMODELS 1024
 
-typedef struct playerModelInfo_s {
+typedef struct {
     int nskins;
     char **skindisplaynames;
     char *directory;
@@ -283,7 +283,7 @@ void ImageSpinControl_Init(menuSpinControl_t *s);
 
 #define NUM_CURSOR_FRAMES 15
 
-typedef struct uiStatic_s {
+typedef struct {
     bool initialized;
     unsigned realtime;
     int width, height; // scaled

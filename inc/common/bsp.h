@@ -236,7 +236,7 @@ typedef struct {
 
 #endif
 
-typedef struct bsp_s {
+typedef struct {
     list_t      entry;
     int         refcount;
 

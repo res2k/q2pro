@@ -176,8 +176,8 @@ typedef union {
 
 extern const vec3_t vec3_origin;
 
-typedef struct vrect_s {
-    int             x, y, width, height;
+typedef struct {
+    int x, y, width, height;
 } vrect_t;
 
 #define DEG2RAD(a)      ((a) * (M_PI / 180))
@@ -867,7 +867,7 @@ typedef uint32_t surfflags_t;
 #define AREA_TRIGGERS   2
 
 // plane_t structure
-typedef struct cplane_s {
+typedef struct {
     vec3_t  normal;
     float   dist;
     byte    type;           // for fast side tests
@@ -882,7 +882,7 @@ typedef struct cplane_s {
 #define PLANE_NON_AXIAL 6
 
 // csurface_t, but as expected by V3 games
-typedef struct csurface_v3_s {
+typedef struct {
     char        name[16];
     surfflags_t flags;
     int32_t		value;
@@ -980,7 +980,7 @@ typedef uint8_t button_t;
 
 #if !defined(GAME3_INCLUDE)
 // usercmd_t is sent to the server each client frame
-typedef struct usercmd_s {
+typedef struct {
     byte    msec;
     button_t buttons;
     vec3_t  angles;
@@ -1597,7 +1597,7 @@ typedef uint8_t entity_event_t;
 // entity_state_t is the information conveyed from the server
 // in an update message about entities that the client will
 // need to render in some way
-typedef struct entity_state_s {
+typedef struct {
     int     number;         // edict index
 
     vec3_t  origin;

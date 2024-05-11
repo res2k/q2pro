@@ -499,13 +499,11 @@ static bool check_entity(client_t *client, int entnum)
     return false;
 }
 
-// sounds reliative to entities are handled specially
+// sounds relative to entities are handled specially
 static void emit_snd(client_t *client, const message_packet_t *msg)
 {
-    int flags, entnum;
-
-    entnum = msg->sendchan >> 3;
-    flags = msg->flags;
+    int entnum = msg->sendchan >> 3;
+    int flags = msg->flags;
 
     // check if position needs to be explicitly sent
     if (!(flags & SND_POS) && !check_entity(client, entnum)) {
@@ -1021,14 +1019,12 @@ calctime:
 
 void SV_InitClientSend(client_t *newcl)
 {
-    int i;
-
     List_Init(&newcl->msg_free_list);
     List_Init(&newcl->msg_unreliable_list);
     List_Init(&newcl->msg_reliable_list);
 
     newcl->msg_pool = SV_Malloc(sizeof(newcl->msg_pool[0]) * MSG_POOLSIZE);
-    for (i = 0; i < MSG_POOLSIZE; i++) {
+    for (int i = 0; i < MSG_POOLSIZE; i++) {
         List_Append(&newcl->msg_free_list, &newcl->msg_pool[i].entry);
     }
 

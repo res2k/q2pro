@@ -550,12 +550,6 @@ typedef struct {
     void (*RestartFilesystem)(void); // called when fs_restart is issued
 } game_q2pro_restart_filesystem_t;
 
-typedef enum {
-    CE_SKIP,            // don't send this entity to client
-    CE_PASS,            // pass unmodified
-    CE_CUSTOMIZE        // customize (game must fill `temp')
-} customize_entity_result_t;
-
 typedef struct {
     entity_state_t s;
 } customize_entity_t;
@@ -563,7 +557,8 @@ typedef struct {
 typedef struct {
     int api_version;
 
-    customize_entity_result_t   (*CustomizeEntity)(edict_t *client, edict_t *ent, customize_entity_t *temp);
+    qboolean    (*CustomizeEntityToClient)(edict_t *client, edict_t *ent, customize_entity_t *temp);
+    qboolean    (*EntityVisibleToClient)(edict_t *client, edict_t *ent);
 } game_q2pro_customize_entity_t;
 
 //===============================================================

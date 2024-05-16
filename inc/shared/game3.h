@@ -270,23 +270,20 @@ typedef struct {
  * API version history:
  * 1 - Initial release.
  * 2 - Added CustomizeEntity().
+ * 3 - Added EntityVisibleToClient(), renamed CustomizeEntity() to
+ * CustomizeEntityToClient() and changed the meaning of return value.
  */
 
 #define GAME3_API_VERSION_EX_MINIMUM             1
 #define GAME3_API_VERSION_EX_CUSTOMIZE_ENTITY    2
-#define GAME3_API_VERSION_EX                     2
+#define GAME3_API_VERSION_EX_ENTITY_VISIBLE      3
+#define GAME3_API_VERSION_EX                     3
 
 typedef enum {
     VIS_PVS     = 0,
     VIS_PHS     = 1,
     VIS_NOAREAS = 2     // can be OR'ed with one of above
 } vis_t;
-
-typedef enum {
-    GAME3_CE_SKIP,            // don't send this entity to client
-    GAME3_CE_PASS,            // pass unmodified
-    GAME3_CE_CUSTOMIZE        // customize (game must fill `temp')
-} game3_customize_entity_result_t;
 
 typedef struct {
     game3_entity_state_t s;
@@ -314,7 +311,8 @@ typedef struct {
     qboolean    (*CanSave)(void);
     void        (*PrepFrame)(void);
     void        (*RestartFilesystem)(void); // called when fs_restart is issued
-    game3_customize_entity_result_t   (*CustomizeEntity)(game3_edict_t *client, game3_edict_t *ent, game3_customize_entity_t *temp);
+    qboolean    (*CustomizeEntityToClient)(game3_edict_t *client, game3_edict_t *ent, game3_customize_entity_t *temp);
+    qboolean    (*EntityVisibleToClient)(game3_edict_t *client, game3_edict_t *ent);
 } game3_export_ex_t;
 
 #endif // GAME3_H

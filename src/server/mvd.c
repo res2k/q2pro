@@ -587,7 +587,7 @@ static void build_gamestate(void)
             continue;
         }
 
-        ent->s.number = i;
+        SV_CheckEntityNumber(ent, i);
         MSG_PackEntity(&mvd.entities[i], &ent->s, svs.csr.extended);
         if (svs.csr.extended)
             mvd.entities[i].solid = sv.entities[i].solid32;
@@ -780,11 +780,7 @@ static void emit_frame(void)
             continue;
         }
 
-        if (ent->s.number != i) {
-            Com_WPrintf("%s: fixing ent->s.number: %d to %d\n",
-                        __func__, ent->s.number, i);
-            ent->s.number = i;
-        }
+        SV_CheckEntityNumber(ent, i);
 
         // calculate flags
         flags = mvd.esFlags;

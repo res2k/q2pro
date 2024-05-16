@@ -57,15 +57,20 @@ static const game_q2pro_restart_filesystem_t game_q2pro_restart_filesystem = {
     .RestartFilesystem = wrap_RestartFilesystem,
 };
 
-static customize_entity_result_t wrap_CustomizeEntity(edict_t *client, edict_t *ent, customize_entity_t *temp)
+static qboolean wrap_CustomizeEntityToClient(edict_t *client, edict_t *ent, customize_entity_t *temp)
 {
     game3_customize_entity_t new_temp;
-    customize_entity_result_t result = game3_export_ex->CustomizeEntity(translate_edict_to_game(client), translate_edict_to_game(ent), &new_temp);
-    if (result == CE_CUSTOMIZE)
+    qboolean result = game3_export_ex->CustomizeEntityToClient(translate_edict_to_game(client), translate_edict_to_game(ent), &new_temp);
+    if (result)
     {
         game_entity_state_to_server(&temp->s, &new_temp.s);
     }
     return result;
+}
+
+static qboolean wrap_EntityVisibleToClient(edict_t *client, edict_t *ent)
+{
+    return game3_export_ex->EntityVisibleToClient(translate_edict_to_game(client), translate_edict_to_game(ent));
 }
 
 const char *game_q2pro_customize_entity_ext = "q2pro:customize_entity";
@@ -73,7 +78,8 @@ const char *game_q2pro_customize_entity_ext = "q2pro:customize_entity";
 static const game_q2pro_customize_entity_t game_q2pro_customize_entity = {
     .api_version = 1,
 
-    .CustomizeEntity = wrap_CustomizeEntity,
+    .CustomizeEntityToClient = wrap_CustomizeEntityToClient,
+    .EntityVisibleToClient = wrap_EntityVisibleToClient,
 };
 
 #define GAME_EDICT_NUM(n) ((game3_edict_t *)((byte *)game3_export->edicts + game3_export->edict_size*(n)))
@@ -865,7 +871,11 @@ static void *wrap_GetExtension_export(const char *name)
     if (game3_export_ex && strcmp(name, game_q2pro_restart_filesystem_ext) == 0) {
         return (void*)&game_q2pro_restart_filesystem;
     }
-    if (game3_export_ex && game3_export_ex->apiversion >= GAME3_API_VERSION_EX_CUSTOMIZE_ENTITY && game3_export_ex->CustomizeEntity && strcmp(name, game_q2pro_customize_entity_ext) == 0) {
+    if (game3_export_ex
+        && game3_export_ex->apiversion >= GAME3_API_VERSION_EX_ENTITY_VISIBLE
+        && game3_export_ex->CustomizeEntityToClient
+        && game3_export_ex->EntityVisibleToClient
+        && strcmp(name, game_q2pro_customize_entity_ext) == 0) {
         return (void*)&game_q2pro_customize_entity;
     }
     return NULL;

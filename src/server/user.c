@@ -396,6 +396,7 @@ static void SV_BeginDownload_f(void)
     cvar_t  *allow;
     size_t  len;
     qhandle_t f;
+    q2proto_download_compress_t download_compress = Q2PROTO_DOWNLOAD_COMPRESS_AUTO;
     q2proto_server_download_state_t *download_state_ptr = NULL;
 
     if (Cmd_ArgvBuffer(1, name, sizeof(name)) >= sizeof(name)) {
@@ -462,13 +463,13 @@ static void SV_BeginDownload_f(void)
 
     f = 0;
 
-#if 0 // USE_ZLIB
+#if USE_ZLIB
     // prefer raw deflate stream from .pkz if supported
-    if (sv_client->has_zlib && offset == 0) {
+    if (sv_client->q2proto_ctx.features.download_compress_raw && offset == 0) {
         downloadsize = FS_OpenFile(name, &f, FS_MODE_READ | FS_FLAG_DEFLATE);
         if (f) {
             Com_DPrintf("Serving compressed download to %s\n", sv_client->name);
-            downloadcmd = svc_rr_zdownload;
+            download_compress = Q2PROTO_DOWNLOAD_COMPRESS_RAW;
         }
     }
 #endif
@@ -485,7 +486,7 @@ static void SV_BeginDownload_f(void)
 #if USE_ZLIB
     deflate_args = &sv_client->q2proto_deflate;
 #endif
-    int err = q2proto_server_download_begin(&sv_client->q2proto_ctx, downloadsize, Q2PROTO_DOWNLOAD_COMPRESS_AUTO, deflate_args, &sv_client->download_state);
+    int err = q2proto_server_download_begin(&sv_client->q2proto_ctx, downloadsize, download_compress, deflate_args, &sv_client->download_state);
     if (err != Q2P_ERR_SUCCESS) {
         Com_DPrintf("Couldn't download %s to %s: q2proto error %d\n", name, sv_client->name, err);
         goto fail1;

@@ -36,14 +36,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define SVF_DEADMONSTER         BIT(1)      // treat as CONTENTS_DEADMONSTER for collision
 #define SVF_MONSTER             BIT(2)      // treat as CONTENTS_MONSTER for collision
 
-#define SVF_PLAYER              BIT(3)
+#define SVF_PLAYER              BIT(3)      // treat as CONTENTS_PLAYER for collision
 #define SVF_BOT                 BIT(4)
 #define SVF_NOBOTS              BIT(5)
 #define SVF_RESPAWNING          BIT(6)
-#define SVF_PROJECTILE          BIT(7)
+#define SVF_PROJECTILE          BIT(7)      // treat as CONTENTS_PROJECTILE for collision
 #define SVF_INSTANCED           BIT(8)
 #define SVF_DOOR                BIT(9)
-#define SVF_NOCULL              BIT(10)
+#define SVF_NOCULL              BIT(10)     // always send entity to clients (no PVS checks)
 #define SVF_HULL                BIT(11)
 
 typedef uint32_t svflags_t;
@@ -557,7 +557,7 @@ typedef struct {
 typedef struct {
     int api_version;
 
-    qboolean    (*CustomizeEntityToClient)(edict_t *client, edict_t *ent, customize_entity_t *temp);
+    qboolean    (*CustomizeEntityToClient)(edict_t *client, edict_t *ent, customize_entity_t *temp); // must initialize `temp'
     qboolean    (*EntityVisibleToClient)(edict_t *client, edict_t *ent);
 } game_q2pro_customize_entity_t;
 

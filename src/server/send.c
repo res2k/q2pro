@@ -566,10 +566,10 @@ static inline void write_unreliables(client_t *client, unsigned maxsize)
     message_packet_t    *msg, *next;
 
     FOR_EACH_MSG_SAFE(&client->msg_unreliable_list) {
-        if (msg->cursize) {
-            write_msg(client, msg, maxsize);
-        } else {
+        if (msg->cursize == SOUND_PACKET) {
             write_snd(client, msg, maxsize);
+        } else {
+            write_msg(client, msg, maxsize);
         }
     }
 }
@@ -641,7 +641,7 @@ static void repack_unreliables(client_t *client, unsigned maxsize)
 
     // temp entities first
     FOR_EACH_MSG_SAFE(&client->msg_unreliable_list) {
-        if (!msg->cursize || msg->data[0] != svc_temp_entity) {
+        if (msg->cursize == SOUND_PACKET || msg->data[0] != svc_temp_entity) {
             continue;
         }
         // ignore some low-priority effects, these checks come from r1q2
@@ -659,7 +659,7 @@ static void repack_unreliables(client_t *client, unsigned maxsize)
 
     // then entity sounds
     FOR_EACH_MSG_SAFE(&client->msg_unreliable_list) {
-        if (!msg->cursize) {
+        if (msg->cursize == SOUND_PACKET) {
             write_snd(client, msg, maxsize);
         }
     }
@@ -670,7 +670,7 @@ static void repack_unreliables(client_t *client, unsigned maxsize)
 
     // then positioned sounds
     FOR_EACH_MSG_SAFE(&client->msg_unreliable_list) {
-        if (msg->cursize && msg->data[0] == svc_sound) {
+        if (msg->cursize != SOUND_PACKET && msg->data[0] == svc_sound) {
             write_msg(client, msg, maxsize);
         }
     }
@@ -681,7 +681,7 @@ static void repack_unreliables(client_t *client, unsigned maxsize)
 
     // then everything else left
     FOR_EACH_MSG_SAFE(&client->msg_unreliable_list) {
-        if (msg->cursize) {
+        if (msg->cursize != SOUND_PACKET) {
             write_msg(client, msg, maxsize);
         }
     }

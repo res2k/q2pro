@@ -71,7 +71,7 @@ void CL_CheckPredictionError(void)
 CL_ClipMoveToEntities
 ====================
 */
-static void CL_ClipMoveToEntities(trace_t *tr, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int contentmask)
+static void CL_ClipMoveToEntities(trace_t *tr, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, int contentmask)
 {
     int         i;
     trace_t     trace;
@@ -111,7 +111,7 @@ static void CL_ClipMoveToEntities(trace_t *tr, const vec3_t start, const vec3_t 
 CL_Trace
 ================
 */
-void CL_Trace(trace_t *tr, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, const struct edict_s* passent, contents_t contentmask)
+void CL_Trace(trace_t *tr, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, const struct edict_s* passent, contents_t contentmask)
 {
     // check against world
     CM_BoxTrace(tr, start, end, mins, maxs, cl.bsp->nodes, contentmask);
@@ -119,13 +119,13 @@ void CL_Trace(trace_t *tr, const vec3_t start, const vec3_t mins, const vec3_t m
         tr->ent = (struct edict_s *)cl_entities;
 
     // check all other solid models
-    CL_ClipMoveToEntities(tr, start, mins, maxs, end, contentmask);
+    CL_ClipMoveToEntities(tr, start, end, mins, maxs, contentmask);
 }
 
 static trace_t q_gameabi CL_PMTrace(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, const struct edict_s* passent, contents_t contentmask)
 {
     trace_t t;
-    CL_Trace(&t, start, mins, maxs, end, passent, contentmask);
+    CL_Trace(&t, start, end, mins, maxs, passent, contentmask);
     return t;
 }
 

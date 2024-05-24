@@ -348,7 +348,7 @@ void SV_New_f(void)
     if (sv.state == ss_pic || sv.state == ss_cinematic)
         MSG_WriteShort(-1);
     else
-        MSG_WriteShort(sv_client->slot);
+        MSG_WriteShort(sv_client->infonum);
     MSG_WriteString(sv_client->configstrings[CS_NAME]);
 
     // send protocol specific stuff

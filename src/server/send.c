@@ -309,7 +309,7 @@ void SV_Multicast(const vec3_t origin, multicast_t to, bool reliable)
 }
 
 #if USE_ZLIB
-static bool can_auto_compress(client_t *client)
+static bool can_auto_compress(const client_t *client)
 {
     if (!client->has_zlib)
         return false;
@@ -321,7 +321,7 @@ static bool can_auto_compress(client_t *client)
     return true;
 }
 
-static int compress_message(client_t *client)
+static int compress_message(const client_t *client)
 {
     int     ret, len;
     byte    *hdr;
@@ -490,7 +490,7 @@ overflowed:
 }
 
 // check if this entity is present in current client frame
-static bool check_entity(client_t *client, int entnum)
+static bool check_entity(const client_t *client, int entnum)
 {
     const client_frame_t *frame;
     int left, right;
@@ -517,7 +517,7 @@ static bool check_entity(client_t *client, int entnum)
 }
 
 // sounds relative to entities are handled specially
-static void emit_snd(client_t *client, const message_packet_t *msg)
+static void emit_snd(const client_t *client, const message_packet_t *msg)
 {
     int entnum = msg->sendchan >> 3;
     int flags = msg->flags;
@@ -842,7 +842,7 @@ static void finish_frame(client_t *client)
 }
 
 #if USE_DEBUG && USE_FPS
-static void check_key_sync(client_t *client)
+static void check_key_sync(const client_t *client)
 {
     int div = sv.frametime.div / client->framediv;
     int key1 = !(sv.framenum % sv.frametime.div);

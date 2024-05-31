@@ -593,6 +593,7 @@ config.set10('USE_MEMORY_TRACES', get_option('memory-traces'))
 config.set10('USE_PACKETDUP',     get_option('packetdup-hack'))
 config.set10('USE_TGA',           get_option('tga'))
 config.set10('USE_' + host_machine.endian().to_upper() + '_ENDIAN', true)
+config.set10('USE_PROTOCOL_EXTENSIONS', true)
 
 if not win32
   have_backtrace = cc.has_header('execinfo.h') and cc.has_function('backtrace')

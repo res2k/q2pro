@@ -38,6 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/pmove.h"
 #include "common/prompt.h"
 #include "common/protocol.h"
+#include "common/q2proto_shared.h"
 #include "common/zone.h"
 
 #include "client/client.h"
@@ -307,18 +308,20 @@ typedef struct client_s {
     unsigned        send_time, send_delta;          // used to rate drop async packets
 
     // current download
-    byte            *download;      // file being downloaded
-    int             downloadsize;   // total bytes (can't use EOF because of paks)
-    int             downloadcount;  // bytes sent
-    char            *downloadname;  // name of the file
-    int             downloadcmd;    // svc_(z)download
+    byte            *download;          // file being downloaded
+    const uint8_t   *download_ptr;      // pointer to remaining download data
+    size_t          download_remaining; // remaining bytes to download
+    char            *downloadname;      // name of the file
     bool            downloadpending;
+    q2proto_server_download_state_t download_state;
 
     // protocol stuff
     int             challenge;  // challenge of this user, randomly generated
     int             protocol;   // major version
     int             version;    // minor version
     int             settings[CLS_MAX];
+    q2proto_servercontext_t q2proto_ctx;
+    q2protoio_ioarg_t io_data;
 
     pmoveParams_t   pmp;        // spectator speed, etc
     msgEsFlags_t    esFlags;    // entity protocol flags
@@ -482,6 +485,8 @@ typedef struct {
     ratelimit_t     ratelimit_rcon;
 
     challenge_t     challenges[MAX_CHALLENGES]; // to prevent invalid IPs from connecting
+
+    q2proto_server_info_t server_info;
 } server_static_t;
 
 //=============================================================================
@@ -752,6 +757,7 @@ static inline void SV_CheckEntityNumber(edict_t *ent, int e, const char *func)
 void SV_BuildClientFrame(client_t *client);
 bool SV_WriteFrameToClient_Default(client_t *client, unsigned maxsize);
 bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize);
+bool SV_MakeEntityDelta(q2proto_entity_state_delta_t *delta, const entity_packed_t *from, const entity_packed_t *to, msgEsFlags_t flags);
 
 //
 // sv_game.c

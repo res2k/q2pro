@@ -243,10 +243,7 @@ static uint32_t SV_PackSolid32(const edict_t *ent)
 {
     uint32_t solid32;
 
-    if (svs.csr.extended)
-        solid32 = MSG_PackSolid32_Ver2(ent->mins, ent->maxs);
-    else
-        solid32 = MSG_PackSolid32_Ver1(ent->mins, ent->maxs);
+    solid32 = q2proto_pack_solid_32_q2pro_v2(ent->mins, ent->maxs); // FIXME: game-dependent
 
     if (solid32 == PACKED_BSP)
         solid32 = 0;  // can happen in pathological case if z mins > maxs
@@ -255,10 +252,7 @@ static uint32_t SV_PackSolid32(const edict_t *ent)
     if (developer->integer) {
         vec3_t mins, maxs;
 
-        if (svs.csr.extended)
-            MSG_UnpackSolid32_Ver2(solid32, mins, maxs);
-        else
-            MSG_UnpackSolid32_Ver1(solid32, mins, maxs);
+        q2proto_unpack_solid_32_q2pro_v2(solid32, mins, maxs); // FIXME: game-dependent
 
         if (!VectorCompare(ent->mins, mins) || !VectorCompare(ent->maxs, maxs))
             Com_LPrintf(PRINT_DEVELOPER, "Bad mins/maxs on entity %d: %s %s\n",
@@ -307,7 +301,7 @@ void PF_LinkEdict(edict_t *ent)
         } else if (svs.csr.extended) {
             sent->solid32 = ent->s.solid = SV_PackSolid32(ent);
         } else {
-            ent->s.solid = MSG_PackSolid16(ent->mins, ent->maxs);
+            ent->s.solid = q2proto_pack_solid_16(ent->mins, ent->maxs);
             sent->solid32 = SV_PackSolid32(ent);
         }
         break;

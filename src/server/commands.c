@@ -616,10 +616,11 @@ static void dump_downloads(void)
     FOR_EACH_CLIENT(client) {
         if (client->download) {
             name = client->downloadname;
-            size = client->downloadsize;
+            size_t downloadcount, size;
+            q2proto_server_download_get_progress(&client->download_state, &downloadcount, &size);
             if (!size)
                 size = 1;
-            percent = client->downloadcount * 100 / size;
+            percent = downloadcount * 100 / size;
         } else if (client->http_download) {
             name = "<HTTP download>";
             size = percent = 0;

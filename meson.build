@@ -35,8 +35,6 @@ common_src = [
 
   'q2proto/src/dummy_q2protoerr_client_write.c',
   'q2proto/src/dummy_q2protoerr_server_read.c',
-  'q2proto/src/dummy_q2protoerr_server_write.c',
-  'q2proto/src/dummy_q2protoio_write.c',
   'q2proto/src/q2proto_client.c',
   'q2proto/src/q2proto_coords.c',
   'q2proto/src/q2proto_crc.c',

@@ -22,6 +22,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 typedef struct q2protoio_ioarg_s {
     sizebuf_t *sz_read;
+    sizebuf_t *sz_write;
+    size_t max_msg_len;
 } q2protoio_ioarg_t;
 
 extern q2protoio_ioarg_t default_q2protoio_ioarg;

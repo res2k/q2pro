@@ -164,6 +164,19 @@ q2proto_error_t q2protoerr_server_write(uintptr_t io_arg, q2proto_error_t err, c
     return err;
 }
 
+q2proto_error_t q2protoerr_server_read(uintptr_t io_arg, q2proto_error_t err, const char *msg, ...)
+{
+    char buf[256];
+    va_list argptr;
+
+    va_start(argptr, msg);
+    Q_vsnprintf(buf, sizeof(buf), msg, argptr);
+    va_end(argptr);
+
+    Com_EPrintf("server read error: %s\n", buf);
+    return err;
+}
+
 #if Q2PROTO_SHOWNET
 extern cvar_t   *cl_shownet;
 

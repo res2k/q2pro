@@ -357,7 +357,7 @@ static bool is_in_safe_state(void)
 
     for (int i = 0; i < sv_maxclients->integer; i++) {
         cl = &svs.client_pool[i];
-        if (cl->state >= cs_assigned && cl->netchan.remote_address.type != NA_LOOPBACK) {            
+        if (cl->state >= cs_assigned && !NET_IsLocalAddress(&cl->netchan.remote_address)) {
             return false;
         }
     }

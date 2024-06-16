@@ -1043,7 +1043,6 @@ static void SVC_DirectConnect(void)
     newcl->challenge = params.challenge; // save challenge for checksumming
     newcl->protocol = params.protocol;
     newcl->version = params.version;
-    newcl->has_zlib = params.has_zlib;
     newcl->edict = EDICT_NUM(number + 1);
     newcl->gamedir = fs_game->string;
     newcl->mapname = sv.name;

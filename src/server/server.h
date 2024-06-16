@@ -262,7 +262,6 @@ typedef struct client_s {
     // client flags
     bool            reconnected: 1;
     bool            nodata: 1;
-    bool            has_zlib: 1;
     bool            drop_hack: 1;
 #if USE_ICMP
     bool            unreachable: 1;

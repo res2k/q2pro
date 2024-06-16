@@ -317,7 +317,7 @@ void SV_Multicast(const vec3_t origin, multicast_t to, bool reliable)
 #if USE_ZLIB
 static bool can_auto_compress(const client_t *client)
 {
-    if (!client->has_zlib)
+    if (!client->q2proto_ctx.features.enable_deflate)
         return false;
 
     // compress only sufficiently large layouts
@@ -327,43 +327,25 @@ static bool can_auto_compress(const client_t *client)
     return true;
 }
 
-static int compress_message(const client_t *client)
+static int compress_message(client_t *client)
 {
-    int     ret, len;
-    byte    *hdr;
-
-    if (!client->has_zlib)
-        return 0;
-
-    svs.z.next_in = msg_write.data;
-    svs.z.avail_in = msg_write.cursize;
-    svs.z.next_out = svs.z_buffer + ZPACKET_HEADER;
-    svs.z.avail_out = svs.z_buffer_size - ZPACKET_HEADER;
-
-    ret = deflate(&svs.z, Z_FINISH);
-    len = svs.z.total_out;
-
-    // prepare for next deflate()
-    deflateReset(&svs.z);
-
-    if (ret != Z_STREAM_END) {
-        Com_WPrintf("Error %d compressing %u bytes message for %s\n",
-                    ret, msg_write.cursize, client->name);
+    size_t uncompressed_size = msg_write.cursize;
+    msg_write.cursize = 0;
+    q2proto_error_t err = q2proto_server_write_zpacket(&client->q2proto_ctx, &client->q2proto_deflate, (uintptr_t)&client->io_data, msg_write.data, uncompressed_size);
+    if (err != Q2P_ERR_SUCCESS)
+    {
+        if (err != Q2P_ERR_ALREADY_COMPRESSED)
+            Com_WPrintf("Error %d compressing %zu bytes message for %s\n",
+                        err, uncompressed_size, client->name);
+        msg_write.cursize = uncompressed_size;
         return 0;
     }
-
-    // write the packet header
-    hdr = svs.z_buffer;
-    hdr[0] = svc_rr_zpacket;
-    WL16(&hdr[1], len);
-    WL16(&hdr[3], msg_write.cursize);
-
-    return len + ZPACKET_HEADER;
+    return msg_write.cursize;
 }
 
 static byte *get_compressed_data(void)
 {
-    return svs.z_buffer;
+    return msg_write.data;
 }
 #else
 #define can_auto_compress(c)    false
@@ -390,11 +372,9 @@ void SV_ClientAddMessage(client_t *client, int flags)
         return;
     }
 
-    if ((flags & MSG_COMPRESS_AUTO) && can_auto_compress(client)) {
-        flags |= MSG_COMPRESS;
-    }
+    bool compress = (flags & MSG_COMPRESS_AUTO) && can_auto_compress(client);
 
-    if ((flags & MSG_COMPRESS) && (len = compress_message(client)) && len < msg_write.cursize) {
+    if (compress && (len = compress_message(client)) && len < msg_write.cursize) {
         client->AddMessage(client, get_compressed_data(), len, flags & MSG_RELIABLE);
         SV_DPrintf(0, "Compressed %sreliable message to %s: %u into %d\n",
                    (flags & MSG_RELIABLE) ? "" : "un", client->name, msg_write.cursize, len);

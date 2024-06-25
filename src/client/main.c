@@ -3361,8 +3361,6 @@ unsigned CL_Frame(unsigned msec)
 
     CL_MeasureStats();
 
-    cls.framecount++;
-
     main_extra = 0;
     return 0;
 }

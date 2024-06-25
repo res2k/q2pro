@@ -546,7 +546,7 @@ typedef struct {
 #define RECENT_MASK (RECENT_ADDR - 1)
 
     netadr_t    recent_addr[RECENT_ADDR];
-    int         recent_head;
+    unsigned    recent_head;
 
     string_entry_t  *stufftextwhitelist;
 

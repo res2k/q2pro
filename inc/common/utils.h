@@ -79,7 +79,7 @@ char *Com_MakePrintable(const char *s);
 #define BC_COUNT(n)     (((n) + BC_BITS - 1) / BC_BITS)
 
 // Some mods actually exploit CS_STATUSBAR to take space up to CS_AIRACCEL
-static inline size_t CS_SIZE(const cs_remap_t *csr, int cs)
+static inline size_t Com_ConfigstringSize(const cs_remap_t *csr, int cs)
 {
     if (cs >= CS_STATUSBAR && cs < csr->airaccel)
         return CS_MAX_STRING_LENGTH * (csr->airaccel - cs);

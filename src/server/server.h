@@ -106,7 +106,7 @@ typedef struct {
     int         number;
     int         num_entities;
     unsigned    first_entity;
-    player_packed_t ps;
+    q2proto_packed_player_state_t ps;
     int         clientNum;
     int         areabytes;
     byte        areabits[MAX_MAP_AREA_BYTES];  // portalarea visibility bits
@@ -138,6 +138,11 @@ typedef struct {
     int         create_framenum;
 #endif
 } server_entity_t;
+
+typedef struct server_entity_packed_s {
+    uint16_t    number;
+    q2proto_packed_entity_state_t e;
+} server_entity_packed_t;
 
 // variable server FPS
 #define SV_FRAMERATE        sv.framerate
@@ -337,12 +342,12 @@ typedef struct client_s {
     unsigned            msg_dynamic_bytes;      // total size of dynamic memory allocated
 
     // per-client baseline chunks
-    entity_packed_t     *baselines[SV_BASELINES_CHUNKS];
+    server_entity_packed_t *baselines[SV_BASELINES_CHUNKS];
 
     // per-client packet entities
     unsigned            num_entities;   // UPDATE_BACKUP*MAX_PACKET_ENTITIES(_OLD)
     unsigned            next_entity;    // next state to use
-    entity_packed_t     *entities;      // [num_entities]
+    server_entity_packed_t *entities;      // [num_entities]
 
     // server state pointers (hack for MVD channels implementation)
     configstring_t      *configstrings;
@@ -758,7 +763,7 @@ static inline void SV_CheckEntityNumber(edict_t *ent, int e, const char *func)
 void SV_BuildClientFrame(client_t *client);
 bool SV_WriteFrameToClient_Default(client_t *client, unsigned maxsize);
 bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize);
-bool SV_MakeEntityDelta(q2proto_entity_state_delta_t *delta, const entity_packed_t *from, const entity_packed_t *to, msgEsFlags_t flags);
+bool SV_MakeEntityDelta(client_t *client, q2proto_entity_state_delta_t *delta, const server_entity_packed_t *from, const server_entity_packed_t *to, msgEsFlags_t flags);
 
 //
 // sv_game.c

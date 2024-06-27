@@ -18,6 +18,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #pragma once
 
+#include "common/sizebuf.h"
+
 #include "q2proto/q2proto.h"
 
 #if USE_ZLIB
@@ -56,3 +58,9 @@ extern q2protoio_ioarg_t default_q2protoio_ioarg;
 #endif
 
 extern bool nonfatal_client_read_errors;
+
+typedef struct entity_state_s entity_state_t;
+
+Q2PROTO_DECLARE_ENTITY_PACKING_FUNCTION(PackEntity, entity_state_t *);
+
+Q2PROTO_DECLARE_PLAYER_PACKING_FUNCTION(PackPlayerstate, player_state_t *);

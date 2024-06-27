@@ -45,7 +45,7 @@ static void SV_CreateBaselines(void)
 {
     int        i;
     edict_t    *ent;
-    entity_packed_t *base, **chunk;
+    server_entity_packed_t *base, **chunk;
 
     // clear baselines from previous level
     for (i = 0; i < SV_BASELINES_CHUNKS; i++) {
@@ -74,23 +74,24 @@ static void SV_CreateBaselines(void)
         }
 
         base = *chunk + (i & SV_BASELINES_MASK);
-        MSG_PackEntity(base, &ent->s, true);
+        PackEntity(&sv_client->q2proto_ctx, &ent->s, &base->e);
+        base->number = ent->s.number;
 
         // no need to transmit data that will change anyway
         if (i <= sv_client->maxclients) {
-            VectorClear(base->origin);
-            VectorClear(base->angles);
-            base->frame = 0;
+            VectorClear(base->e.origin);
+            VectorClear(base->e.angles);
+            base->e.frame = 0;
         }
 
         // don't ever transmit event
-        base->event = 0;
+        base->e.event = 0;
 
 #if USE_MVD_CLIENT
         if (sv.state != ss_broadcast)
 #endif
         if (sv_client->esFlags & MSG_ES_LONGSOLID && !sv_client->csr->extended) {
-            base->solid = sv.entities[i].solid32;
+            base->e.solid = sv.entities[i].solid32;
         }
     }
 }
@@ -120,7 +121,7 @@ static void write_gamestate(void)
     }
 
     for (int i = 0; i < SV_BASELINES_CHUNKS; i++) {
-        entity_packed_t *base = sv_client->baselines[i];
+        server_entity_packed_t *base = sv_client->baselines[i];
         if (!base) {
             continue;
         }
@@ -128,7 +129,7 @@ static void write_gamestate(void)
             if (base->number) {
                 q2proto_svc_spawnbaseline_t *baseline = &spawnbaselines[gamestate.num_spawnbaselines++];
                 baseline->entnum = base->number;
-                SV_MakeEntityDelta(&baseline->delta_state, NULL, base, baseline_flags);
+                SV_MakeEntityDelta(sv_client, &baseline->delta_state, NULL, base, baseline_flags);
             }
             base++;
         }

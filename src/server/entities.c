@@ -41,8 +41,8 @@ delta compression happy.
 static bool SV_TruncPacketEntities(client_t *client, const client_frame_t *from,
                                    client_frame_t *to, int oldindex, int newindex)
 {
-    entity_packed_t *newent;
-    const entity_packed_t *oldent;
+    server_entity_packed_t *newent;
+    const server_entity_packed_t *oldent;
     int i, oldnum, newnum, entities_mask, from_num_entities, to_num_entities;
     bool ret = true;
 
@@ -160,133 +160,102 @@ static client_frame_t *get_last_frame(client_t *client)
     return frame;
 }
 
-static inline void make_blend_delta(const uint8_t from[4], const uint8_t to[4], q2proto_color_delta_t *blend)
+static void make_playerstate_delta(client_t *client, const q2proto_packed_player_state_t *from, q2proto_packed_player_state_t *to, q2proto_svc_playerstate_t *playerstate, msgPsFlags_t flags)
 {
-    int bits = 0;
-    for (int i = 0; i < 4; i++) {
-        if (from[i] != to[i])
-            bits |= BIT(i);
-    }
+    q2proto_server_make_player_state_delta(&client->q2proto_ctx, from, to, playerstate);
 
-    q2proto_var_color_set_byte(&blend->values, to);
-    blend->delta_bits = bits;
-}
+    if (flags & MSG_PS_IGNORE_PREDICTION) {
+        memcpy(&playerstate->pm_velocity.write.current, &playerstate->pm_velocity.write.prev, sizeof(playerstate->pm_velocity.write.current));
+        playerstate->delta_bits &= ~(Q2P_PSD_PM_TIME | Q2P_PSD_PM_FLAGS | Q2P_PSD_PM_GRAVITY);
 
-static void make_playerstate_delta(const player_packed_t *from, const player_packed_t *to, q2proto_svc_playerstate_t *playerstate, msgPsFlags_t flags)
-{
-    int     i;
-
-    Q_assert(to);
-
-    if (!from)
-        from = &nullPlayerState;
-
-    memset(playerstate, 0, sizeof(*playerstate));
-
-    if (to->pmove.pm_type != from->pmove.pm_type) {
-        playerstate->delta_bits |= Q2P_PSD_PM_TYPE;
-        playerstate->pm_type = to->pmove.pm_type;
-    }
-
-    q2proto_var_coords_set_float(&playerstate->pm_origin.write.prev, from->pmove.origin);
-    q2proto_var_coords_set_float(&playerstate->pm_origin.write.current, to->pmove.origin);
-
-    if (!(flags & MSG_PS_IGNORE_PREDICTION)) {
-        q2proto_var_coords_set_float(&playerstate->pm_velocity.write.prev, from->pmove.velocity);
-        q2proto_var_coords_set_float(&playerstate->pm_velocity.write.current, to->pmove.velocity);
-
-        if (to->pmove.pm_time != from->pmove.pm_time) {
-            playerstate->delta_bits |= Q2P_PSD_PM_TIME;
-            playerstate->pm_time = to->pmove.pm_time;
+        /* MSG_PS_IGNORE_xxx don't just indicate something should be omitted from the delta, but also
+         * that the "new" state should retain the "from" value.
+         * (Presumably that, once a MSG_PS_IGNORE_xxx isn't given, the correct value is emitted.) */
+        if(from)
+        {
+            memcpy(&to->pm_velocity, &from->pm_velocity, sizeof(to->pm_velocity));
+            to->pm_time = from->pm_time;
+            to->pm_flags = from->pm_flags;
+            to->pm_gravity = from->pm_gravity;
         }
-
-        if (to->pmove.pm_flags != from->pmove.pm_flags) {
-            playerstate->delta_bits |= Q2P_PSD_PM_FLAGS;
-            playerstate->pm_flags = to->pmove.pm_flags;
-        }
-
-        if (to->pmove.gravity != from->pmove.gravity) {
-            playerstate->delta_bits |= Q2P_PSD_PM_GRAVITY;
-            playerstate->pm_gravity = to->pmove.gravity;
+        else
+        {
+            memset(&to->pm_velocity, 0, sizeof(to->pm_velocity));
+            to->pm_time = 0;
+            to->pm_flags = 0;
+            to->pm_gravity = 0;
         }
     }
 
-    if (!(flags & MSG_PS_IGNORE_DELTAANGLES)) {
-        if (!VectorCompare(to->pmove.delta_angles, from->pmove.delta_angles)) {
-            playerstate->delta_bits |= Q2P_PSD_PM_DELTA_ANGLES;
-            q2proto_var_angles_set_float(&playerstate->pm_delta_angles, to->pmove.delta_angles);
+    if (flags & MSG_PS_IGNORE_DELTAANGLES) {
+        playerstate->delta_bits &= ~Q2P_PSD_PM_DELTA_ANGLES;
+
+        if(from)
+            memcpy(&to->pm_delta_angles, &from->pm_delta_angles, sizeof(to->pm_delta_angles));
+        else
+            memset(&to->pm_delta_angles, 0, sizeof(to->pm_delta_angles));
+    }
+
+    if (flags & MSG_PS_IGNORE_VIEWANGLES)
+    {
+        playerstate->viewangles.delta_bits = 0;
+
+        if(from)
+            memcpy(&to->viewangles, &from->viewangles, sizeof(to->viewangles));
+        else
+            memset(&to->viewangles, 0, sizeof(to->viewangles));
+    }
+
+    if (flags & MSG_PS_IGNORE_BLEND) {
+        playerstate->blend.delta_bits = 0;
+        playerstate->damage_blend.delta_bits = 0;
+
+        if(from)
+        {
+            memcpy(&to->blend, &from->blend, sizeof(to->blend));
+            memcpy(&to->damage_blend, &from->damage_blend, sizeof(to->damage_blend));
+        }
+        else
+        {
+            memset(&to->blend, 0, sizeof(to->blend));
+            memset(&to->damage_blend, 0, sizeof(to->damage_blend));
         }
     }
 
-    if (!VectorCompare(to->viewoffset, from->viewoffset)) {
-        playerstate->delta_bits |= Q2P_PSD_VIEWOFFSET;
-        q2proto_var_small_offsets_set_q2repro_viewoffset(&playerstate->viewoffset, to->viewoffset);
-    }
+    if (flags & MSG_PS_IGNORE_GUNFRAMES) {
+        playerstate->delta_bits &= ~(Q2P_PSD_GUNFRAME | Q2P_PSD_GUNOFFSET | Q2P_PSD_GUNANGLES);
 
-    if (!(flags & MSG_PS_IGNORE_VIEWANGLES))
-        Q2PROTO_SET_ANGLES_DELTA(playerstate->viewangles, to->viewangles, from->viewangles, short);
-
-    if (!VectorCompare(to->kick_angles, from->kick_angles)) {
-        playerstate->delta_bits |= Q2P_PSD_KICKANGLES;
-        q2proto_var_small_angles_set_q2repro_kick_angles(&playerstate->kick_angles, to->kick_angles);
-    }
-
-    if (!(flags & MSG_PS_IGNORE_BLEND)) {
-        make_blend_delta(from->screen_blend, to->screen_blend, &playerstate->blend);
-        make_blend_delta(from->damage_blend, to->damage_blend, &playerstate->damage_blend);
-    }
-
-    if (to->fov != from->fov) {
-        playerstate->delta_bits |= Q2P_PSD_FOV;
-        playerstate->fov = to->fov;
-    }
-
-    if (to->rdflags != from->rdflags) {
-        playerstate->delta_bits |= Q2P_PSD_RDFLAGS;
-        playerstate->rdflags = to->rdflags;
-    }
-
-    if (!(flags & MSG_PS_IGNORE_GUNFRAMES)) {
-        if (to->gunframe != from->gunframe)
-            playerstate->delta_bits |= Q2P_PSD_GUNFRAME;
-        if (!VectorCompare(to->gunoffset, from->gunoffset))
-            playerstate->delta_bits |= Q2P_PSD_GUNOFFSET;
-        if (!VectorCompare(to->gunangles, from->gunangles))
-            playerstate->delta_bits |= Q2P_PSD_GUNANGLES;
-        if (playerstate->delta_bits & (Q2P_PSD_GUNFRAME | Q2P_PSD_GUNOFFSET | Q2P_PSD_GUNANGLES)) {
-            playerstate->gunframe = to->gunframe;
-            q2proto_var_small_offsets_set_q2repro_gunoffset(&playerstate->gunoffset, to->gunoffset);
-            q2proto_var_small_angles_set_q2repro_gunangles(&playerstate->gunangles, to->gunangles);
+        if(from)
+        {
+            to->gunframe = from->gunframe;
+            memcpy(&to->gunoffset, &from->gunoffset, sizeof(to->gunoffset));
+            memcpy(&to->gunangles, &from->gunangles, sizeof(to->gunangles));
+        }
+        else
+        {
+            to->gunframe = 0;
+            memset(&to->gunoffset, 0, sizeof(to->gunoffset));
+            memset(&to->gunangles, 0, sizeof(to->gunangles));
         }
     }
 
-    if (!(flags & MSG_PS_IGNORE_GUNINDEX)) {
-        if (to->gunindex != from->gunindex) {
-            playerstate->delta_bits |= Q2P_PSD_GUNINDEX;
-            playerstate->gunindex = to->gunindex & GUNINDEX_MASK;
-            playerstate->gunskin = to->gunindex >> GUNINDEX_BITS;
+    if (flags & MSG_PS_IGNORE_GUNINDEX) {
+        playerstate->delta_bits &= ~Q2P_PSD_GUNINDEX;
+
+        if(from)
+        {
+            to->gunindex = from->gunindex;
+            to->gunskin = from->gunskin;
         }
-    }
-
-
-    for (i = 0; i < MAX_STATS; i++)
-        if (to->stats[i] != from->stats[i]) {
-            playerstate->statbits |= BIT_ULL(i);
-            playerstate->stats[i] = to->stats[i];
+        else
+        {
+            to->gunindex = 0;
+            to->gunskin = 0;
         }
-
-    if (to->gunrate != from->gunrate) {
-        playerstate->delta_bits |= Q2P_PSD_GUNRATE;
-        playerstate->gunrate = to->gunrate;
-    }
-
-    if (to->pmove.viewheight != from->pmove.viewheight) {
-        playerstate->delta_bits |= Q2P_PSD_PM_VIEWHEIGHT;
-        playerstate->pm_viewheight = to->pmove.viewheight;
     }
 }
 
-static void write_entity_delta(client_t *client, const entity_packed_t *from, const entity_packed_t *to, msgEsFlags_t flags)
+static void write_entity_delta(client_t *client, const server_entity_packed_t *from, const server_entity_packed_t *to, msgEsFlags_t flags)
 {
     q2proto_svc_message_t message = {.type = Q2P_SVC_FRAME_ENTITY_DELTA, .frame_entity_delta = {0}};
 
@@ -306,7 +275,7 @@ static void write_entity_delta(client_t *client, const entity_packed_t *from, co
 
     if (client->q2proto_ctx.features.has_beam_old_origin_fix)
         flags |= MSG_ES_BEAMORIGIN;
-    bool entity_differs = SV_MakeEntityDelta(&message.frame_entity_delta.entity_delta, from, to, flags);
+    bool entity_differs = SV_MakeEntityDelta(client, &message.frame_entity_delta.entity_delta, from, to, flags);
     if (!(flags & MSG_ES_FORCE) && !entity_differs)
         return;
     q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
@@ -318,8 +287,8 @@ static bool emit_packet_entities(client_t               *client,
                                  int                    clientEntityNum,
                                  unsigned               maxsize)
 {
-    entity_packed_t *newent;
-    const entity_packed_t *oldent;
+    server_entity_packed_t *newent;
+    const server_entity_packed_t *oldent;
     int i, oldnum, newnum, oldindex, newindex, from_num_entities;
     bool ret = true;
 
@@ -368,8 +337,8 @@ static bool emit_packet_entities(client_t               *client,
             }
             if (newnum == clientEntityNum) {
                 flags |= MSG_ES_FIRSTPERSON;
-                VectorCopy(oldent->origin, newent->origin);
-                VectorCopy(oldent->angles, newent->angles);
+                VectorCopy(oldent->e.origin, newent->e.origin);
+                VectorCopy(oldent->e.angles, newent->e.angles);
             }
             write_entity_delta(client, oldent, newent, flags);
             oldindex++;
@@ -382,8 +351,6 @@ static bool emit_packet_entities(client_t               *client,
             oldent = client->baselines[newnum >> SV_BASELINES_SHIFT];
             if (oldent) {
                 oldent += (newnum & SV_BASELINES_MASK);
-            } else {
-                oldent = &nullEntityState;
             }
             write_entity_delta(client, oldent, newent, MSG_ES_NEWENTITY | MSG_ES_FORCE);
             newindex++;
@@ -413,7 +380,7 @@ SV_WriteFrameToClient_Default
 bool SV_WriteFrameToClient_Default(client_t *client, unsigned maxsize)
 {
     client_frame_t  *frame, *oldframe;
-    player_packed_t *oldstate;
+    q2proto_packed_player_state_t *oldstate;
     int             lastframe;
 
     // this is the frame we are creating
@@ -438,7 +405,7 @@ bool SV_WriteFrameToClient_Default(client_t *client, unsigned maxsize)
     message.frame.areabits_len = frame->areabytes;
     message.frame.areabits = frame->areabits;
 
-    make_playerstate_delta(oldstate, &frame->ps, &message.frame.playerstate, 0);
+    make_playerstate_delta(client, oldstate, &frame->ps, &message.frame.playerstate, 0);
     if ((oldframe ? oldframe->clientNum : 0) != frame->clientNum) {
         message.frame.playerstate.clientnum = frame->clientNum;
         message.frame.playerstate.delta_bits |= Q2P_PSD_CLIENTNUM;
@@ -461,7 +428,7 @@ SV_WriteFrameToClient_Enhanced
 bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
 {
     client_frame_t  *frame, *oldframe;
-    player_packed_t *oldstate;
+    q2proto_packed_player_state_t *oldstate;
     msgPsFlags_t    psFlags;
     int             clientEntityNum;
 
@@ -500,8 +467,8 @@ bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
         if (client->settings[CLS_NOBLEND]) {
             psFlags |= MSG_PS_IGNORE_BLEND;
         }
-        if (frame->ps.pmove.pm_type < PM_DEAD) {
-            if (!(frame->ps.pmove.pm_flags & PMF_NO_PREDICTION)) {
+        if (frame->ps.pm_type < PM_DEAD) {
+            if (!(frame->ps.pm_flags & PMF_NO_PREDICTION)) {
                 psFlags |= MSG_PS_IGNORE_VIEWANGLES;
             }
         } else {
@@ -511,7 +478,7 @@ bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
     }
 
     clientEntityNum = 0;
-    if (frame->ps.pmove.pm_type < PM_DEAD && !client->settings[CLS_RECORDING]) {
+    if (frame->ps.pm_type < PM_DEAD && !client->settings[CLS_RECORDING]) {
         clientEntityNum = frame->clientNum + 1;
     }
     if (client->settings[CLS_NOPREDICT]) {
@@ -521,7 +488,7 @@ bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
     psFlags |= MSG_PS_RERELEASE;
 
     // delta encode the playerstate
-    make_playerstate_delta(oldstate, &frame->ps, &message.frame.playerstate, psFlags);
+    make_playerstate_delta(client, oldstate, &frame->ps, &message.frame.playerstate, psFlags);
 
     if ((oldframe ? oldframe->clientNum : 0) != frame->clientNum) {
         message.frame.playerstate.clientnum = frame->clientNum;
@@ -537,107 +504,24 @@ bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
     return emit_packet_entities(client, oldframe, frame, clientEntityNum, maxsize);
 }
 
-bool SV_MakeEntityDelta(q2proto_entity_state_delta_t *delta, const entity_packed_t *from, const entity_packed_t *to, msgEsFlags_t flags)
+static const server_entity_packed_t nullServerEntityState;
+
+bool SV_MakeEntityDelta(client_t *client, q2proto_entity_state_delta_t *delta, const server_entity_packed_t *from, const server_entity_packed_t *to, msgEsFlags_t flags)
 {
     if (!from)
-        from = &nullEntityState;
+        from = &nullServerEntityState;
 
-// send an update
-    if (!(flags & MSG_ES_FIRSTPERSON)) {
-        q2proto_var_coords_set_float(&delta->origin.write.prev, from->origin);
-        q2proto_var_coords_set_float(&delta->origin.write.current, to->origin);
-
-        if (to->angles[0] != from->angles[0]) {
-            delta->angle.delta_bits |= BIT(0);
-            q2proto_var_angles_set_short_comp(&delta->angle.values, 0, to->angles[0]);
-        }
-        if (to->angles[1] != from->angles[1]) {
-            delta->angle.delta_bits |= BIT(1);
-            q2proto_var_angles_set_short_comp(&delta->angle.values, 1, to->angles[1]);
-        }
-        if (to->angles[2] != from->angles[2]) {
-            delta->angle.delta_bits |= BIT(2);
-            q2proto_var_angles_set_short_comp(&delta->angle.values, 2, to->angles[2]);
-        }
-
-        bool write_old_origin =
-            ((flags & MSG_ES_NEWENTITY) && !VectorCompare(to->old_origin, from->origin))
-            || ((to->renderfx & RF_FRAMELERP) && !VectorCompare(to->old_origin, from->origin))
-            || ((to->renderfx & RF_BEAM) && (!(flags & MSG_ES_BEAMORIGIN) || !VectorCompare(to->old_origin, from->old_origin)));
-        if (write_old_origin)
-        {
-            delta->delta_bits |= Q2P_ESD_OLD_ORIGIN;
-            q2proto_var_coords_set_float(&delta->old_origin, to->old_origin);
-        }
+    bool write_old_origin =
+        ((flags & MSG_ES_NEWENTITY) && !VectorCompare(to->e.old_origin, from->e.origin))
+        || ((to->e.renderfx & RF_FRAMELERP) && !VectorCompare(to->e.old_origin, from->e.origin))
+        || ((to->e.renderfx & RF_BEAM) && (!(flags & MSG_ES_BEAMORIGIN) || !VectorCompare(to->e.old_origin, from->e.old_origin)));
+    q2proto_server_make_entity_state_delta(&client->q2proto_ctx, &from->e, &to->e, !(flags & MSG_ES_FIRSTPERSON) && write_old_origin, delta);
+    if (flags & MSG_ES_FIRSTPERSON)
+    {
+        memcpy(&delta->origin.write.current, &delta->origin.write.prev, sizeof(delta->origin.write.current));
+        delta->angle.delta_bits = 0;
     }
-
-    if (to->skinnum != from->skinnum) {
-        delta->delta_bits |= Q2P_ESD_SKINNUM;
-        delta->skinnum = to->skinnum;
-    }
-
-    if (to->frame != from->frame) {
-        delta->delta_bits |= Q2P_ESD_FRAME;
-        delta->frame = to->frame;
-    }
-
-    if (to->effects != from->effects) {
-        if ((uint32_t)to->effects != (uint32_t)from->effects)
-            delta->delta_bits |= Q2P_ESD_EFFECTS;
-        if ((to->effects >> 32) != (from->effects >> 32))
-            delta->delta_bits |= Q2P_ESD_EFFECTS_MORE;
-        delta->effects = to->effects;
-        delta->effects_more = to->effects >> 32;
-    }
-
-    if (to->renderfx != from->renderfx) {
-        delta->delta_bits |= Q2P_ESD_RENDERFX;
-        delta->renderfx = to->renderfx;
-    }
-
-    if (to->solid != from->solid) {
-        delta->delta_bits |= Q2P_ESD_SOLID;
-        delta->solid = to->solid;
-    }
-
-    // event is not delta compressed, just 0 compressed
-    if (to->event) {
-        delta->delta_bits |= Q2P_ESD_EVENT;
-        delta->event = to->event;
-    }
-
-    if (to->modelindex != from->modelindex) {
-        delta->delta_bits |= Q2P_ESD_MODELINDEX;
-        delta->modelindex = to->modelindex;
-    }
-    if (to->modelindex2 != from->modelindex2) {
-        delta->delta_bits |= Q2P_ESD_MODELINDEX2;
-        delta->modelindex2 = to->modelindex2;
-    }
-    if (to->modelindex3 != from->modelindex3) {
-        delta->delta_bits |= Q2P_ESD_MODELINDEX3;
-        delta->modelindex3 = to->modelindex3;
-    }
-    if (to->modelindex4 != from->modelindex4) {
-        delta->delta_bits |= Q2P_ESD_MODELINDEX4;
-        delta->modelindex4 = to->modelindex4;
-    }
-
-    if (to->sound != from->sound) {
-        delta->delta_bits |= Q2P_ESD_SOUND;
-        delta->sound = to->sound;
-    }
-
-    if (to->alpha != from->alpha) {
-        delta->delta_bits |= Q2P_ESD_ALPHA;
-        delta->alpha = to->alpha;
-    }
-    if (to->scale != from->scale) {
-        delta->delta_bits |= Q2P_ESD_SCALE;
-        delta->scale = to->scale;
-    }
-
-    return (delta->delta_bits != 0) || (to->origin[0] != from->origin[0]) || (to->origin[1] != from->origin[1]) || (to->origin[2] != from->origin[2]) || (delta->angle.delta_bits != 0);
+    return (delta->delta_bits != 0) || (memcmp(&delta->origin.write.current, &delta->origin.write.prev, sizeof(delta->origin.write.current)) != 0) || (delta->angle.delta_bits != 0);
 }
 
 /*
@@ -777,7 +661,7 @@ void SV_BuildClientFrame(client_t *client)
     server_entity_t *svent;
     edict_t     *clent;
     client_frame_t  *frame;
-    entity_packed_t *state;
+    server_entity_packed_t *state;
     const mleaf_t   *leaf;
     int         clientarea, clientcluster;
     byte        clientphs[VIS_MAX_BYTES];
@@ -821,7 +705,7 @@ void SV_BuildClientFrame(client_t *client)
     }
 
     // grab the current player_state_t
-    MSG_PackPlayer(&frame->ps, &clent->client->ps, MSG_PS_RERELEASE);
+    PackPlayerstate(&client->q2proto_ctx, (const player_state_t*)clent->client, &frame->ps);
 
     // grab the current clientNum
     if (g_features->integer & GMF_CLIENTNUM) {
@@ -951,10 +835,11 @@ void SV_BuildClientFrame(client_t *client)
         // optionally customize it
         if (customize && customize(clent, ent, &temp)) {
             Q_assert(temp.s.number == e);
-            MSG_PackEntity(state, &temp.s, true);
+            PackEntity(&client->q2proto_ctx, &temp.s, &state->e);
         } else {
-            MSG_PackEntity(state, &ent->s, true);
+            PackEntity(&client->q2proto_ctx, &ent->s, &state->e);
         }
+        state->number = e;
 
 #if USE_FPS
         // fix old entity origins for clients not running at
@@ -964,22 +849,22 @@ void SV_BuildClientFrame(client_t *client)
 #endif
 
         // clear footsteps
-        if (client->settings[CLS_NOFOOTSTEPS] && (state->event == EV_FOOTSTEP
-            || (state->event == EV_OTHER_FOOTSTEP || state->event == EV_LADDER_STEP))) {
-            state->event = 0;
+        if (client->settings[CLS_NOFOOTSTEPS] && (state->e.event == EV_FOOTSTEP
+            || (state->e.event == EV_OTHER_FOOTSTEP || state->e.event == EV_LADDER_STEP))) {
+            state->e.event = 0;
         }
 
         // hide POV entity from renderer, unless this is player's own entity
         if (e == frame->clientNum + 1 && ent != clent &&
             (!Q2PRO_OPTIMIZE(client))) {
-            state->modelindex = 0;
+            state->e.modelindex = 0;
         }
 
         if ((!USE_MVD_CLIENT || sv.state != ss_broadcast) && (ent->owner == clent)) {
             // don't mark players missiles as solid
-            state->solid = 0;
+            state->e.solid = 0;
         } else if (client->esFlags & MSG_ES_LONGSOLID && !client->csr->extended) {
-            state->solid = sv.entities[e].solid32;
+            state->e.solid = sv.entities[e].solid32;
         }
 
         frame->num_entities++;

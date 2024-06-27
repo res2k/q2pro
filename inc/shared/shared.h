@@ -1719,7 +1719,7 @@ typedef union {
 // entity_state_t is the information conveyed from the server
 // in an update message about entities that the client will
 // need to render in some way
-typedef struct {
+typedef struct entity_state_s {
     int     number;         // edict index
 
     vec3_t  origin;
@@ -1763,7 +1763,7 @@ typedef struct {
 // to rendered a view.  There will only be 10 player_state_t sent each second,
 // but the number of pmove_state_t changes will be reletive to client
 // frame rates
-typedef struct {
+typedef struct player_state_s {
     pmove_state_t   pmove;  // for prediction
 
     // these fields do not need to be communicated bit-precise

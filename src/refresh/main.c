@@ -99,8 +99,8 @@ static void GL_SetupFrustum(void)
 
     // right/left
     angle = DEG2RAD(glr.fd.fov_x / 2);
-    sf = sin(angle);
-    cf = cos(angle);
+    sf = sinf(angle);
+    cf = cosf(angle);
 
     VectorScale(glr.viewaxis[0], sf, forward);
     VectorScale(glr.viewaxis[1], cf, left);
@@ -110,8 +110,8 @@ static void GL_SetupFrustum(void)
 
     // top/bottom
     angle = DEG2RAD(glr.fd.fov_y / 2);
-    sf = sin(angle);
-    cf = cos(angle);
+    sf = sinf(angle);
+    cf = cosf(angle);
 
     VectorScale(glr.viewaxis[0], sf, forward);
     VectorScale(glr.viewaxis[2], cf, up);
@@ -1018,14 +1018,14 @@ static void GL_InitTables(void)
 
     for (i = 0; i < NUMVERTEXNORMALS; i++) {
         v = bytedirs[i];
-        lat = acos(v[2]);
-        lng = atan2(v[1], v[0]);
-        gl_static.latlngtab[i][0] = (int)(lat * (float)(255 / (2 * M_PI))) & 255;
-        gl_static.latlngtab[i][1] = (int)(lng * (float)(255 / (2 * M_PI))) & 255;
+        lat = acosf(v[2]);
+        lng = atan2f(v[1], v[0]);
+        gl_static.latlngtab[i][0] = (int)(lat * (255 / (2 * M_PIf))) & 255;
+        gl_static.latlngtab[i][1] = (int)(lng * (255 / (2 * M_PIf))) & 255;
     }
 
     for (i = 0; i < 256; i++) {
-        gl_static.sintab[i] = sin(i * (2 * M_PI / 255));
+        gl_static.sintab[i] = sinf(i * (2 * M_PIf / 255));
     }
 }
 

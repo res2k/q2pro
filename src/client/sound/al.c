@@ -673,7 +673,7 @@ static void s_underwater_gain_hf_changed(cvar_t *self)
         s_underwater_flag = false;
     }
 
-    qalFilterf(s_underwater_filter, AL_LOWPASS_GAINHF, Cvar_ClampValue(self, 0, 1));
+    qalFilterf(s_underwater_filter, AL_LOWPASS_GAINHF, Cvar_ClampValue(self, 0.001f, 1));
 }
 
 static void al_reverb_changed(cvar_t *self)

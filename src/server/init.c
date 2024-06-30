@@ -197,8 +197,8 @@ void SV_SpawnServer(const mapcmd_t *cmd)
     ge->SpawnEntities(sv.name, sv.cm.entitystring, cmd->spawnpoint);
 
     // run two frames to allow everything to settle
-    ge->RunFrame(false); sv.framenum++;
-    ge->RunFrame(false); sv.framenum++;
+    for (i = 0; i < 2; i++, sv.framenum++)
+        ge->RunFrame(false);
 
     // make sure maxclients string is correct
     sprintf(sv.configstrings[svs.csr.maxclients], "%d", sv_maxclients->integer);

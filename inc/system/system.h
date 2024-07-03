@@ -34,7 +34,7 @@ void    Sys_FreeLibrary(void *handle);
 void    *Sys_GetProcAddress(void *handle, const char *sym);
 
 unsigned    Sys_Milliseconds(void);
-void    Sys_Sleep(int msec);
+void        Sys_Sleep(int msec);
 
 void    Sys_Init(void);
 void    Sys_AddDefaultConfig(void);
@@ -78,11 +78,11 @@ bool    Sys_GetInstalledGamePath(game_path_t path_type, char *path, size_t path_
 void    Sys_DebugBreak(void);
 
 #if USE_AC_CLIENT
-bool Sys_GetAntiCheatAPI(void);
+bool    Sys_GetAntiCheatAPI(void);
 #endif
 
 #ifndef _WIN32
-bool Sys_SetNonBlock(int fd, bool nb);
+bool    Sys_SetNonBlock(int fd, bool nb);
 #endif
 
 #if USE_MEMORY_TRACES

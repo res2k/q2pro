@@ -775,7 +775,7 @@ ACTION MESSAGES
 
 tent_params_t   te;
 mz_params_t     mz;
-snd_params_t    snd;
+q2proto_sound_t snd;
 
 static void CL_ParseTEntPacket(const q2proto_svc_temp_entity_t *temp_entity)
 {
@@ -800,19 +800,11 @@ static void CL_ParseMuzzleFlashPacket(const q2proto_svc_muzzleflash_t *muzzlefla
 
 static void CL_ParseStartSoundPacket(const q2proto_svc_sound_t* sound)
 {
-    snd.flags = sound->flags;
-    snd.index = sound->index;
+    q2proto_sound_decode_message(sound, &snd);
     if (snd.index >= cl.csr.max_sounds)
         Com_Error(ERR_DROP, "%s: bad index: %d", __func__, snd.index);
-    snd.volume = sound->volume / 255.0f;
-    snd.attenuation = sound->attenuation / 64.0f;
-    snd.timeofs = sound->timeofs / 1000.0f;
-    snd.entity = sound->entity;
     if (snd.entity >= cl.csr.max_edicts)
         Com_Error(ERR_DROP, "%s: bad entity: %d", __func__, snd.entity);
-    snd.channel = sound->channel;
-    q2proto_var_coords_get_float(&sound->pos, snd.pos);
-
     SHOWNET(2, "    %s\n", cl.configstrings[cl.csr.sounds + snd.index]);
 }
 

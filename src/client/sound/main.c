@@ -725,11 +725,11 @@ void S_ParseStartSound(void)
         return;
 
 #if USE_DEBUG
-    if (developer->integer && !(snd.flags & SND_POS))
+    if (developer->integer && !snd.has_position)
         CL_CheckEntityPresent(snd.entity, "sound");
 #endif
 
-    S_StartSound((snd.flags & SND_POS) ? snd.pos : NULL,
+    S_StartSound(snd.has_position ? snd.pos : NULL,
                  snd.entity, snd.channel, handle,
                  snd.volume, snd.attenuation, snd.timeofs);
 }

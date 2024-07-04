@@ -535,11 +535,11 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
                           int channel, int soundindex, float volume,
                           float attenuation, float timeofs)
 {
-    int         ent, vol, att, ofs, flags;
     vec3_t      origin_v;
     client_t    *client;
     byte        mask[VIS_MAX_BYTES];
     const mleaf_t       *leaf1, *leaf2;
+    q2proto_sound_t snd = {0};
     message_packet_t    *msg;
     bool        force_pos;
 
@@ -553,26 +553,6 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
         Com_Error(ERR_DROP, "%s: timeofs = %f", __func__, timeofs);
     if (soundindex < 0 || soundindex >= svs.csr.max_sounds)
         Com_Error(ERR_DROP, "%s: soundindex = %d", __func__, soundindex);
-
-    vol = volume * 255;
-    att = attenuation * 64;
-    ofs = timeofs * 1000;
-
-    // need to clip due to faulty range check above
-    att = min(att, 255);
-
-    ent = NUM_FOR_EDICT(edict);
-
-    // always send the entity number for channel overrides
-    flags = SND_ENT;
-    if (vol != 255)
-        flags |= SND_VOLUME;
-    if (att != 64)
-        flags |= SND_ATTENUATION;
-    if (ofs)
-        flags |= SND_OFFSET;
-    if (soundindex > 255)
-        flags |= SND_INDEX16;
 
     // send origin for invisible entities
     // the origin can also be explicitly set
@@ -589,16 +569,20 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
         }
     }
 
+    snd.index = soundindex;
+    // always send the entity number for channel overrides
+    snd.has_entity_channel = true;
+    snd.entity = NUM_FOR_EDICT(edict);
+    snd.channel = channel;
+    snd.has_position = true;
+    VectorCopy(origin, snd.pos);
+    snd.volume = volume;
+    snd.attenuation = attenuation;
+    snd.timeofs = timeofs;
+
     // prepare multicast message
     q2proto_svc_message_t sound_msg = {.type = Q2P_SVC_SOUND, .sound = {0}};
-    sound_msg.sound.flags = flags | SND_POS;
-    sound_msg.sound.index = soundindex;
-    sound_msg.sound.volume = vol;
-    sound_msg.sound.attenuation = att;
-    sound_msg.sound.timeofs = ofs;
-    sound_msg.sound.entity = ent;
-    sound_msg.sound.channel = channel;
-    q2proto_var_coords_set_float(&sound_msg.sound.pos, origin);
+    q2proto_sound_encode_message(&snd, &sound_msg.sound);
 
     q2proto_server_multicast_write(&svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &sound_msg);
 
@@ -665,7 +649,7 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
 
         msg->cursize = SOUND_PACKET;
         msg->sound = sound_msg.sound;
-        msg->sound.flags = flags; // lacks SND_POS, which will be set, if necessary, by emit_snd()
+        msg->sound.flags &= ~SND_POS; // SND_POS, will be set, if necessary, by emit_snd()
 
         List_Remove(&msg->entry);
         List_Append(&client->msg_unreliable_list, &msg->entry);
@@ -675,7 +659,7 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
     // clear multicast buffer
     SZ_Clear(&msg_write);
 
-    SV_MvdStartSound(ent, channel, flags, soundindex, vol, att, ofs);
+    SV_MvdStartSound(snd.entity, channel, sound_msg.sound.flags, soundindex, sound_msg.sound.volume, sound_msg.sound.attenuation, sound_msg.sound.timeofs);
 }
 
 static void PF_StartSound(edict_t *entity, int channel,
@@ -687,18 +671,25 @@ static void PF_StartSound(edict_t *entity, int channel,
     SV_StartSound(NULL, entity, channel, soundindex, volume, attenuation, timeofs);
 }
 
-// TODO: support origin/entity/volume/attenuation/timeofs
+// TODO: support origin; add range checks?
 static void PF_LocalSound(edict_t *target, const vec3_t origin,
                           edict_t *entity, int channel,
                           int soundindex, float volume,
                           float attenuation, float timeofs)
 {
     int entnum = NUM_FOR_EDICT(target);
-    q2proto_svc_message_t message = {.type = Q2P_SVC_SOUND, .sound = {0}};
+
+    q2proto_sound_t snd = {.index = soundindex};
     // always send the entity number for channel overrides
-    message.sound.flags = SND_ENT;
-    message.sound.entity = entnum;
-    message.sound.channel = channel;
+    snd.has_entity_channel = true;
+    snd.entity = entnum;
+    snd.channel = channel;
+    snd.volume = volume;
+    snd.attenuation = attenuation;
+    snd.timeofs = timeofs;
+
+    q2proto_svc_message_t message = {.type = Q2P_SVC_SOUND, .sound = {0}};
+    q2proto_sound_encode_message(&snd, &message.sound);
 
     int clientNum = entnum - 1;
     if (clientNum < 0 || clientNum >= sv_maxclients->integer) {

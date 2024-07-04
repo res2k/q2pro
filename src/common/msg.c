@@ -24,6 +24,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/math.h"
 #include "common/intreadwrite.h"
 
+#include "q2proto/q2proto_sound.h"
+
 /*
 ==============================================================================
 
@@ -557,14 +559,7 @@ void MSG_PackEntity(entity_packed_t *out, const entity_state_t *in, bool ext)
         out->alpha = Q_clip_alpha(in->alpha);
         out->scale = Q_clip_scale(in->scale);
         out->loop_volume = Q_clip_uint8(in->loop_volume * 255.0f);
-        // encode ATTN_STATIC (192) as 0, and ATTN_LOOP_NONE (-1) as 192
-        if (in->loop_attenuation == ATTN_LOOP_NONE) {
-            out->loop_attenuation = 192;
-        } else {
-            out->loop_attenuation = Q_clip_uint8(in->loop_attenuation * 64.0f);
-            if (out->loop_attenuation == 192)
-                out->loop_attenuation = 0;
-        }
+        out->loop_attenuation = q2proto_sound_encode_loop_attenuation(in->loop_attenuation);
         // save network bandwidth
         if (out->scale == 16) out->scale = 0;
         if (out->loop_volume == 255) out->loop_volume = 0;
@@ -2248,11 +2243,7 @@ void MSG_ParseDeltaEntity(entity_state_t            *to,
             if (w & 0x4000)
                 to->loop_volume = MSG_ReadByte() / 255.0f;
             if (w & 0x8000) {
-                int b = MSG_ReadByte();
-                if (b == 192)
-                    to->loop_attenuation = ATTN_LOOP_NONE;
-                else
-                    to->loop_attenuation = b / 64.0f;
+                to->loop_attenuation = q2proto_sound_decode_loop_attenuation(MSG_ReadByte());
             }
         } else {
             to->sound = MSG_ReadByte();

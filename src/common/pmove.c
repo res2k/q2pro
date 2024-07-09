@@ -68,7 +68,7 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
     pm_clipmask = MASK_PLAYERSOLID;
 
     // remaster player collision rules
-    if (params->extended_server) {
+    if (params->extended_server_ver != 0) {
         if (pmove->s.pm_type == PM_DEAD || pmove->s.pm_type == PM_GIB)
             pm_clipmask = MASK_DEADSOLID;
 
@@ -76,20 +76,58 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
             pm_clipmask |= CONTENTS_PLAYER;
     }
 
-    game3_pmove_t game3_pmove;
-    ConvertToGame3_pmove_state(&game3_pmove.s, &pmove->s, params->extended_server);
+    if (params->extended_server_ver >= 2) {
+        game3_pmove_new_t game3_pmove;
+        ConvertToGame3_pmove_state_new(&game3_pmove.s, &pmove->s, true);
 
-    ConvertToGame3_usercmd(&game3_pmove.cmd, &pmove->cmd);
-    game3_pmove.snapinitial = pmove->snapinitial;
-    game3_pmove.trace = wrap_pmove_trace;
-    // "Classic" pmove doesn't actually use clip(), so no need to set it
-    game3_pmove.pointcontents = wrap_pmove_pointcontents;
+        ConvertToGame3_usercmd(&game3_pmove.cmd, &pmove->cmd);
+        game3_pmove.snapinitial = pmove->snapinitial;
+        game3_pmove.trace = wrap_pmove_trace;
+        // "Classic" pmove doesn't actually use clip(), so no need to set it
+        game3_pmove.pointcontents = wrap_pmove_pointcontents;
 
-    current_pmove_trace = pmove->trace;
-    current_pmove_pointcontents = pmove->pointcontents;
-    game3_Pmove(&game3_pmove, &pmove->groundplane, params);
+        current_pmove_trace = pmove->trace;
+        current_pmove_pointcontents = pmove->pointcontents;
+        game3_PmoveNew(&game3_pmove, &pmove->groundplane, params);
 
-    ConvertFromGame3_pmove_state(&pmove->s, &game3_pmove.s, params->extended_server);
+        ConvertFromGame3_pmove_state_new(&pmove->s, &game3_pmove.s, true);
+
+        VectorCopy(game3_pmove.viewangles, pmove->viewangles);
+        VectorCopy(game3_pmove.mins, pmove->mins);
+        VectorCopy(game3_pmove.maxs, pmove->maxs);
+
+        // See comment on trace.ent above
+        pmove->groundentity = (edict_t *)game3_pmove.groundentity;
+
+        pmove->watertype = game3_pmove.watertype;
+        pmove->waterlevel = game3_pmove.waterlevel;
+    } else {
+        game3_pmove_old_t game3_pmove;
+        ConvertToGame3_pmove_state_old(&game3_pmove.s, &pmove->s, params->extended_server_ver != 0);
+
+        ConvertToGame3_usercmd(&game3_pmove.cmd, &pmove->cmd);
+        game3_pmove.snapinitial = pmove->snapinitial;
+        game3_pmove.trace = wrap_pmove_trace;
+        // "Classic" pmove doesn't actually use clip(), so no need to set it
+        game3_pmove.pointcontents = wrap_pmove_pointcontents;
+
+        current_pmove_trace = pmove->trace;
+        current_pmove_pointcontents = pmove->pointcontents;
+        game3_PmoveOld(&game3_pmove, &pmove->groundplane, params);
+
+        ConvertFromGame3_pmove_state_old(&pmove->s, &game3_pmove.s, params->extended_server_ver != 0);
+
+        VectorCopy(game3_pmove.viewangles, pmove->viewangles);
+        VectorCopy(game3_pmove.mins, pmove->mins);
+        VectorCopy(game3_pmove.maxs, pmove->maxs);
+
+        // See comment on trace.ent above
+        pmove->groundentity = (edict_t *)game3_pmove.groundentity;
+
+        pmove->watertype = game3_pmove.watertype;
+        pmove->waterlevel = game3_pmove.waterlevel;
+    }
+
     /* viewheight is now added to the viewoffset; this didn't happen in vanilla,
      * so clear out the viewheight */
     pmove->s.viewheight = 0;
@@ -98,16 +136,6 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
      * touches, so cheat and pretend 0 touches (and don't bother to somehow
      * produce correct touch info). */
     pmove->touch.num = 0;
-
-    VectorCopy(game3_pmove.viewangles, pmove->viewangles);
-    VectorCopy(game3_pmove.mins, pmove->mins);
-    VectorCopy(game3_pmove.maxs, pmove->maxs);
-
-    // See comment on trace.ent above
-    pmove->groundentity = (edict_t *)game3_pmove.groundentity;
-
-    pmove->watertype = game3_pmove.watertype;
-    pmove->waterlevel = game3_pmove.waterlevel;
 }
 
 void PmoveInit(pmoveParams_t *pmp)
@@ -121,6 +149,8 @@ void PmoveInit(pmoveParams_t *pmp)
     pmp->friction = 6;
     pmp->waterfriction = 1;
     pmp->flyfriction = 9;
+    pmp->time_shift = 3;
+    pmp->coord_bits = 16;
 }
 
 void PmoveEnableQW(pmoveParams_t *pmp)
@@ -132,4 +162,10 @@ void PmoveEnableQW(pmoveParams_t *pmp)
     pmp->friction = 4;
     pmp->waterfriction = 4;
     pmp->airaccelerate = true;
+}
+
+void PmoveEnableExt(pmoveParams_t *pmp)
+{
+    pmp->time_shift = 0;
+    pmp->coord_bits = 23;
 }

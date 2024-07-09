@@ -681,6 +681,8 @@ static void MVD_UpdateClient(mvd_client_t *client)
             Vector4Set(client->ps.screen_blend, 0.5f, 0.3f, 0.2f, 0.4f);
         else
             Vector4Clear(client->ps.screen_blend);
+
+        Vector4Clear(client->ps.damage_blend);
     } else {
         // copy entire player state
         client->ps = target->ps;
@@ -695,7 +697,7 @@ static void MVD_UpdateClient(mvd_client_t *client)
         if (target != mvd->dummy) {
             if (mvd_stats_hack->integer && mvd->dummy) {
                 // copy stats of the dummy MVD observer
-                for (i = 0; i < MAX_STATS; i++) {
+                for (i = 0; i < MAX_STATS_OLD; i++) {
                     if (mvd_stats_hack->integer & BIT(i)) {
                         client->ps.stats[i] = mvd->dummy->ps.stats[i];
                     }
@@ -772,12 +774,16 @@ void MVD_BroadcastPrintf(mvd_t *mvd, int level, int mask, const char *fmt, ...)
     SZ_Clear(&msg_write);
 }
 
+#define ES_MASK     (MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS | MSG_ES_EXTENSIONS_2)
+#define PS_MASK     (MSG_PS_EXTENSIONS | MSG_PS_EXTENSIONS_2)
+
 static void MVD_SetServerState(client_t *cl, mvd_t *mvd)
 {
     if (cl->csr != mvd->csr) {
         Z_Freep(&cl->entities);
         cl->num_entities = 0;
     }
+
     cl->gamedir = mvd->gamedir;
     cl->mapname = mvd->mapname;
     cl->configstrings = mvd->configstrings;
@@ -787,6 +793,12 @@ static void MVD_SetServerState(client_t *cl, mvd_t *mvd)
     cl->ge = &mvd->ge;
     cl->spawncount = mvd->servercount;
     cl->maxclients = mvd->maxclients;
+
+    cl->esFlags &= ~ES_MASK;
+    cl->psFlags &= ~PS_MASK;
+    cl->esFlags |= mvd->esFlags & ES_MASK;
+    cl->psFlags |= mvd->psFlags & PS_MASK;
+
     cl->esFlags |= MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS;
 }
 
@@ -1756,7 +1768,7 @@ static void MVD_GameInit(void)
 
     for (i = 0; i < sv_maxclients->integer; i++) {
         mvd_clients[i].cl = &svs.client_pool[i];
-        edicts[i + 1].client = (gclient_t *)&mvd_clients[i];
+        edicts[i + 1].client = (struct gclient_s*)&mvd_clients[i];
     }
 
     mvd_ge.edicts = edicts;

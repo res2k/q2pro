@@ -1217,7 +1217,7 @@ bool CL_GetDemoInfo(const char *path, demoInfo_t *info)
         int protocol = MSG_ReadLong();
         if (protocol == PROTOCOL_VERSION_RERELEASE) {
             // Don't futz anything
-        } else if (protocol == PROTOCOL_VERSION_EXTENDED) {
+        } else if (protocol == PROTOCOL_VERSION_EXTENDED || protocol == PROTOCOL_VERSION_EXTENDED_OLD) {
             csr = &cs_remap_q2pro_new;
         } else if (protocol < PROTOCOL_VERSION_OLD || protocol > PROTOCOL_VERSION_DEFAULT) {
             goto fail;

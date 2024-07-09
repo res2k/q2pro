@@ -440,6 +440,9 @@ void SV_InitGame(unsigned mvd_spawn)
 
     svs.csr = cs_remap_old;
 
+    // set up default pmove parameters
+    PmoveInit(&svs.pmp);
+
     // init game
 #if USE_MVD_CLIENT
     if (mvd_spawn) {

@@ -479,7 +479,8 @@ should do it for us by providing some SVF_* flag or something.
 */
 static bool player_is_active(const edict_t *ent)
 {
-    int num;
+    int num, pm_type, pm_flags;
+    float fov;
 
     if ((g_features->integer & GMF_PROPERINUSE) && !ent->inuse) {
         return false;
@@ -503,8 +504,13 @@ static bool player_is_active(const edict_t *ent)
         }
     }
 
+    const gclient_t *cl = ent->client;
+    pm_type  = cl->ps.pmove.pm_type;
+    pm_flags = cl->ps.pmove.pm_flags;
+    fov      = cl->ps.fov;
+
     // first of all, make sure player_state_t is valid
-    if (!ent->client->ps.fov) {
+    if (!fov) {
         return false;
     }
 
@@ -514,7 +520,7 @@ static bool player_is_active(const edict_t *ent)
     }
 
     // never capture spectators
-    if (ent->client->ps.pmove.pm_type == PM_SPECTATOR) {
+    if (pm_type == PM_SPECTATOR) {
         return false;
     }
 
@@ -532,12 +538,12 @@ static bool player_is_active(const edict_t *ent)
     }
 
     // they are likely following someone in case of PM_FREEZE
-    if (ent->client->ps.pmove.pm_type == PM_FREEZE) {
+    if (pm_type == PM_FREEZE) {
         return false;
     }
 
     // they are likely following someone if PMF_NO_PREDICTION is set
-    if (ent->client->ps.pmove.pm_flags & PMF_NO_PREDICTION) {
+    if (pm_flags & PMF_NO_PREDICTION) {
         return false;
     }
 
@@ -602,7 +608,7 @@ static void emit_gamestate(void)
     player_packed_t *ps;
     entity_packed_t *es;
     size_t      length;
-    int         flags, extra, portalbytes;
+    int         flags, portalbytes;
     byte        portalbits[MAX_MAP_PORTAL_BYTES];
 
     // don't bother writing if there are no active MVD clients
@@ -610,24 +616,29 @@ static void emit_gamestate(void)
         return;
     }
 
-    // pack MVD stream flags into extra bits
-    extra = 0;
-    if (sv_mvd_nomsgs->integer && mvd.dummy) {
-        extra |= MVF_NOMSGS << SVCMD_BITS;
-    }
-    if (svs.csr.extended) {
-        extra |= MVF_EXTLIMITS << SVCMD_BITS;
-    }
+    // setup MVD stream flags
+    flags = 0;
+    if (sv_mvd_nomsgs->integer && mvd.dummy)
+        flags |= MVF_NOMSGS;
 
     // send the serverdata
-    MSG_WriteByte(mvd_serverdata | extra);
-    MSG_WriteLong(PROTOCOL_VERSION_MVD);
-    if (svs.is_game_rerelease)
+    if (svs.is_game_rerelease) {
+        MSG_WriteByte(mvd_serverdata | (flags << SVCMD_BITS));
+        MSG_WriteLong(PROTOCOL_VERSION_MVD);
         MSG_WriteShort(PROTOCOL_VERSION_MVD_RERELEASE);
-    else if (svs.csr.extended)
+    } else if (svs.csr.extended) {
+        flags |= MVF_EXTLIMITS;
+        // if (IS_NEW_GAME_API) // TODO
+        //     flags |= MVF_EXTLIMITS_2;
+        MSG_WriteByte(mvd_serverdata);
+        MSG_WriteLong(PROTOCOL_VERSION_MVD);
         MSG_WriteShort(PROTOCOL_VERSION_MVD_CURRENT);
-    else
+        MSG_WriteShort(flags);
+    } else {
+        MSG_WriteByte(mvd_serverdata | (flags << SVCMD_BITS));
+        MSG_WriteLong(PROTOCOL_VERSION_MVD);
         MSG_WriteShort(PROTOCOL_VERSION_MVD_DEFAULT);
+    }
     MSG_WriteLong(sv.spawncount);
     MSG_WriteString(fs_game->string);
     if (mvd.dummy)
@@ -2134,12 +2145,19 @@ void SV_MvdPostInit(void)
     if (sv_mvd_noblend->integer) {
         mvd.psFlags |= MSG_PS_IGNORE_BLEND;
     }
+
     if (sv_mvd_nogun->integer) {
         mvd.psFlags |= MSG_PS_IGNORE_GUNINDEX | MSG_PS_IGNORE_GUNFRAMES;
     }
+
     if (svs.csr.extended) {
         mvd.esFlags |= MSG_ES_LONGSOLID | MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS;
         mvd.psFlags |= MSG_PS_EXTENSIONS;
+
+        // if (IS_NEW_GAME_API) {
+        //     mvd.esFlags |= MSG_ES_EXTENSIONS_2;
+        //     mvd.psFlags |= MSG_PS_EXTENSIONS_2;
+        // }
     }
     if (svs.is_game_rerelease) {
         mvd.esFlags |= MSG_ES_LONGSOLID | MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS | MSG_ES_RERELEASE;

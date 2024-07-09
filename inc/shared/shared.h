@@ -1367,7 +1367,6 @@ enum {
     STAT_CHASE,
     STAT_SPECTATOR,
 
-    MAX_STATS_OLD = 32,
 #if !defined(GAME3_INCLUDE)
     MAX_STATS = 64, // KEX
 
@@ -1400,6 +1399,9 @@ enum {
 	STAT_ACTIVE_WEAPON,
 #endif // !defined(GAME3_INCLUDE)
 };
+
+#define MAX_STATS_OLD   32
+#define MAX_STATS_NEW   64
 
 // STAT_LAYOUTS flags
 #define LAYOUTS_LAYOUT          BIT(0)
@@ -1657,7 +1659,7 @@ typedef struct {
 // but the number of pmove_state_t changes will be reletive to client
 // frame rates
 typedef struct {
-    pmove_state_t   pmove;      // for prediction
+    pmove_state_t   pmove;  // for prediction
 
     // these fields do not need to be communicated bit-precise
 

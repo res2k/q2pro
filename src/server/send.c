@@ -545,9 +545,8 @@ static void emit_snd(const client_t *client, const message_packet_t *msg)
 
     MSG_WriteShort(msg->sendchan);
 
-    if (flags & SND_POS) {
-        MSG_WritePos(msg->pos, true);
-    }
+    if (flags & SND_POS)
+        MSG_WritePos(msg->pos);
 }
 
 static inline void write_snd(client_t *client, message_packet_t *msg, unsigned maxsize)

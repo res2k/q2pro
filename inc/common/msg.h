@@ -21,14 +21,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/protocol.h"
 #include "common/sizebuf.h"
 
-#define MAX_PACKETENTITY_BYTES  64  // 62 bytes worst case + margin
+#define MAX_PACKETENTITY_BYTES  70  // 68 bytes worst case + 2 byte eof
 
 // entity and player states are pre-quantized before sending to make delta
 // comparsion easier
 typedef struct {
     uint16_t    number;
-    vec3_t      origin;
     int16_t     angles[3];
+    vec3_t      origin;
     vec3_t      old_origin;
     uint16_t    modelindex;
     uint16_t    modelindex2;
@@ -51,21 +51,21 @@ typedef struct {
 } entity_packed_t;
 
 typedef struct {
-    pmove_state_t   pmove;
-    int16_t         viewangles[3];
-    int16_t         viewoffset[3];
-    int16_t         kick_angles[3];
-    int16_t         gunangles[3];
-    int16_t         gunoffset[3];
-    uint16_t        gunindex;
-    uint8_t         gunframe;
-    uint8_t         screen_blend[4];
-    uint8_t         fov;
-    uint8_t         rdflags;
-    int16_t         stats[MAX_STATS];
+    pmove_state_t       pmove;
+    int16_t             viewangles[3];
+    int16_t             viewoffset[3];
+    int16_t             kick_angles[3];
+    int16_t             gunangles[3];
+    int16_t             gunoffset[3];
+    uint16_t            gunindex;
+    uint8_t             gunframe;
+    uint8_t             screen_blend[4];
+    uint8_t             damage_blend[4];
+    uint8_t             fov;
+    uint8_t             rdflags;
+    int16_t             stats[MAX_STATS_NEW];
 // KEX
-    int8_t          gunrate;
-    uint8_t         damage_blend[4];
+    int8_t              gunrate;
 // KEX
 } player_packed_t;
 
@@ -77,11 +77,12 @@ typedef enum {
     MSG_PS_IGNORE_DELTAANGLES   = BIT(4),   // ignore delta_angles
     MSG_PS_IGNORE_PREDICTION    = BIT(5),   // mutually exclusive with IGNORE_VIEWANGLES
     MSG_PS_EXTENSIONS           = BIT(6),   // enable protocol extensions
-    MSG_PS_RERELEASE            = BIT(7),   // rerelease extensions: floating point coordinates,
+    MSG_PS_EXTENSIONS_2         = BIT(7),   // enable more protocol extensions
+    MSG_PS_RERELEASE            = BIT(8),   // rerelease extensions: floating point coordinates,
                                             // increased stats numbers,
                                             // wider pm_time and pm_flags
-    MSG_PS_FORCE                = BIT(8),   // send even if unchanged (MVD stream only)
-    MSG_PS_REMOVE               = BIT(9),  // player is removed (MVD stream only)
+    MSG_PS_FORCE                = BIT(9),   // send even if unchanged (MVD stream only)
+    MSG_PS_REMOVE               = BIT(10),  // player is removed (MVD stream only)
 } msgPsFlags_t;
 
 typedef enum {
@@ -93,8 +94,9 @@ typedef enum {
     MSG_ES_BEAMORIGIN   = BIT(5),   // client has RF_BEAM old_origin fix
     MSG_ES_SHORTANGLES  = BIT(6),   // higher precision angles encoding
     MSG_ES_EXTENSIONS   = BIT(7),   // enable protocol extensions
-    MSG_ES_RERELEASE    = BIT(8),   // rerelease extensions: floating point coordinates
-    MSG_ES_REMOVE       = BIT(9),   // entity is removed (MVD stream only)
+    MSG_ES_EXTENSIONS_2 = BIT(8),   // enable more protocol extensions
+    MSG_ES_RERELEASE    = BIT(9),   // rerelease extensions: floating point coordinates
+    MSG_ES_REMOVE       = BIT(10),  // entity is removed (MVD stream only)
 } msgEsFlags_t;
 
 extern sizebuf_t    msg_write;
@@ -116,7 +118,7 @@ void    MSG_WriteShort(int c);
 void    MSG_WriteLong(int c);
 void    MSG_WriteLong64(int64_t c);
 void    MSG_WriteString(const char *s);
-void    MSG_WritePos(const vec3_t pos, bool float_coord);
+void    MSG_WritePos(const vec3_t pos);
 void    MSG_WriteAngle(float f);
 void    MSG_WriteFloat(float f);
 #if USE_CLIENT
@@ -155,8 +157,8 @@ int64_t MSG_ReadLong64(void);
 size_t  MSG_ReadString(char *dest, size_t size);
 size_t  MSG_ReadStringLine(char *dest, size_t size);
 float   MSG_ReadFloat(void);
-void    MSG_ReadPos(vec3_t pos, bool float_coord);
 #if USE_CLIENT
+void    MSG_ReadPos(vec3_t pos, msgEsFlags_t flags);
 void    MSG_ReadDir(vec3_t vector);
 #endif
 int     MSG_ReadBits(int bits);

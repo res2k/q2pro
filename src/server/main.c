@@ -20,8 +20,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "client/input.h"
 #include "server/nav.h"
 
-pmoveParams_t   sv_pmp;
-
 master_t    sv_masters[MAX_MASTERS];   // address of group servers
 
 LIST_DECL(sv_banlist);
@@ -452,7 +450,7 @@ static size_t SV_StatusString(char *status)
             }
             len = Q_snprintf(entry, sizeof(entry),
                              "%i %i \"%s\"\n",
-                             cl->edict->client->ps.stats[STAT_FRAGS],
+                             SV_GetClient_Stat(cl, STAT_FRAGS),
                              cl->ping, cl->name);
             if (len >= sizeof(entry)) {
                 continue;
@@ -775,7 +773,7 @@ static bool parse_enhanced_params(conn_params_t *p)
     p->has_zlib = !*s || atoi(s);
 
     // set minor protocol version
-    p->version = PROTOCOL_VERSION_Q2PRO_EXTENDED_LIMITS;
+    p->version = PROTOCOL_VERSION_Q2PRO_EXTENDED_LIMITS_2;
 
     return true;
 }
@@ -937,7 +935,7 @@ static client_t *find_client_slot(conn_params_t *params)
 static void init_pmove_and_es_flags(client_t *newcl)
 {
     // copy default pmove parameters
-    newcl->pmp = sv_pmp;
+    newcl->pmp = svs.pmp;
     newcl->pmp.airaccelerate = sv_airaccelerate->integer;
 
     // common extensions
@@ -955,6 +953,7 @@ static void init_pmove_and_es_flags(client_t *newcl)
     newcl->esFlags |= MSG_ES_SHORTANGLES;
     newcl->esFlags |= MSG_ES_EXTENSIONS;
     newcl->esFlags |= MSG_ES_RERELEASE;
+    newcl->psFlags = MSG_PS_RERELEASE | MSG_PS_EXTENSIONS;
     newcl->pmp.waterhack = sv_waterjump_hack->integer >= 1;
 }
 
@@ -1371,7 +1370,7 @@ static void SV_CalcPings(void)
         }
 
         // let the game dll know about the ping
-        cl->edict->client->ping = cl->ping;
+        SV_SetClient_Ping(cl, cl->ping);
     }
 }
 
@@ -2193,8 +2192,8 @@ void SV_Init(void)
 #endif
 
     // set up default pmove parameters
-    PmoveInit(&sv_pmp);
-    sv_pmp.extended_server = true;
+    PmoveInit(&svs.pmp);
+    svs.pmp.extended_server_ver = 1;
 
     Nav_Init();
 

@@ -227,6 +227,7 @@ extern cvar_t *gl_md5_load;
 extern cvar_t *gl_md5_use;
 #endif
 extern cvar_t *gl_fog;
+extern cvar_t *gl_damageblend_frac;
 
 // development variables
 extern cvar_t *gl_znear;
@@ -245,7 +246,6 @@ extern cvar_t *gl_fullbright;
 extern cvar_t *gl_vertexlight;
 extern cvar_t *gl_lightgrid;
 extern cvar_t *gl_showerrors;
-extern cvar_t *gl_damageblend_frac;
 extern cvar_t *gl_per_pixel_lighting; // use_shaders only
 
 typedef enum {

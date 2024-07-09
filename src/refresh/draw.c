@@ -148,7 +148,7 @@ static inline void _GL_StretchRotatePic(
 #define GL_StretchRotatePic(x,y,w,h,s1,t1,s2,t2,angle,px,py,color,image) \
     _GL_StretchRotatePic(x,y,w,h,s1,t1,s2,t2,angle,px,py,color,(image)->texnum,(image)->flags)
 
-static void GL_DrawVignette(int distance, color_t color)
+static void GL_DrawVignette(int distance, color_t outer, color_t inner)
 {
     vec_t *dst_vert;
     uint32_t *dst_color;
@@ -167,44 +167,42 @@ static void GL_DrawVignette(int distance, color_t color)
 
     // outer vertices
     dst_vert = tess.vertices + tess.numverts * 4;
-    Vector2Set(dst_vert,      x,     y    );
-    Vector2Set(dst_vert +  4, x + w, y    );
-    Vector2Set(dst_vert +  8, x + w, y + h);
-    Vector2Set(dst_vert + 12, x,     y + h);
+    Vector4Set(dst_vert,      x,     y,     0, 0);
+    Vector4Set(dst_vert +  4, x + w, y,     0, 0);
+    Vector4Set(dst_vert +  8, x + w, y + h, 0, 0);
+    Vector4Set(dst_vert + 12, x,     y + h, 0, 0);
 
     dst_color = (uint32_t *)tess.colors + tess.numverts;
-    dst_color[0] = color.u32;
-    dst_color[1] = color.u32;
-    dst_color[2] = color.u32;
-    dst_color[3] = color.u32;
+    dst_color[0] = outer.u32;
+    dst_color[1] = outer.u32;
+    dst_color[2] = outer.u32;
+    dst_color[3] = outer.u32;
 
     // inner vertices
     x += distance;
     y += distance;
     w -= distance * 2;
     h -= distance * 2;
-    
+
     dst_vert += 16;
-    Vector2Set(dst_vert,      x,     y    );
-    Vector2Set(dst_vert +  4, x + w, y    );
-    Vector2Set(dst_vert +  8, x + w, y + h);
-    Vector2Set(dst_vert + 12, x,     y + h);
+    Vector4Set(dst_vert,      x,     y,     0, 0);
+    Vector4Set(dst_vert +  4, x + w, y,     0, 0);
+    Vector4Set(dst_vert +  8, x + w, y + h, 0, 0);
+    Vector4Set(dst_vert + 12, x,     y + h, 0, 0);
+
+    dst_color += 4;
+    dst_color[0] = inner.u32;
+    dst_color[1] = inner.u32;
+    dst_color[2] = inner.u32;
+    dst_color[3] = inner.u32;
 
     /*
     0             1
-    
         4     5
 
         7     6
-
     3             2
     */
-
-    dst_color += 4;
-    dst_color[0] = 0;
-    dst_color[1] = 0;
-    dst_color[2] = 0;
-    dst_color[3] = 0;
 
     dst_indices = tess.indices + tess.numindices;
     dst_indices[0] = tess.numverts + 0;
@@ -243,9 +241,9 @@ static void GL_DrawVignette(int distance, color_t color)
 
 void GL_Blend(void)
 {
-    color_t color;
-
     if (glr.fd.screen_blend[3]) {
+        color_t color;
+
         color.u8[0] = glr.fd.screen_blend[0] * 255;
         color.u8[1] = glr.fd.screen_blend[1] * 255;
         color.u8[2] = glr.fd.screen_blend[2] * 255;
@@ -256,17 +254,20 @@ void GL_Blend(void)
     }
 
     if (glr.fd.damage_blend[3]) {
-        color.u8[0] = glr.fd.damage_blend[0] * 255;
-        color.u8[1] = glr.fd.damage_blend[1] * 255;
-        color.u8[2] = glr.fd.damage_blend[2] * 255;
-        color.u8[3] = glr.fd.damage_blend[3] * 255;
+        color_t outer, inner;
 
-        if (gl_damageblend_frac->value <= 0) {
+        outer.u8[0] = glr.fd.damage_blend[0] * 255;
+        outer.u8[1] = glr.fd.damage_blend[1] * 255;
+        outer.u8[2] = glr.fd.damage_blend[2] * 255;
+        outer.u8[3] = glr.fd.damage_blend[3] * 255;
+
+        inner.u32 = outer.u32 & U32_RGB;
+
+        if (gl_damageblend_frac->value > 0)
+            GL_DrawVignette(min(glr.fd.width, glr.fd.height) * gl_damageblend_frac->value, outer, inner);
+        else
             GL_StretchPic_(glr.fd.x, glr.fd.y, glr.fd.width, glr.fd.height, 0, 0, 1, 1,
-                           color.u32, TEXNUM_WHITE, 0);
-        } else {
-            GL_DrawVignette(min(glr.fd.width * gl_damageblend_frac->value, glr.fd.height * gl_damageblend_frac->value), color);
-        }
+                           outer.u32, TEXNUM_WHITE, 0);
     }
 }
 

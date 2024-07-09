@@ -557,7 +557,7 @@ typedef struct {
 typedef struct {
     int api_version;
 
-    qboolean    (*CustomizeEntityToClient)(edict_t *client, edict_t *ent, customize_entity_t *temp); // must initialize `temp'
+    qboolean    (*CustomizeEntityToClient)(edict_t *client, edict_t *ent, customize_entity_t *temp); // if true is returned, `temp' must be initialized
     qboolean    (*EntityVisibleToClient)(edict_t *client, edict_t *ent);
 } game_q2pro_customize_entity_t;
 

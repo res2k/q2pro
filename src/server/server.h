@@ -327,6 +327,7 @@ typedef struct client_s {
 
     pmoveParams_t   pmp;        // spectator speed, etc
     msgEsFlags_t    esFlags;    // entity protocol flags
+    msgPsFlags_t    psFlags;
 
     // packetized messages
     list_t              msg_free_list;
@@ -474,6 +475,7 @@ typedef struct {
 
     cs_remap_t      csr;
     bool            is_game_rerelease;
+    pmoveParams_t   pmp;
 
     unsigned        last_heartbeat;
     unsigned        last_timescale_check;
@@ -503,8 +505,6 @@ extern list_t       sv_clientlist;  // linked list of non-free clients
 
 extern server_static_t      svs;        // persistant server info
 extern server_t             sv;         // local server
-
-extern pmoveParams_t    sv_pmp;
 
 extern cvar_t       *sv_hostname;
 extern cvar_t       *sv_maxclients;
@@ -767,7 +767,7 @@ extern const game_q2pro_customize_entity_t   *g_customize_entity;
 void SV_InitGameProgs(void);
 void SV_ShutdownGameProgs(void);
 
-void PF_Pmove(pmove_t *pm);
+void PF_Pmove(void *pm);
 
 //
 // sv_save.c
@@ -785,6 +785,31 @@ void SV_RegisterSavegames(void);
 #define SV_CheckForEnhancedSavegames()  (void)0
 #define SV_RegisterSavegames()          (void)0
 #endif
+
+//
+// ugly gclient_(old|new)_t accessors
+//
+
+static inline void SV_GetClient_ViewOrg(const client_t *client, vec3_t org)
+{
+    const gclient_t *cl = client->edict->client;
+    VectorAdd(cl->ps.viewoffset, cl->ps.pmove.origin, org);
+}
+
+static inline int SV_GetClient_ClientNum(const client_t *client)
+{
+    return ((const gclient_t *)client->edict->client)->clientNum;
+}
+
+static inline int SV_GetClient_Stat(const client_t *client, int stat)
+{
+    return ((const gclient_t *)client->edict->client)->ps.stats[stat];
+}
+
+static inline void SV_SetClient_Ping(const client_t *client, int ping)
+{
+    ((gclient_t *)client->edict->client)->ping = ping;
+}
 
 //============================================================
 

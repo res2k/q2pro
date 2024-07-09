@@ -82,6 +82,10 @@ static const game_q2pro_customize_entity_t game_q2pro_customize_entity = {
     .EntityVisibleToClient = wrap_EntityVisibleToClient,
 };
 
+// flag indicating if game uses gclient_new_t or gclient_old_t.
+// doesn't enable protocol extensions by itself.
+#define IS_NEW_GAME_API    (game3_export->apiversion == GAME3_API_VERSION_NEW)
+
 #define GAME_EDICT_NUM(n) ((game3_edict_t *)((byte *)game3_export->edicts + game3_export->edict_size*(n)))
 #define NUM_FOR_GAME_EDICT(e) ((int)(((byte *)(e) - (byte *)game3_export->edicts) / game3_export->edict_size))
 
@@ -218,13 +222,14 @@ static qboolean wrap_inPHS(const vec3_t p1, const vec3_t p2)
     return game_import.inPHS(p1, p2, true);
 }
 
-static void wrap_Pmove_import(game3_pmove_t *pmove)
+static void wrap_Pmove_import(void *pmove)
 {
-    if (sv_client) {
-        game3_Pmove(pmove, NULL, &sv_client->pmp);
-    } else {
-        game3_Pmove(pmove, NULL, &sv_pmp);
-    }
+    const pmoveParams_t *pmp = sv_client ? &sv_client->pmp : &svs.pmp;
+
+    if (IS_NEW_GAME_API)
+        game3_PmoveNew(pmove, NULL, pmp);
+    else
+        game3_PmoveOld(pmove, NULL, pmp);
 }
 
 static void wrap_sound(game3_edict_t *gent, int channel,
@@ -417,8 +422,12 @@ static void sync_single_edict_server_to_game(int index)
     game_edict->s.event = server_edict->s.event;
 
     assert((game_edict->client && server_edict->client) || (!game_edict->client && !server_edict->client));
-    if(game_edict->client)
-        game_edict->client->ping = server_edict->client->ping;
+    if(game_edict->client) {
+        if (IS_NEW_GAME_API)
+            ((struct game3_gclient_new_s*)game_edict->client)->ping = server_edict->client->ping;
+        else
+            ((struct game3_gclient_old_s*)game_edict->client)->ping = server_edict->client->ping;
+    }
     game_edict->linkcount = server_edict->linkcount;
     game_edict->area.next = game_edict->area.prev = server_edict->linked ? &game_edict->area : NULL; // emulate entity being linked
     game_edict->num_clusters = sent->num_clusters;
@@ -457,9 +466,31 @@ static void sync_edicts_server_to_game(void)
     game3_export->num_edicts = game_export.num_edicts;
 }
 
-static void game_client_to_server(struct gclient_s *server_client, const struct game3_gclient_s *game_client)
+static void game_client_old_to_server(struct gclient_s *server_client, const struct game3_gclient_old_s *game_client)
 {
-    ConvertFromGame3_pmove_state(&server_client->ps.pmove, &game_client->ps.pmove, game_csr->extended);
+    ConvertFromGame3_pmove_state_old(&server_client->ps.pmove, &game_client->ps.pmove, game_csr->extended);
+
+    VectorCopy(game_client->ps.viewangles, server_client->ps.viewangles);
+    VectorCopy(game_client->ps.viewoffset, server_client->ps.viewoffset);
+    VectorCopy(game_client->ps.kick_angles, server_client->ps.kick_angles);
+    VectorCopy(game_client->ps.gunangles, server_client->ps.gunangles);
+    VectorCopy(game_client->ps.gunoffset, server_client->ps.gunoffset);
+    server_client->ps.gunindex = game_client->ps.gunindex;
+    server_client->ps.gunframe = game_client->ps.gunframe;
+    Vector4Copy(game_client->ps.blend, server_client->ps.screen_blend);
+    server_client->ps.fov = game_client->ps.fov;
+    server_client->ps.rdflags = game_client->ps.rdflags;
+    memset(&server_client->ps.stats, 0, sizeof(server_client->ps.stats));
+    memcpy(&server_client->ps.stats, &game_client->ps.stats, sizeof(game_client->ps.stats));
+
+    server_client->ping = game_client->ping;
+    // FIXME: Only copy if GMF_CLIENTNUM feature is set
+    server_client->clientNum = game_client->clientNum;
+}
+
+static void game_client_new_to_server(struct gclient_s *server_client, const struct game3_gclient_new_s *game_client)
+{
+    ConvertFromGame3_pmove_state_new(&server_client->ps.pmove, &game_client->ps.pmove, game_csr->extended);
 
     VectorCopy(game_client->ps.viewangles, server_client->ps.viewangles);
     VectorCopy(game_client->ps.viewoffset, server_client->ps.viewoffset);
@@ -507,7 +538,10 @@ static void sync_single_edict_game_to_server(int index)
         if(!server_edict->client) {
             server_edict->client = Z_Malloc(sizeof(struct gclient_s));
         }
-        game_client_to_server(server_edict->client, game_edict->client);
+        if (IS_NEW_GAME_API)
+            game_client_new_to_server(server_edict->client, game_edict->client);
+        else
+            game_client_old_to_server(server_edict->client, game_edict->client);
     } else if (server_edict->client) {
         Z_Free(server_edict->client);
         server_edict->client = NULL;
@@ -563,6 +597,15 @@ static void wrap_Init(void)
         game_csr = &cs_remap_q2pro_new;
     } else
         game_csr = &cs_remap_old;
+
+    if (game_csr->extended && IS_NEW_GAME_API) {
+        PmoveEnableExt(&svs.pmp);
+        svs.pmp.extended_server_ver = 2;
+    } else if (game_csr->extended) {
+        svs.pmp.extended_server_ver = 1;
+    } else {
+        svs.pmp.extended_server_ver = 0;
+    }
 
     server_edicts = Z_Mallocz(sizeof(edict_t) * game3_export->max_edicts);
     game_export.edicts = server_edicts;

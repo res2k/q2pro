@@ -31,4 +31,5 @@ Common between server and client so prediction matches
 ==============================================================
 */
 
-void game3_Pmove(game3_pmove_t *pmove, cplane_t* groundplane, const pmoveParams_t *params);
+void game3_PmoveOld(game3_pmove_old_t *pmove, cplane_t* groundplane, const pmoveParams_t *params);
+void game3_PmoveNew(game3_pmove_new_t *pmove, cplane_t* groundplane, const pmoveParams_t *params);

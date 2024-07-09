@@ -52,7 +52,7 @@ static void build_gamestate(void)
 
     // set protocol flags
     cls.gtv.psFlags = MSG_PS_RERELEASE | MSG_PS_EXTENSIONS;
-    cls.gtv.esFlags = MSG_ES_UMASK | MSG_ES_BEAMORIGIN;
+    cls.gtv.esFlags = MSG_ES_UMASK | MSG_ES_BEAMORIGIN | (cl.esFlags & CL_ES_EXTENDED_MASK_2);
     if (cl.csr.extended)
         cls.gtv.esFlags |= MSG_ES_LONGSOLID | MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS;
 }
@@ -66,16 +66,26 @@ static void emit_gamestate(void)
 
     // send the serverdata
     flags = MVF_SINGLEPOV;
-    if (cl.csr.extended)
+    if (cl.csr.extended) {
         flags |= MVF_EXTLIMITS;
     MSG_WriteByte(mvd_serverdata | (flags << SVCMD_BITS));
     MSG_WriteLong(PROTOCOL_VERSION_MVD);
-    if (cl.is_rerelease_game)
+    if (cl.is_rerelease_game) {
+        MSG_WriteByte(mvd_serverdata | (flags << SVCMD_BITS));
+        MSG_WriteLong(PROTOCOL_VERSION_MVD);
         MSG_WriteShort(PROTOCOL_VERSION_MVD_RERELEASE);
-    else if (cl.csr.extended)
+    } else if (cl.csr.extended) {
+        if (cl.esFlags & MSG_ES_EXTENSIONS_2)
+            flags |= MVF_EXTLIMITS_2;
+        MSG_WriteByte(mvd_serverdata);
+        MSG_WriteLong(PROTOCOL_VERSION_MVD);
         MSG_WriteShort(PROTOCOL_VERSION_MVD_CURRENT);
-    else
+        MSG_WriteShort(flags);
+    } else {
+        MSG_WriteByte(mvd_serverdata | (flags << SVCMD_BITS));
+        MSG_WriteLong(PROTOCOL_VERSION_MVD);
         MSG_WriteShort(PROTOCOL_VERSION_MVD_DEFAULT);
+    }
     MSG_WriteLong(cl.servercount);
     MSG_WriteString(cl.gamedir);
     MSG_WriteShort(-1);

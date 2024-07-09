@@ -347,7 +347,7 @@ bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
     MSG_WriteData(frame->areabits, frame->areabytes);
 
     // ignore some parts of playerstate if not recording demo
-    psFlags = 0;
+    psFlags = client->psFlags;
     if (!client->settings[CLS_RECORDING]) {
         if (client->settings[CLS_NOGUN]) {
             psFlags |= MSG_PS_IGNORE_GUNFRAMES;
@@ -537,7 +537,6 @@ void SV_BuildClientFrame(client_t *client)
     edict_t     *clent;
     client_frame_t  *frame;
     entity_packed_t *state;
-    player_state_t  *ps;
     const mleaf_t   *leaf;
     int         clientarea, clientcluster;
     byte        clientphs[VIS_MAX_BYTES];
@@ -564,11 +563,10 @@ void SV_BuildClientFrame(client_t *client)
     client->frames_sent++;
 
     // find the client's PVS
-    ps = &clent->client->ps;
-    VectorAdd(ps->viewoffset, ps->pmove.origin, org);
+    SV_GetClient_ViewOrg(client, org);
     // Rerelease game doesn't include viewheight in viewoffset, vanilla does
     if (svs.is_game_rerelease)
-        org[2] += ps->pmove.viewheight;
+        org[2] += clent->client->ps.pmove.viewheight;
 
     leaf = CM_PointLeaf(client->cm, org);
     clientarea = leaf->area;
@@ -582,11 +580,11 @@ void SV_BuildClientFrame(client_t *client)
     }
 
     // grab the current player_state_t
-    MSG_PackPlayer(&frame->ps, ps, MSG_PS_RERELEASE);
+    MSG_PackPlayer(&frame->ps, &clent->client->ps, MSG_PS_RERELEASE);
 
     // grab the current clientNum
     if (g_features->integer & GMF_CLIENTNUM) {
-        frame->clientNum = clent->client->clientNum;
+        frame->clientNum = SV_GetClient_ClientNum(client);
         if (!VALIDATE_CLIENTNUM(client->csr, frame->clientNum)) {
             Com_WPrintf("%s: bad clientNum %d for client %d\n",
                         __func__, frame->clientNum, client->number);

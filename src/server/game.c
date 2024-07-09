@@ -411,6 +411,11 @@ typedef enum {
     VIS_NOAREAS = 2     // can be OR'ed with one of above
 } vis_t;
 
+static void PF_WritePos(const vec3_t pos)
+{
+    MSG_WritePos(pos);
+}
+
 static qboolean PF_inVIS(const vec3_t p1, const vec3_t p2, vis_t vis)
 {
     const mleaf_t *leaf1, *leaf2;
@@ -558,7 +563,7 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
         MSG_WriteByte(ofs);
 
     MSG_WriteShort(sendchan);
-    MSG_WritePos(origin, true);
+    PF_WritePos(origin);
 
     // if the sound doesn't attenuate, send it to everyone
     // (global radio chatter, voiceovers, etc)
@@ -667,13 +672,11 @@ static void PF_LocalSound(edict_t *target, const vec3_t origin,
     PF_Unicast(target, !!(channel & CHAN_RELIABLE), dupe_key);
 }
 
-void PF_Pmove(pmove_t *pm)
+void PF_Pmove(void *pm)
 {
-    if (sv_client) {
-        Pmove(pm, &sv_client->pmp);
-    } else {
-        Pmove(pm, &sv_pmp);
-    }
+    const pmoveParams_t *pmp = sv_client ? &sv_client->pmp : &svs.pmp;
+
+    Pmove(pm, pmp);
 }
 
 static void PF_WriteEntity(const edict_t *entity)
@@ -891,11 +894,6 @@ static size_t PF_Info_ValueForKey (const char *s, const char *key, char *buffer,
     return Q_strlcpy(buffer, infostr, buffer_len);
 }
 
-static void PF_MSG_WritePos (const vec3_t p)
-{
-    MSG_WritePos(p, true);
-}
-
 //==============================================
 
 static const game_import_t game_import = {
@@ -933,7 +931,7 @@ static const game_import_t game_import = {
     .WriteLong = MSG_WriteLong,
     .WriteFloat = PF_WriteFloat,
     .WriteString = MSG_WriteString,
-    .WritePosition = PF_MSG_WritePos,
+    .WritePosition = PF_WritePos,
     .WriteDir = MSG_WriteDir,
     .WriteAngle = MSG_WriteAngle,
     .WriteEntity = PF_WriteEntity,
@@ -1071,8 +1069,8 @@ void SV_InitGameProgs(void)
 
     if (ge->apiversion != GAME_API_VERSION) {
         svs.is_game_rerelease = false;
-        if (ge->apiversion == 3) {
-            Com_DPrintf("Detected version 3 game library, using proxy game\n");
+        if (ge->apiversion == GAME3_API_VERSION_OLD || ge->apiversion == GAME3_API_VERSION_NEW) {
+            Com_DPrintf("Detected version %d game library, using proxy game\n", ge->apiversion);
             ge = GetGame3Proxy(&import, entry, entry_ex);
         } else {
             Com_Error(ERR_DROP, "Game library is version %d, expected %d",

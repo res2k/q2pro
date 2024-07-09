@@ -36,7 +36,9 @@ typedef struct {
     bool        strafehack;
     bool        flyhack;
     bool        waterhack;
-    bool        extended_server;
+    byte        extended_server_ver;
+    byte        time_shift;
+    byte        coord_bits;
     float       speedmult;
     float       watermult;
     float       maxspeed;
@@ -49,3 +51,4 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params);
 
 void PmoveInit(pmoveParams_t *pmp);
 void PmoveEnableQW(pmoveParams_t *pmp);
+void PmoveEnableExt(pmoveParams_t *pmp);

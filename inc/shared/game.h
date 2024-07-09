@@ -85,8 +85,8 @@ typedef struct gclient_s gclient_t;
 #ifndef GAME_INCLUDE
 
 struct gclient_s {
-    player_state_t  ps;     // communicated by server to clients
-    int             ping;
+    player_state_t      ps;     // communicated by server to clients
+    int                 ping;
 
     // set to (client POV entity number) - 1 by game,
     // only valid if g_features has GMF_CLIENTNUM bit

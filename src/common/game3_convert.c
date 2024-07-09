@@ -18,7 +18,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "common/game3_convert.h"
 
-void ConvertToGame3_pmove_state(game3_pmove_state_t *game_pmove_state, const pmove_state_t *server_pmove_state, bool extended)
+void ConvertToGame3_pmove_state_old(game3_pmove_state_old_t *game_pmove_state, const pmove_state_t *server_pmove_state, bool extended)
 {
     game_pmove_state->pm_type = pmtype_to_game3(server_pmove_state->pm_type);
     VectorScale(server_pmove_state->origin, 8, game_pmove_state->origin);
@@ -31,13 +31,39 @@ void ConvertToGame3_pmove_state(game3_pmove_state_t *game_pmove_state, const pmo
     game_pmove_state->delta_angles[2] = ANGLE2SHORT(server_pmove_state->delta_angles[2]);
 }
 
-void ConvertFromGame3_pmove_state(pmove_state_t *pmove_state, const game3_pmove_state_t *game_pmove_state, bool extended)
+void ConvertFromGame3_pmove_state_old(pmove_state_t *pmove_state, const game3_pmove_state_old_t *game_pmove_state, bool extended)
 {
     pmove_state->pm_type = pmtype_from_game3(game_pmove_state->pm_type);
     VectorScale(game_pmove_state->origin, 0.125f, pmove_state->origin);
     VectorScale(game_pmove_state->velocity, 0.125f, pmove_state->velocity);
     pmove_state->pm_flags = pmflags_from_game3(game_pmove_state->pm_flags, extended);
     pmove_state->pm_time = game_pmove_state->pm_time * 8;
+    pmove_state->gravity = game_pmove_state->gravity;
+    pmove_state->delta_angles[0] = SHORT2ANGLE(game_pmove_state->delta_angles[0]);
+    pmove_state->delta_angles[1] = SHORT2ANGLE(game_pmove_state->delta_angles[1]);
+    pmove_state->delta_angles[2] = SHORT2ANGLE(game_pmove_state->delta_angles[2]);
+}
+
+void ConvertToGame3_pmove_state_new(game3_pmove_state_new_t *game_pmove_state, const pmove_state_t *server_pmove_state, bool extended)
+{
+    game_pmove_state->pm_type = pmtype_to_game3(server_pmove_state->pm_type);
+    VectorScale(server_pmove_state->origin, 8, game_pmove_state->origin);
+    VectorScale(server_pmove_state->velocity, 8, game_pmove_state->velocity);
+    game_pmove_state->pm_flags = pmflags_to_game3(server_pmove_state->pm_flags, extended);
+    game_pmove_state->pm_time = server_pmove_state->pm_time;
+    game_pmove_state->gravity = server_pmove_state->gravity;
+    game_pmove_state->delta_angles[0] = ANGLE2SHORT(server_pmove_state->delta_angles[0]);
+    game_pmove_state->delta_angles[1] = ANGLE2SHORT(server_pmove_state->delta_angles[1]);
+    game_pmove_state->delta_angles[2] = ANGLE2SHORT(server_pmove_state->delta_angles[2]);
+}
+
+void ConvertFromGame3_pmove_state_new(pmove_state_t *pmove_state, const game3_pmove_state_new_t *game_pmove_state, bool extended)
+{
+    pmove_state->pm_type = pmtype_from_game3(game_pmove_state->pm_type);
+    VectorScale(game_pmove_state->origin, 0.125f, pmove_state->origin);
+    VectorScale(game_pmove_state->velocity, 0.125f, pmove_state->velocity);
+    pmove_state->pm_flags = pmflags_from_game3(game_pmove_state->pm_flags, extended);
+    pmove_state->pm_time = game_pmove_state->pm_time;
     pmove_state->gravity = game_pmove_state->gravity;
     pmove_state->delta_angles[0] = SHORT2ANGLE(game_pmove_state->delta_angles[0]);
     pmove_state->delta_angles[1] = SHORT2ANGLE(game_pmove_state->delta_angles[1]);

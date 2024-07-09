@@ -82,6 +82,11 @@ static inline game3_pmtype_t pmtype_to_game3(pmtype_t pmtype)
 #define G3PMF_NO_PREDICTION   BIT(6)      // temporarily disables prediction (used for grappling hook)
 #define G3PMF_TELEPORT_BIT    BIT(7)      // used by Q2PRO (non-extended servers)
 
+//KEX
+#define G3PMF_IGNORE_PLAYER_COLLISION     BIT(7)
+#define G3PMF_ON_LADDER                   BIT(8)
+//KEX
+
 #if !defined(GAME3_INCLUDE)
 static inline pmflags_t pmflags_from_game3(byte pmflags, bool extended)
 {
@@ -103,6 +108,11 @@ static inline pmflags_t pmflags_from_game3(byte pmflags, bool extended)
     if (!extended) {
         if(pmflags & G3PMF_TELEPORT_BIT)
             new_pmflags |= PMF_TELEPORT_BIT;
+    } else {
+        if(pmflags & G3PMF_IGNORE_PLAYER_COLLISION)
+            new_pmflags |= PMF_IGNORE_PLAYER_COLLISION;
+        if(pmflags & G3PMF_ON_LADDER)
+            new_pmflags |= PMF_ON_LADDER;
     }
     return new_pmflags;
 }
@@ -127,6 +137,11 @@ static inline byte pmflags_to_game3(pmflags_t pmflags, bool extended)
     if (!extended) {
         if(pmflags & PMF_TELEPORT_BIT)
             new_pmflags |= G3PMF_TELEPORT_BIT;
+    } else {
+        if(pmflags & PMF_IGNORE_PLAYER_COLLISION)
+            new_pmflags |= G3PMF_IGNORE_PLAYER_COLLISION;
+        if(pmflags & PMF_ON_LADDER)
+            new_pmflags |= G3PMF_ON_LADDER;
     }
     return new_pmflags;
 }
@@ -142,7 +157,21 @@ typedef struct {
     short       gravity;
     short       delta_angles[3];    // add to command angles to get view direction
                                     // changed by spawns, rotating objects, and teleporters
-} game3_pmove_state_t;
+} game3_pmove_state_old_t;
+
+#if USE_NEW_GAME_API
+typedef struct {
+    game3_pmtype_t pm_type;
+
+    int32_t     origin[3];      // 19.3
+    int32_t     velocity[3];    // 19.3
+    uint16_t    pm_flags;       // ducked, jump_held, etc
+    uint16_t    pm_time;        // in msec
+    int16_t     gravity;
+    int16_t     delta_angles[3];    // add to command angles to get view direction
+                                    // changed by spawns, rotating objects, and teleporters
+} game3_pmove_state_new_t;
+#endif
 
 typedef struct {
     qboolean    allsolid;   // if true, plane is not valid
@@ -166,26 +195,66 @@ typedef struct game3_usercmd_s {
 
 typedef struct {
     // state (in / out)
-    game3_pmove_state_t s;
+    game3_pmove_state_old_t   s;
 
     // command (in)
     game3_usercmd_t cmd;
     qboolean        snapinitial;    // if s has been changed outside pmove
 
     // results (out)
-    int         numtouch;
-    game3_edict_t  *touchents[MAXTOUCH];
+    int             numtouch;
+    game3_edict_t   *touchents[MAXTOUCH];
 
     vec3_t      viewangles;         // clamped
     float       viewheight;
 
     vec3_t      mins, maxs;         // bounding box size
 
-    game3_edict_t  *groundentity;
-    int         watertype;
-    int         waterlevel;
+    game3_edict_t   *groundentity;
+    int             watertype;
+    int             waterlevel;
 
     // callbacks to test the world
     game3_trace_t (* q_gameabi trace)(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end);
     int         (*pointcontents)(const vec3_t point);
-} game3_pmove_t;
+} game3_pmove_old_t;
+
+#if USE_NEW_GAME_API
+typedef struct {
+    // state (in / out)
+    game3_pmove_state_new_t   s;
+
+    // command (in)
+    game3_usercmd_t cmd;
+    qboolean        snapinitial;    // if s has been changed outside pmove
+
+    // results (out)
+    int             numtouch;
+    game3_edict_t   *touchents[MAXTOUCH];
+
+    vec3_t      viewangles;         // clamped
+    float       viewheight;
+
+    vec3_t      mins, maxs;         // bounding box size
+
+    game3_edict_t   *groundentity;
+    int             watertype;
+    int             waterlevel;
+
+    // callbacks to test the world
+    game3_trace_t (* q_gameabi trace)(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end);
+    int         (*pointcontents)(const vec3_t point);
+} game3_pmove_new_t;
+#endif
+
+#if USE_NEW_GAME_API
+
+typedef game3_pmove_new_t         game3_pmove_t;
+typedef game3_pmove_state_new_t   game3_pmove_state_t;
+
+#else
+
+typedef game3_pmove_old_t         game3_pmove_t;
+typedef game3_pmove_state_old_t   game3_pmove_state_t;
+
+#endif

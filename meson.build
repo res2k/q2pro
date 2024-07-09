@@ -20,7 +20,8 @@ common_src = [
   'src/common/fifo.c',
   'src/common/files.c',
   'src/common/game3_convert.c',
-  'src/common/game3_pmove.c',
+  'src/common/game3_pmove/new.c',
+  'src/common/game3_pmove/old.c',
   'src/common/natsort.c',
   'src/common/hash_map.c',
   'src/common/loc.c',
@@ -299,9 +300,14 @@ else
   common_args += '-D_GNU_SOURCE'
 endif
 
-engine_args = []
+engine_args = ['-DUSE_NEW_GAME_API=1']
 if win32
   engine_args += '-D_WIN32_WINNT=0x0601'
+endif
+
+game_args = []
+if get_option('game-new-api')
+  game_args += '-DUSE_NEW_GAME_API=1'
 endif
 
 common_link_args = []
@@ -560,6 +566,7 @@ shared_library('game' + cpu, game_src,
   include_directories:   'inc',
   gnu_symbol_visibility: 'hidden',
   link_args:             dll_link_args,
+  c_args:                game_args,
   install:               true,
   install_dir:           libdir / get_option('base-game'),
   override_options:      get_option('game-build-options'),

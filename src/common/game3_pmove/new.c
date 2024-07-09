@@ -16,15 +16,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-#ifndef GAME3_PROXY_H_
-#define GAME3_PROXY_H_
+#include "shared/shared.h"
+#include "common/pmove.h"
+#include "shared/game3_shared.h"
+#include "common/game3_pmove.h"
 
-#define GAME3_API_VERSION_OLD    3       // game uses gclient_old_t
-#define GAME3_API_VERSION_NEW    3300    // game uses gclient_new_t
-
-extern const char *game_q2pro_restart_filesystem_ext;
-extern const char *game_q2pro_customize_entity_ext;
-
-game_export_t *GetGame3Proxy(game_import_t *import, void *game3_entry, void *game3_ex_entry);
-
-#endif // GAME3_PROXY_H_
+#define PMOVE_NEW 1
+#define PMOVE_TYPE game3_pmove_new_t
+#define PMOVE_FUNC game3_PmoveNew
+#define PMOVE_TIME_SHIFT pmp->time_shift
+#define PMOVE_C2S(x) SignExtend(COORD2SHORT(x), pmp->coord_bits)
+#include "template.c"

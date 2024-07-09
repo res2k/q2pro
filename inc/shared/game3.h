@@ -50,10 +50,8 @@ typedef struct {
     float       loop_attenuation;
 } game3_entity_state_extension_t;
 
-#define MAX_STATS_GAME3 32
-
 typedef struct {
-    game3_pmove_state_t pmove;      // for prediction
+    game3_pmove_state_old_t   pmove;  // for prediction
 
     // these fields do not need to be communicated bit-precise
 
@@ -67,18 +65,48 @@ typedef struct {
     int         gunindex;
     int         gunframe;
 
-    float       blend[4];       // rgba full screen effect
+    vec4_t      blend;          // rgba full screen effect
 
     float       fov;            // horizontal field of view
 
     int         rdflags;        // refdef flags
 
-    short       stats[MAX_STATS_GAME3];       // fast status bar updates
-} game3_player_state_t;
+    short       stats[MAX_STATS_OLD];   // fast status bar updates
+} game3_player_state_old_t;
 
-struct game3_gclient_s {
-    game3_player_state_t ps;     // communicated by server to clients
-    int             ping;
+#if USE_NEW_GAME_API
+typedef struct {
+    game3_pmove_state_new_t   pmove;  // for prediction
+
+    // these fields do not need to be communicated bit-precise
+
+    vec3_t      viewangles;     // for fixed views
+    vec3_t      viewoffset;     // add to pmovestate->origin
+    vec3_t      kick_angles;    // add to view direction to get render angles
+                                // set by weapon kicks, pain effects, etc
+
+    vec3_t      gunangles;
+    vec3_t      gunoffset;
+    int         gunindex;
+    int         gunframe;
+
+    vec4_t      blend;          // rgba full screen effect
+    vec4_t      damage_blend;
+
+    float       fov;            // horizontal field of view
+
+    int         rdflags;        // refdef flags
+
+    int         reserved[4];
+
+    int16_t     stats[MAX_STATS_NEW];   // fast status bar updates
+} game3_player_state_new_t;
+#endif
+
+#if !defined(GAME_INCLUDE)
+struct game3_gclient_old_s {
+    game3_player_state_old_t  ps;     // communicated by server to clients
+    int                 ping;
 
     // set to (client POV entity number) - 1 by game,
     // only valid if g_features has GMF_CLIENTNUM bit
@@ -88,10 +116,21 @@ struct game3_gclient_s {
     // this point in the structure
 };
 
-#if !defined(GAME_INCLUDE)
+struct game3_gclient_new_s {
+    game3_player_state_new_t  ps;     // communicated by server to clients
+    int                 ping;
+
+    // set to (client POV entity number) - 1 by game,
+    // only valid if g_features has GMF_CLIENTNUM bit
+    int             clientNum;
+
+    // the game dll can add anything it wants after
+    // this point in the structure
+};
+
 struct game3_edict_s {
     game3_entity_state_t  s;
-    struct game3_gclient_s    *client;
+    void        *client;
     qboolean    inuse;
     int         linkcount;
 
@@ -116,6 +155,18 @@ struct game3_edict_s {
     // this point in the structure
 };
 #endif // !defined(GAME_INCLUDE)
+
+#if USE_NEW_GAME_API
+
+#define MAX_STATS_GAME3           MAX_STATS_NEW
+typedef game3_player_state_new_t  game3_player_state_t;
+
+#else
+
+#define MAX_STATS_GAME3           MAX_STATS_OLD
+typedef game3_player_state_old_t  game3_player_state_t;
+
+#endif
 
 //===============================================================
 
@@ -160,7 +211,7 @@ typedef struct {
     void (*linkentity)(game3_edict_t *ent);
     void (*unlinkentity)(game3_edict_t *ent);     // call before removing an interactive edict
     int (*BoxEdicts)(const vec3_t mins, const vec3_t maxs, game3_edict_t **list, int maxcount, int areatype);
-    void (*Pmove)(game3_pmove_t *pmove);          // player movement code common with client prediction
+    void (*Pmove)(void *pmove);          // player movement code common with client prediction
 
     // network messaging
     void (*multicast)(const vec3_t origin, multicast_t to);

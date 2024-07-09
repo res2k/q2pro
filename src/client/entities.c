@@ -1418,8 +1418,8 @@ void CL_CalcViewValues(void)
         Vector4Lerp(ops->screen_blend, ps->screen_blend, blendfrac, cl.refdef.screen_blend);
         Vector4Lerp(ops->damage_blend, ps->damage_blend, damageblendfrac, cl.refdef.damage_blend);
     } else {
-        // don't interpolate blend color
         Vector4Copy(ps->screen_blend, cl.refdef.screen_blend);
+        Vector4Copy(ps->damage_blend, cl.refdef.damage_blend);
     }
     // Mix in screen_blend from cgame pmove
     // FIXME: Should also be interpolated?...

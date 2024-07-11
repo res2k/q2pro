@@ -510,16 +510,25 @@ void MSG_WriteDir(const vec3_t dir)
     MSG_WriteByte(best);
 }
 
+#define PACK_COORDS(out, in)        \
+    (out[0] = COORD2SHORT(in[0]),   \
+     out[1] = COORD2SHORT(in[1]),   \
+     out[2] = COORD2SHORT(in[2]))
+
+#define PACK_ANGLES(out, in)        \
+    (out[0] = ANGLE2SHORT(in[0]),   \
+     out[1] = ANGLE2SHORT(in[1]),   \
+     out[2] = ANGLE2SHORT(in[2]))
+
 void MSG_PackEntity(entity_packed_t *out, const entity_state_t *in, bool ext)
 {
     // allow 0 to accomodate empty baselines
     Q_assert(in->number >= 0 && in->number < MAX_EDICTS);
     out->number = in->number;
+
     VectorCopy(in->origin, out->origin);
-    out->angles[0] = ANGLE2SHORT(in->angles[0]);
-    out->angles[1] = ANGLE2SHORT(in->angles[1]);
-    out->angles[2] = ANGLE2SHORT(in->angles[2]);
     VectorCopy(in->old_origin, out->old_origin);
+    PACK_ANGLES(out->angles, in->angles);
     out->modelindex = in->modelindex;
     out->modelindex2 = in->modelindex2;
     out->modelindex3 = in->modelindex3;
@@ -531,6 +540,7 @@ void MSG_PackEntity(entity_packed_t *out, const entity_state_t *in, bool ext)
     out->frame = in->frame;
     out->sound = in->sound;
     out->event = in->event;
+
     if (ext) {
         out->alpha = Q_clip_uint8(in->alpha * 255.0f);
         out->scale = Q_clip_uint8(in->scale * 16.0f);
@@ -843,6 +853,18 @@ void MSG_WriteDeltaEntity(const entity_packed_t *from,
 }
 
 #define OFFSET2CHAR(x)  Q_clip_int8((x) * 4)
+#define BLEND2BYTE(x)   Q_clip_uint8((x) * 255)
+
+#define PACK_OFFSET(out, in)        \
+    (out[0] = OFFSET2CHAR(in[0]),   \
+     out[1] = OFFSET2CHAR(in[1]),   \
+     out[2] = OFFSET2CHAR(in[2]))
+
+#define PACK_BLEND(out, in)        \
+    (out[0] = BLEND2BYTE(in[0]),   \
+     out[1] = BLEND2BYTE(in[1]),   \
+     out[2] = BLEND2BYTE(in[2]),   \
+     out[3] = BLEND2BYTE(in[3]))
 
 static inline int16_t scaled_short(float x, int scale)
 {
@@ -851,33 +873,32 @@ static inline int16_t scaled_short(float x, int scale)
 
 void MSG_PackPlayer(player_packed_t *out, const player_state_t *in, msgPsFlags_t flags)
 {
-    int i;
-
     out->pmove = in->pmove;
-    for (i = 0; i < 3; i++) out->viewangles[i] = ANGLE2SHORT(in->viewangles[i]);
+
+    PACK_ANGLES(out->viewangles, in->viewangles);
     if (flags & MSG_PS_RERELEASE) {
-        for (i = 0; i < 3; i++) out->viewoffset[i] = scaled_short(in->viewoffset[i], 16);
-        for (i = 0; i < 3; i++) out->kick_angles[i] = scaled_short(in->kick_angles[i], 1024);
-        for (i = 0; i < 3; i++) out->gunoffset[i] = COORD2SHORT(in->gunoffset[i]);
-        for (i = 0; i < 3; i++) out->gunangles[i] = ANGLE2SHORT(in->gunangles[i]);
+        for (int i = 0; i < 3; i++) out->viewoffset[i] = scaled_short(in->viewoffset[i], 16);
+        for (int i = 0; i < 3; i++) out->kick_angles[i] = scaled_short(in->kick_angles[i], 1024);
+        for (int i = 0; i < 3; i++) out->gunoffset[i] = COORD2SHORT(in->gunoffset[i]);
+        for (int i = 0; i < 3; i++) out->gunangles[i] = ANGLE2SHORT(in->gunangles[i]);
     } else {
-        for (i = 0; i < 3; i++) out->viewoffset[i] = OFFSET2CHAR(in->viewoffset[i]);
-        for (i = 0; i < 3; i++) out->kick_angles[i] = OFFSET2CHAR(in->kick_angles[i]);
-        for (i = 0; i < 3; i++) out->gunoffset[i] = OFFSET2CHAR(in->gunoffset[i]);
-        for (i = 0; i < 3; i++) out->gunangles[i] = OFFSET2CHAR(in->gunangles[i]);
+        PACK_OFFSET(out->viewoffset, in->viewoffset);
+        PACK_OFFSET(out->kick_angles, in->kick_angles);
+        PACK_OFFSET(out->gunoffset, in->gunoffset);
+        PACK_OFFSET(out->gunangles, in->gunangles);
     }
+
     out->gunindex = in->gunindex;
     out->gunframe = in->gunframe;
-    for (i = 0; i < 4; i++)
-        out->screen_blend[i] = Q_clip_uint8(in->screen_blend[i] * 255);
+    PACK_BLEND(out->screen_blend, in->screen_blend);
     out->fov = (int)in->fov;
     out->rdflags = in->rdflags;
-    for (i = 0; i < MAX_STATS; i++)
+
+    for (int i = 0; i < MAX_STATS; i++)
         out->stats[i] = in->stats[i];
 // KEX
     out->gunrate = (in->gunrate == 10) ? 0 : in->gunrate;
-    for (i = 0; i < 4; i++)
-        out->damage_blend[i] = Q_clip_uint8(in->damage_blend[i] * 255);
+    PACK_BLEND(out->damage_blend, in->damage_blend);
 // KEX
 }
 

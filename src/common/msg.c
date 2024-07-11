@@ -1071,12 +1071,8 @@ void MSG_WriteDeltaPlayerstate_Default(const player_packed_t *from, const player
         }
     }
 
-    if (pflags & PS_BLEND) {
-        MSG_WriteByte(to->screen_blend[0]);
-        MSG_WriteByte(to->screen_blend[1]);
-        MSG_WriteByte(to->screen_blend[2]);
-        MSG_WriteByte(to->screen_blend[3]);
-    }
+    if (pflags & PS_BLEND)
+        MSG_WriteData(to->screen_blend, sizeof(to->screen_blend));
 
     if (pflags & PS_FOV)
         MSG_WriteByte(to->fov);
@@ -1396,12 +1392,8 @@ int MSG_WriteDeltaPlayerstate_Enhanced(const player_packed_t    *from,
             if (blend_bits & BLENDBITS_DAMAGE_G) MSG_WriteByte(to->damage_blend[1]);
             if (blend_bits & BLENDBITS_DAMAGE_B) MSG_WriteByte(to->damage_blend[2]);
             if (blend_bits & BLENDBITS_DAMAGE_A) MSG_WriteByte(to->damage_blend[3]);
-        } else {
-            MSG_WriteByte(to->screen_blend[0]);
-            MSG_WriteByte(to->screen_blend[1]);
-            MSG_WriteByte(to->screen_blend[2]);
-            MSG_WriteByte(to->screen_blend[3]);
-        }
+        } else
+            MSG_WriteData(to->screen_blend, sizeof(to->screen_blend));
     }
 
     if (pflags & PS_FOV)
@@ -1634,12 +1626,8 @@ void MSG_WriteDeltaPlayerstate_Packet(const player_packed_t *from,
         }
     }
 
-    if (pflags & PPS_BLEND) {
-        MSG_WriteByte(to->screen_blend[0]);
-        MSG_WriteByte(to->screen_blend[1]);
-        MSG_WriteByte(to->screen_blend[2]);
-        MSG_WriteByte(to->screen_blend[3]);
-    }
+    if (pflags & PPS_BLEND)
+        MSG_WriteData(to->screen_blend, sizeof(to->screen_blend));
 
     if (pflags & PPS_FOV)
         MSG_WriteByte(to->fov);

@@ -1677,9 +1677,9 @@ typedef struct {
     int         gunrate;
 // KEX
 
-    float       screen_blend[4];       // rgba full screen effect
+    vec4_t      screen_blend;       // rgba full screen effect
 // KEX
-    float       damage_blend[4];
+    vec4_t      damage_blend;
 // KEX
 
     float       fov;            // horizontal field of view

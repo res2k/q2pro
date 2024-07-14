@@ -618,6 +618,10 @@ typedef struct {
         bool        compat;             // demomap compatibility mode
         msgEsFlags_t    esFlags;        // for snapshots/recording
         msgPsFlags_t    psFlags;
+
+        // q2proto fields
+        q2proto_server_info_t server_info;
+        q2proto_servercontext_t q2proto_context;
     } demo;
 
 #if USE_CLIENT_GTV
@@ -1093,6 +1097,9 @@ void CL_FreeDemoSnapshots(void);
 void CL_FirstDemoFrame(void);
 void CL_Stop_f(void);
 bool CL_GetDemoInfo(const char *path, demoInfo_t *info);
+
+extern q2protoio_ioarg_t demo_q2protoio_ioarg;
+#define Q2PROTO_IOARG_DEMO_WRITE    ((uintptr_t)&demo_q2protoio_ioarg)
 
 
 //

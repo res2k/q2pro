@@ -29,6 +29,8 @@ static cvar_t   *cl_demomsglen;
 static cvar_t   *cl_demowait;
 static cvar_t   *cl_demosuspendtoggle;
 
+q2protoio_ioarg_t demo_q2protoio_ioarg = {.sz_write = &cls.demo.buffer};
+
 // =========================================================================
 
 /*
@@ -85,10 +87,40 @@ void CL_PackEntity(entity_packed_t *out, const entity_state_t *in)
     }
 }
 
+static void CL_PackEntity_q2proto(q2proto_packed_entity_state_t *out, const entity_state_t *in)
+{
+    PackEntity(&cls.demo.q2proto_context, in, out);
+    // repack solid 32 to 16
+    if (!cl.csr.extended && in->solid && in->solid != PACKED_BSP) {
+        vec3_t mins, maxs;
+        q2proto_client_unpack_solid(&cls.q2proto_ctx, in->solid, mins, maxs);
+        out->solid = q2proto_pack_solid_16(mins, maxs);
+    }
+}
+
+static void write_delta_entity(const q2proto_packed_entity_state_t *oldpack, const q2proto_packed_entity_state_t *newpack, int newnum, msgEsFlags_t flags)
+{
+    q2proto_svc_message_t message_entity_delta = {.type = Q2P_SVC_FRAME_ENTITY_DELTA, .frame_entity_delta = {0}};
+    bool entity_differs = Q2PROTO_MakeEntityDelta(&cls.demo.q2proto_context, &message_entity_delta.frame_entity_delta.entity_delta, oldpack, newpack, flags);
+    message_entity_delta.frame_entity_delta.newnum = newnum;
+
+    if (!(flags & MSG_ES_FORCE) && !entity_differs)
+        return;
+    q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message_entity_delta);
+}
+
+static void write_entity_remove(int num)
+{
+    q2proto_svc_message_t message_entity_delta = {.type = Q2P_SVC_FRAME_ENTITY_DELTA, .frame_entity_delta = {0}};
+    message_entity_delta.frame_entity_delta.remove = true;
+    message_entity_delta.frame_entity_delta.newnum = num;
+    q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message_entity_delta);
+}
+
 // writes a delta update of an entity_state_t list to the message.
 static void emit_packet_entities(const server_frame_t *from, const server_frame_t *to)
 {
-    entity_packed_t oldpack, newpack;
+    q2proto_packed_entity_state_t oldpack, newpack;
     entity_state_t *oldent, *newent;
     int     oldindex, newindex;
     int     oldnum, newnum;
@@ -128,9 +160,9 @@ static void emit_packet_entities(const server_frame_t *from, const server_frame_
             msgEsFlags_t flags = cls.demo.esFlags;
             if (newent->number <= cl.maxclients)
                 flags |= MSG_ES_NEWENTITY;
-            CL_PackEntity(&oldpack, oldent);
-            CL_PackEntity(&newpack, newent);
-            MSG_WriteDeltaEntity(&oldpack, &newpack, flags);
+            CL_PackEntity_q2proto(&oldpack, oldent);
+            CL_PackEntity_q2proto(&newpack, newent);
+            write_delta_entity(&oldpack, &newpack, newnum, flags);
             oldindex++;
             newindex++;
             continue;
@@ -138,74 +170,53 @@ static void emit_packet_entities(const server_frame_t *from, const server_frame_
 
         if (newnum < oldnum) {
             // this is a new entity, send it from the baseline
-            CL_PackEntity(&oldpack, &cl.baselines[newnum]);
-            CL_PackEntity(&newpack, newent);
-            MSG_WriteDeltaEntity(&oldpack, &newpack, cls.demo.esFlags | MSG_ES_FORCE | MSG_ES_NEWENTITY);
+            CL_PackEntity_q2proto(&oldpack, &cl.baselines[newnum]);
+            CL_PackEntity_q2proto(&newpack, newent);
+            write_delta_entity(&oldpack, &newpack, newnum, MSG_ES_FORCE | MSG_ES_NEWENTITY);
             newindex++;
             continue;
         }
 
         if (newnum > oldnum) {
             // the old entity isn't present in the new message
-            CL_PackEntity(&oldpack, oldent);
-            MSG_WriteDeltaEntity(&oldpack, NULL, cls.demo.esFlags | MSG_ES_FORCE);
+            write_entity_remove(oldnum);
             oldindex++;
             continue;
         }
     }
 
-    MSG_WriteShort(0);      // end of packetentities
+    // end of packetentities
+    q2proto_svc_message_t message = {.type = Q2P_SVC_FRAME_ENTITY_DELTA, .frame_entity_delta = {0}};
+    q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message);
 }
 
 static void emit_delta_frame(const server_frame_t *from, const server_frame_t *to,
                              int fromnum, int tonum)
 {
-    player_packed_t oldpack, newpack;
-    byte *bflags = NULL;
+    q2proto_svc_message_t message = {.type = Q2P_SVC_FRAME, .frame = {0}};
 
-    MSG_WriteByte(svc_frame);
-    if (cls.serverProtocol == PROTOCOL_VERSION_RERELEASE) {
-        int delta = from ? tonum - fromnum : 31;
-        MSG_WriteLong((tonum & FRAMENUM_MASK) | (delta << FRAMENUM_BITS));
-        MSG_WriteByte(0); // server: client->frameflags
-        bflags = SZ_GetSpace(&msg_write, 1);
-    } else {
-        MSG_WriteLong(tonum);
-        MSG_WriteLong(fromnum); // what we are delta'ing from
-        if (cls.serverProtocol != PROTOCOL_VERSION_OLD)
-        MSG_WriteByte(cl.suppress_count);   // rate dropped packets
+    message.frame.serverframe = tonum;
+    message.frame.deltaframe = fromnum;
+    message.frame.suppress_count = cl.suppress_count;   // rate dropped packets
+    message.frame.q2pro_frame_flags = 0;
+
+    message.frame.areabits_len = to->areabytes;
+    message.frame.areabits = to->areabits;
+
+    q2proto_packed_player_state_t newpack, oldpack;
+    PackPlayerstate(&cls.demo.q2proto_context, &to->ps, &newpack);
+    if (from) {
+        PackPlayerstate(&cls.demo.q2proto_context, &from->ps, &oldpack);
+        q2proto_server_make_player_state_delta(&cls.demo.q2proto_context, &oldpack, &newpack, &message.frame.playerstate);
+    } else
+        q2proto_server_make_player_state_delta(&cls.demo.q2proto_context, NULL, &newpack, &message.frame.playerstate);
+    if ((from ? from->clientNum : 0) != to->clientNum) {
+        message.frame.playerstate.clientnum = to->clientNum;
+        message.frame.playerstate.delta_bits |= Q2P_PSD_CLIENTNUM;
     }
 
-    // send over the areabits
-    MSG_WriteByte(to->areabytes);
-    MSG_WriteData(to->areabits, to->areabytes);
+    q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message);
 
-    msgPsFlags_t psFlags = cl.psFlags;
-    if (cls.serverProtocol == PROTOCOL_VERSION_RERELEASE) {
-        psFlags |= MSG_PS_EXTENSIONS;
-        psFlags |= MSG_PS_RERELEASE;
-    }
-    // delta encode the playerstate
-    MSG_PackPlayer(&newpack, &to->ps, psFlags);
-    if (from)
-        MSG_PackPlayer(&oldpack, &from->ps, psFlags);
-    if (cls.serverProtocol == PROTOCOL_VERSION_RERELEASE) {
-        uint32_t extraflags = MSG_WriteDeltaPlayerstate_Enhanced(from ? &oldpack : NULL, &newpack, psFlags);
-
-        // delta encode the clientNum
-        if ((from ? from->clientNum : 0) != to->clientNum) {
-            extraflags |= EPS_CLIENTNUM;
-            MSG_WriteShort(from->clientNum);
-        }
-        *bflags = extraflags;
-    } else {
-        MSG_WriteByte(svc_playerinfo);
-        MSG_WriteDeltaPlayerstate_Default(from ? &oldpack : NULL, &newpack, cl.psFlags);
-    }
-
-    // delta encode the entities
-    if (cls.serverProtocol != PROTOCOL_VERSION_RERELEASE)
-        MSG_WriteByte(svc_packetentities);
     emit_packet_entities(from, to);
 }
 
@@ -358,10 +369,6 @@ static void CL_Record_f(void)
 {
     char    buffer[MAX_OSPATH];
     int     i, c;
-    size_t  len;
-    entity_state_t  *ent;
-    entity_packed_t pack;
-    char            *s;
     qhandle_t       f;
     unsigned        mode = FS_MODE_WRITE;
     size_t          size = Cvar_ClampInteger(
@@ -407,6 +414,21 @@ static void CL_Record_f(void)
         return;
     }
 
+    if (cl.csr.extended)
+        size = MAX_MSGLEN;
+
+    // Set up q2proto structures
+    memset(&cls.demo.server_info, 0, sizeof(cls.demo.server_info));
+    cls.demo.server_info.game_type = cls.q2proto_ctx.features.server_game_type;
+    cls.demo.server_info.default_packet_length = size;
+
+    q2proto_error_t err = q2proto_init_servercontext_demo(&cls.demo.q2proto_context, &cls.demo.server_info, &size);
+    if (err != Q2P_ERR_SUCCESS) {
+        Com_EPrintf("Failed to start demo recording: %d.\n", err);
+        return;
+    }
+    demo_q2protoio_ioarg.max_msg_len = size;
+
     //
     // open the demo file
     //
@@ -424,9 +446,6 @@ static void CL_Record_f(void)
     // the first frame will be delta uncompressed
     cls.demo.last_server_frame = -1;
 
-    if (cl.csr.extended)
-        size = MAX_MSGLEN;
-
     SZ_InitWrite(&cls.demo.buffer, demo_buffer, size);
 
     // clear dirty configstrings
@@ -435,79 +454,65 @@ static void CL_Record_f(void)
     // tell the server we are recording
     CL_UpdateRecordingSetting();
 
+
+
     //
     // write out messages to hold the startup information
     //
 
     // send the serverdata
-    MSG_WriteByte(svc_serverdata);
-    if (cls.serverProtocol == PROTOCOL_VERSION_RERELEASE)
-        MSG_WriteLong(PROTOCOL_VERSION_RERELEASE);
-    else if (cl.csr.extended)
-        MSG_WriteLong(PROTOCOL_VERSION_EXTENDED_CURRENT);
-    else
-        MSG_WriteLong(min(cls.serverProtocol, PROTOCOL_VERSION_DEFAULT));
-    MSG_WriteLong(cl.servercount);
-    MSG_WriteByte(1);      // demos are always attract loops
-    MSG_WriteString(cl.gamedir);
-    MSG_WriteShort(cl.clientNum);
-    MSG_WriteString(cl.configstrings[CS_NAME]);
+    q2proto_svc_message_t message_svcdata = {.type = Q2P_SVC_SERVERDATA, .serverdata = {0}};
+    q2proto_server_fill_serverdata(&cls.demo.q2proto_context, &message_svcdata.serverdata);
+    message_svcdata.serverdata.servercount = cl.servercount;
+    message_svcdata.serverdata.attractloop = true; // demos are always attract loops
+    message_svcdata.serverdata.gamedir = q2proto_make_string(cl.gamedir);
+    message_svcdata.serverdata.clientnum = cl.clientNum;
+    message_svcdata.serverdata.levelname = q2proto_make_string(cl.configstrings[CS_NAME]);
+    message_svcdata.serverdata.q2repro.server_fps = cl.frametime_inv * 1000;
+    q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message_svcdata);
 
-    if (cls.serverProtocol == PROTOCOL_VERSION_RERELEASE) {
-        MSG_WriteShort(PROTOCOL_VERSION_Q2PRO_CURRENT);
-        MSG_WriteByte(cl.serverstate);
-        int protocol_flags = 0;
-        if (cl.game_type != Q2PROTO_GAME_RERELEASE) {
-            if (cl.game_type >= Q2PROTO_GAME_Q2PRO_EXTENDED)
-                protocol_flags |= Q2PRO_PF_EXTENSIONS;
-            if (cl.game_type >= Q2PROTO_GAME_Q2PRO_EXTENDED_V2)
-                protocol_flags |= Q2PRO_PF_EXTENSIONS_2;
-            protocol_flags |= Q2PRO_PF_GAME3_COMPAT;
-        }
-        MSG_WriteShort(protocol_flags);
-        int rate = cl.frametime_inv / 0.001f;
-        MSG_WriteByte(rate);
-    }
+    q2proto_svc_configstring_t configstrings[MAX_CONFIGSTRINGS];
+    q2proto_svc_spawnbaseline_t spawnbaselines[MAX_PACKET_ENTITIES];
+    q2proto_gamestate_t gamestate = {.num_configstrings = 0, .configstrings = configstrings, .num_spawnbaselines = 0, .spawnbaselines = spawnbaselines};
+    memset(spawnbaselines, 0, sizeof(spawnbaselines));
 
     // configstrings
-    for (i = 0; i < cl.csr.end; i++) {
-        s = cl.configstrings[i];
-        if (!*s)
+    for (int i = 0; i < cl.csr.end; i++) {
+        char* string = cl.configstrings[i];
+        if (!string[0]) {
             continue;
-
-        len = Q_strnlen(s, CS_MAX_STRING_LENGTH);
-        if (msg_write.cursize + len + 4 > size) {
-            if (!CL_WriteDemoMessage(&msg_write))
-                return;
         }
-
-        MSG_WriteByte(svc_configstring);
-        MSG_WriteShort(i);
-        MSG_WriteData(s, len);
-        MSG_WriteByte(0);
+        q2proto_svc_configstring_t *cfgstr = &configstrings[gamestate.num_configstrings++];
+        cfgstr->index = i;
+        cfgstr->value.str = string;
+        cfgstr->value.len = Q_strnlen(string, MAX_QPATH);
     }
 
     // baselines
     for (i = 1; i < cl.csr.max_edicts; i++) {
-        ent = &cl.baselines[i];
-        if (!ent->number)
+        entity_state_t *ent = &cl.baselines[i];
+        if (!ent->number) {
             continue;
-
-        if (msg_write.cursize + MAX_PACKETENTITY_BYTES > size) {
-            if (!CL_WriteDemoMessage(&msg_write))
-                return;
         }
-
-        MSG_WriteByte(svc_spawnbaseline);
-        CL_PackEntity(&pack, ent);
-        MSG_WriteDeltaEntity(NULL, &pack, cls.demo.esFlags | MSG_ES_FORCE);
+        q2proto_svc_spawnbaseline_t *baseline = &spawnbaselines[gamestate.num_spawnbaselines++];
+        baseline->entnum = ent->number;
+        q2proto_packed_entity_state_t packed_entity;
+        PackEntity(&cls.demo.q2proto_context, ent, &packed_entity);
+        Q2PROTO_MakeEntityDelta(&cls.demo.q2proto_context, &baseline->delta_state, NULL, &packed_entity, 0);
     }
 
-    MSG_WriteByte(svc_stufftext);
-    MSG_WriteString("precache\n");
+    int write_result;
+    do {
+        write_result = q2proto_server_write_gamestate(&cls.demo.q2proto_context, NULL, Q2PROTO_IOARG_DEMO_WRITE, &gamestate);;
+        CL_WriteDemoMessage(&cls.demo.buffer);
+    } while (write_result == Q2P_ERR_NOT_ENOUGH_PACKET_SPACE);
+
+    q2proto_svc_message_t message = {.type = Q2P_SVC_STUFFTEXT};
+    message.stufftext.string = q2proto_make_string("precache\n");
+    q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message);
 
     // write it to the demo file
-    CL_WriteDemoMessage(&msg_write);
+    CL_WriteDemoMessage(&cls.demo.buffer);
 
     // the rest of the demo file will be individual frames
 }
@@ -539,10 +544,11 @@ static void resume_record(void)
                 // multiple packets = not seamless
             }
 
-            SZ_WriteByte(&cls.demo.buffer, svc_configstring);
-            SZ_WriteShort(&cls.demo.buffer, index);
-            SZ_Write(&cls.demo.buffer, s, len);
-            SZ_WriteByte(&cls.demo.buffer, 0);
+            q2proto_svc_message_t message = {.type = Q2P_SVC_CONFIGSTRING};
+            message.configstring.index = index;
+            message.configstring.value.str = s;
+            message.configstring.value.len = len;
+            q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message);
         }
     }
 
@@ -805,6 +811,21 @@ static void CL_PlayDemo_f(void)
     // parse the first message just read
     CL_ParseServerMessage();
 
+    // Set up cls.demo.q2proto_context for demo snaps, with same protocol as server
+    memset(&cls.demo.server_info, 0, sizeof(cls.demo.server_info));
+    cls.demo.server_info.game_type = cls.q2proto_ctx.features.server_game_type;
+    q2proto_connect_t connect_info;
+    memset(&connect_info, 0, sizeof(connect_info));
+    connect_info.protocol = q2proto_protocol_from_netver(cls.serverProtocol);
+    connect_info.version = cls.protocolVersion;
+    connect_info.q2pro_nctype = cls.netchan.type;
+    q2proto_error_t err = q2proto_init_servercontext(&cls.demo.q2proto_context, &cls.demo.server_info, &connect_info);
+    if (err != Q2P_ERR_SUCCESS) {
+        Com_Error(ERR_DISCONNECT, "Couldn't init demo context: %d", err);
+        return;
+    }
+    SZ_InitWrite(&cls.demo.buffer, demo_buffer, MAX_MSGLEN);
+
     // read and parse messages util `precache' command
     for (int i = 0; cls.state == ca_connected && i < 1000; i++) {
         Cbuf_Execute(&cl_cmdbuf);
@@ -883,33 +904,35 @@ void CL_EmitDemoSnapshot(void)
         if (!strcmp(from, to))
             continue;
 
-        len = Q_strnlen(to, CS_MAX_STRING_LENGTH);
-        MSG_WriteByte(svc_configstring);
-        MSG_WriteShort(i);
-        MSG_WriteData(to, len);
-        MSG_WriteByte(0);
+        len = Q_strnlen(to, MAX_QPATH);
+        q2proto_svc_message_t message = {.type = Q2P_SVC_CONFIGSTRING};
+        message.configstring.index = i;
+        message.configstring.value.str = to;
+        message.configstring.value.len = len;
+        q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message);
     }
 
     // write layout
-    MSG_WriteByte(svc_layout);
-    MSG_WriteString(cl.cgame_data.layout);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_LAYOUT};
+    message.layout.layout_str = q2proto_make_string(cl.cgame_data.layout);
+    q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message);
 
-    if (msg_write.overflowed) {
+    if (cls.demo.buffer.overflowed) {
         Com_WPrintf("%s: message buffer overflowed\n", __func__);
     } else {
-        snap = Z_Malloc(sizeof(*snap) + msg_write.cursize - 1);
+        snap = Z_Malloc(sizeof(*snap) + cls.demo.buffer.cursize - 1);
         snap->framenum = cls.demo.frames_read;
         snap->filepos = pos;
-        snap->msglen = msg_write.cursize;
-        memcpy(snap->data, msg_write.data, msg_write.cursize);
+        snap->msglen = cls.demo.buffer.cursize;
+        memcpy(snap->data, cls.demo.buffer.data, cls.demo.buffer.cursize);
 
         cls.demo.snapshots = Z_Realloc(cls.demo.snapshots, sizeof(cls.demo.snapshots[0]) * Q_ALIGN(cls.demo.numsnapshots + 1, MIN_SNAPSHOTS));
         cls.demo.snapshots[cls.demo.numsnapshots++] = snap;
 
-        Com_DPrintf("[%d] snaplen %u\n", cls.demo.frames_read, msg_write.cursize);
+        Com_DPrintf("[%d] snaplen %u\n", cls.demo.frames_read, cls.demo.buffer.cursize);
     }
 
-    SZ_Clear(&msg_write);
+    SZ_Clear(&cls.demo.buffer);
 
     cls.demo.last_snapshot = cls.demo.frames_read;
 }

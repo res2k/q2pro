@@ -275,7 +275,7 @@ static void write_entity_delta(client_t *client, const server_entity_packed_t *f
 
     if (client->q2proto_ctx.features.has_beam_old_origin_fix)
         flags |= MSG_ES_BEAMORIGIN;
-    bool entity_differs = SV_MakeEntityDelta(client, &message.frame_entity_delta.entity_delta, from, to, flags);
+    bool entity_differs = Q2PROTO_MakeEntityDelta(&client->q2proto_ctx, &message.frame_entity_delta.entity_delta, from ? &from->e : NULL, &to->e, flags);
     if (!(flags & MSG_ES_FORCE) && !entity_differs)
         return;
     q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
@@ -502,26 +502,6 @@ bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
 
     // delta encode the entities
     return emit_packet_entities(client, oldframe, frame, clientEntityNum, maxsize);
-}
-
-static const server_entity_packed_t nullServerEntityState;
-
-bool SV_MakeEntityDelta(client_t *client, q2proto_entity_state_delta_t *delta, const server_entity_packed_t *from, const server_entity_packed_t *to, msgEsFlags_t flags)
-{
-    if (!from)
-        from = &nullServerEntityState;
-
-    bool write_old_origin =
-        ((flags & MSG_ES_NEWENTITY) && !VectorCompare(to->e.old_origin, from->e.origin))
-        || ((to->e.renderfx & RF_FRAMELERP) && !VectorCompare(to->e.old_origin, from->e.origin))
-        || ((to->e.renderfx & RF_BEAM) && (!(flags & MSG_ES_BEAMORIGIN) || !VectorCompare(to->e.old_origin, from->e.old_origin)));
-    q2proto_server_make_entity_state_delta(&client->q2proto_ctx, &from->e, &to->e, !(flags & MSG_ES_FIRSTPERSON) && write_old_origin, delta);
-    if (flags & MSG_ES_FIRSTPERSON)
-    {
-        memcpy(&delta->origin.write.current, &delta->origin.write.prev, sizeof(delta->origin.write.current));
-        delta->angle.delta_bits = 0;
-    }
-    return (delta->delta_bits != 0) || (memcmp(&delta->origin.write.current, &delta->origin.write.prev, sizeof(delta->origin.write.current)) != 0) || (delta->angle.delta_bits != 0);
 }
 
 /*

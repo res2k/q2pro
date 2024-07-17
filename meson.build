@@ -32,6 +32,7 @@ common_src = [
   'src/common/net/net.c',
   'src/common/pmove.c',
   'src/common/prompt.c',
+  'src/common/q2proto_shared.c',
   'src/common/sizebuf.c',
   'src/common/utils.c',
   'src/common/zone.c',

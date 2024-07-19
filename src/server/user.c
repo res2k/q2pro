@@ -89,7 +89,7 @@ static void SV_CreateBaselines(void)
 #if USE_MVD_CLIENT
         if (sv.state != ss_broadcast)
 #endif
-        if (sv_client->esFlags & MSG_ES_LONGSOLID) {
+        if (sv_client->esFlags & MSG_ES_LONGSOLID && !sv_client->csr->extended) {
             base->solid = sv.entities[i].solid32;
         }
     }

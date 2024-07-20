@@ -866,7 +866,7 @@ void CL_DrawBeam(const vec3_t start, const vec3_t end, qhandle_t model)
         ent.flags = RF_FULLBRIGHT;
         ent.angles[0] = angles[0];
         ent.angles[1] = angles[1];
-        ent.angles[2] = Q_rand() % 360;
+        ent.angles[2] = CL_rand() % 360;
         V_AddEntity(&ent);
         return;
     }
@@ -882,11 +882,11 @@ void CL_DrawBeam(const vec3_t start, const vec3_t end, qhandle_t model)
             ent.flags = RF_FULLBRIGHT;
             ent.angles[0] = -angles[0];
             ent.angles[1] = angles[1] + 180.0f;
-            ent.angles[2] = Q_rand() % 360;
+            ent.angles[2] = CL_rand() % 360;
         } else {
             ent.angles[0] = angles[0];
             ent.angles[1] = angles[1];
-            ent.angles[2] = Q_rand() % 360;
+            ent.angles[2] = CL_rand() % 360;
         }
 
         V_AddEntity(&ent);
@@ -1048,7 +1048,7 @@ static void CL_AddPlayerBeams(void)
             ent.flags = RF_FULLBRIGHT;
             ent.angles[0] = angles[0];
             ent.angles[1] = angles[1];
-            ent.angles[2] = Q_rand() % 360;
+            ent.angles[2] = CL_rand() % 360;
             V_AddEntity(&ent);
             continue;
         }
@@ -1070,11 +1070,11 @@ static void CL_AddPlayerBeams(void)
                 ent.flags = RF_FULLBRIGHT;
                 ent.angles[0] = -angles[0];
                 ent.angles[1] = angles[1] + 180.0f;
-                ent.angles[2] = Q_rand() % 360;
+                ent.angles[2] = CL_rand() % 360;
             } else {
                 ent.angles[0] = angles[0];
                 ent.angles[1] = angles[1];
-                ent.angles[2] = Q_rand() % 360;
+                ent.angles[2] = CL_rand() % 360;
             }
 
             V_AddEntity(&ent);

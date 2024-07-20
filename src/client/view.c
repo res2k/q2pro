@@ -507,6 +507,7 @@ void V_RenderView(void)
         cl.refdef.dlights = r_dlights;
         cl.refdef.lightstyles = r_lightstyles;
         cl.refdef.rdflags = cl.frame.ps.rdflags | cl.predicted_rdflags;
+        cl.refdef.extended = cl.csr.extended;
 
         // sort entities for better cache locality
         qsort(cl.refdef.entities, cl.refdef.num_entities, sizeof(cl.refdef.entities[0]), entitycmpfnc);

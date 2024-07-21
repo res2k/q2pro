@@ -339,7 +339,7 @@ typedef struct {
 #define MD5_MAX_JOINTS      256
 #define MD5_MAX_JOINTNAME   32
 #define MD5_MAX_MESHES      32
-#define MD5_MAX_WEIGHTS     4096
+#define MD5_MAX_WEIGHTS     8192
 #define MD5_MAX_FRAMES      1024
 
 /* Joint */
@@ -728,7 +728,7 @@ extern cvar_t *gl_intensity;
  * gl_tess.c
  *
  */
-#define TESS_MAX_VERTICES   4096
+#define TESS_MAX_VERTICES   6144
 #define TESS_MAX_INDICES    (3 * TESS_MAX_VERTICES)
 
 typedef struct {

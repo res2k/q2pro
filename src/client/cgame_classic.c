@@ -517,6 +517,24 @@ static const char *parse_loc_string(const char** s)
     return cgi.Localize(arg_tokens[0], arg_buffers, num_args);
 }
 
+static void SCR_DrawHealthBar(vrect_t hud_vrect, int x, int y, int value)
+{
+    if (!value)
+        return;
+
+    const rgba_t rgba_fg = {239, 0, 0, 255};    // index 240
+    const rgba_t rgba_bg = {63, 63, 63, 255};   // index 4
+
+    int bar_width = hud_vrect.width / 3;
+    float percent = (value - 1) / 254.0f;
+    int w = bar_width * percent + 0.5f;
+    int h = CHAR_HEIGHT / 2;
+
+    x -= bar_width / 2;
+    cgi.SCR_DrawColorPic(x, y, w, h, "_white", &rgba_fg);
+    cgi.SCR_DrawColorPic(x + w, y, bar_width -w, h, "_white", &rgba_bg);
+}
+
 static void SCR_ExecuteLayoutString(vrect_t hud_vrect, const char *s, int32_t playernum, const player_state_t *ps)
 {
     int     x, y;
@@ -690,6 +708,26 @@ static void SCR_ExecuteLayoutString(vrect_t hud_vrect, const char *s, int32_t pl
             if (SCR_ParseColor(token, &color)) {
                 cgix.SetColor(color.u32);
             }
+            continue;
+        }
+
+        if (!strcmp(token, "health_bars")) {
+            token = COM_Parse(&s);
+            value = Q_atoi(token);
+            if (value < 0 || value >= MAX_STATS) {
+                Com_Error(ERR_DROP, "%s: invalid stat index", __func__);
+            }
+            value = ps->stats[value];
+
+            token = COM_Parse(&s);
+            int index = Q_atoi(token);
+            if (index < 0 || index >= csr->end) {
+                Com_Error(ERR_DROP, "%s: invalid string index", __func__);
+            }
+
+            HUD_DrawCenterString(x + 320 / 2, y, cgi.get_configstring(index));
+            SCR_DrawHealthBar(hud_vrect, x + 320 / 2, y + CHAR_HEIGHT + 4, value & 0xff);
+            SCR_DrawHealthBar(hud_vrect, x + 320 / 2, y + CHAR_HEIGHT + 12, (value >> 8) & 0xff);
             continue;
         }
     }

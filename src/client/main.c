@@ -101,7 +101,7 @@ extern cvar_t *gl_modulate_entities;
 extern cvar_t *gl_brightness;
 #endif
 
-extern cvar_t *scr_hit_markers;
+static cvar_t   *cl_hit_markers; // 1 = sound + pic, 2 = pic
 
 client_static_t cls;
 client_state_t  cl;
@@ -2737,6 +2737,7 @@ static void CL_InitLocal(void)
     cl_noglow = Cvar_Get("cl_noglow", "0", 0);
     cl_nobob = Cvar_Get("cl_nobob", "0", 0);
     cl_nolerp = Cvar_Get("cl_nolerp", "0", 0);
+    cl_hit_markers = Cvar_Get("cl_hit_markers", "2", 0);
 
     // hack for timedemo
     com_timedemo->changed = cl_sync_changed;
@@ -3202,19 +3203,25 @@ void CL_UpdateFrameTimes(void)
                  __func__, sync_names[sync_mode], main_msec, ref_msec, phys_msec);
 }
 
-static void CL_UpdateHitMarkers(void)
+void CL_AddHitMarker(void)
 {
-    if (!cl.is_rerelease_game || !scr_hit_markers->integer)
-        return;
-
-    if (cgame->GetHitMarkerDamage(&cl.frame.ps) && cl.hit_marker_frame != cl.frame.number) {
+    if (cl.hit_marker_frame != cl.frame.number) {
         cl.hit_marker_frame = cl.frame.number;
         cl.hit_marker_time = cls.realtime;
+        cl.hit_marker_count++;
 
-        if (scr_hit_markers->integer == 1) {
-            S_StartLocalSound("weapons/marker.wav");
-        }
+        if (cl_hit_markers->integer > 1)
+            S_StartSound(NULL, listener_entnum, 257, cl.sfx_hit_marker, 1, ATTN_NONE, 0);
     }
+}
+
+static void CL_UpdateHitMarkers(void)
+{
+    if (!cl.is_rerelease_game || !cl_hit_markers->integer)
+        return;
+
+    if (cgame->GetHitMarkerDamage(&cl.frame.ps))
+        CL_AddHitMarker();
 }
 
 /*

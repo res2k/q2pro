@@ -64,7 +64,6 @@ static cvar_t   *ch_scale;
 static cvar_t   *ch_x;
 static cvar_t   *ch_y;
 
-cvar_t          *scr_hit_markers; // 1 = sound + pic, 2 = pic
 static cvar_t   *scr_hit_marker_time;
 
 static cvar_t   *scr_damage_indicators;
@@ -1124,15 +1123,14 @@ void SCR_RegisterMedia(void)
     scr.loading_pic = R_RegisterPic("loading");
     R_GetPicSize(&scr.loading_width, &scr.loading_height, scr.loading_pic);
 
-    scr.hit_marker_pic = R_RegisterPic("marker");
-    R_GetPicSize(&scr.hit_marker_width, &scr.hit_marker_height, scr.hit_marker_pic);
-    scr.hit_marker_sound = S_RegisterSound("weapons/marker.wav");
-
     scr.damage_display_pic = R_RegisterPic("damage_indicator");
     R_GetPicSize(&scr.damage_display_width, &scr.damage_display_height, scr.damage_display_pic);
 
     scr.net_pic = R_RegisterPic("net");
     scr.font_pic = R_RegisterFont(scr_font->string);
+
+    scr.hit_marker_pic = R_RegisterPic("marker");
+    R_GetPicSize(&scr.hit_marker_width, &scr.hit_marker_height, scr.hit_marker_pic);
 
     scr_crosshair_changed(scr_crosshair);
 
@@ -1341,7 +1339,6 @@ void SCR_Init(void)
     scr_showpmove = Cvar_Get("scr_showpmove", "0", 0);
 #endif
 
-    scr_hit_markers = Cvar_Get("scr_hit_markers", "1", 0);
     scr_hit_marker_time = Cvar_Get("scr_hit_marker_time", "500", 0);
     
     scr_damage_indicators = Cvar_Get("scr_damage_indicators", "1", 0);
@@ -1484,31 +1481,29 @@ static void SCR_DrawLoading(void)
     R_SetScale(1.0f);
 }
 
-static void SCR_DrawHitMarkers(void)
+static void SCR_DrawHitMarker(void)
 {
-    if (!cl.is_rerelease_game || !scr_hit_markers->integer) {
+    if (!cl.hit_marker_count)
+        return;
+    if (scr_hit_marker_time->integer <= 0 ||
+        cls.realtime - cl.hit_marker_time > scr_hit_marker_time->integer) {
+        cl.hit_marker_count = 0;
         return;
     }
 
-    int hit_marker_end = cl.hit_marker_time + scr_hit_marker_time->integer;
-    if (hit_marker_end > cls.realtime) {
-        float frac = 1.0f - ((hit_marker_end - cls.realtime) / scr_hit_marker_time->value);
-        float alpha = 1.0f - (frac * frac);
-        float scale = frac;
+    float frac = (float)(cls.realtime - cl.hit_marker_time) / scr_hit_marker_time->integer;
+    float alpha = 1.0f - (frac * frac);
 
-        scale = max(1.0f, 1.5f * (1.f - scale));
-        
-        int w = scr.hit_marker_width * scale;
-        int h = scr.hit_marker_height * scale;
+    float scale = max(1.0f, 1.5f * (1.f - frac));
+    int w = scr.hit_marker_width * ch_scale->value * scale;
+    int h = scr.hit_marker_height * ch_scale->value * scale;
 
-        int x = (scr.hud_width - w) / 2;
-        int y = (scr.hud_height - h) / 2;
+    int x = (scr.hud_width - w) / 2;
+    int y = (scr.hud_height - h) / 2;
 
-        R_SetColor(MakeColor(255, 0, 0, alpha * 255));
+    R_SetColor(MakeColor(255, 0, 0, alpha * 255));
 
-        R_DrawStretchPic(x + ch_x->integer, y + ch_y->integer,
-            w, h, scr.hit_marker_pic);
-    }
+    R_DrawStretchPic(x + ch_x->integer, y + ch_y->integer, w, h, scr.hit_marker_pic);
 }
 
 static scr_damage_entry_t *SCR_AllocDamageDisplay(const vec3_t dir)
@@ -1816,7 +1811,7 @@ static void SCR_DrawCrosshair(void)
                      scr.crosshair_height,
                      scr.crosshair_pic);
 
-    SCR_DrawHitMarkers();
+    SCR_DrawHitMarker();
 
     SCR_DrawDamageDisplays();
 }

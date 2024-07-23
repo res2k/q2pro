@@ -344,6 +344,7 @@ typedef struct {
 
     qhandle_t sound_precache[MAX_SOUNDS];
     qhandle_t image_precache[MAX_IMAGES];
+    qhandle_t sfx_hit_marker;
 
     clientinfo_t    clientinfo[MAX_CLIENTS];
     clientinfo_t    baseclientinfo;
@@ -353,7 +354,9 @@ typedef struct {
     
     bool    need_powerscreen_scale;
 
-    int     hit_marker_frame, hit_marker_time;
+    int hit_marker_frame;
+    unsigned hit_marker_time;
+    int hit_marker_count;
 
     // data for view weapon
     struct {
@@ -736,6 +739,7 @@ void CL_SendRcon(const netadr_t *adr, const char *pass, const char *cmd);
 const char *CL_Server_g(const char *partial, int argnum, int state);
 void CL_CheckForPause(void);
 void CL_UpdateFrameTimes(void);
+void CL_AddHitMarker(void);
 bool CL_CheckForIgnore(const char *s);
 void CL_LoadFilterList(string_entry_t **list, const char *name, const char *comments, size_t maxlen);
 
@@ -1169,7 +1173,6 @@ typedef struct {
     qhandle_t   hit_marker_pic;
     int         hit_marker_time;
     int         hit_marker_width, hit_marker_height;
-    qhandle_t   hit_marker_sound;
 
     qhandle_t   damage_display_pic;
     int         damage_display_width, damage_display_height;

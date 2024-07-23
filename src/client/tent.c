@@ -1677,6 +1677,11 @@ void CL_ParseTEnt(void)
         CL_PowerSplash();
         break;
 
+    case TE_DAMAGE_DEALT:
+        if (te.count > 0)
+            CL_AddHitMarker();
+        break;
+
     default:
         Com_Error(ERR_DROP, "%s: bad type", __func__);
     }

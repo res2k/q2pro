@@ -165,6 +165,9 @@ typedef enum {
     IF_NEAREST      = BIT(7),
     IF_OPAQUE       = BIT(8),
     IF_SPECIAL      = BIT(9),
+
+    // not stored in image
+    IF_OPTIONAL     = BIT(16),
 } imageflags_t;
 
 typedef enum {

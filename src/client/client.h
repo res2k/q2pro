@@ -1164,10 +1164,8 @@ typedef struct {
     color_t     crosshair_color;
 
     qhandle_t   pause_pic;
-    int         pause_width, pause_height;
 
     qhandle_t   loading_pic;
-    int         loading_width, loading_height;
     bool        draw_loading;
 
     qhandle_t   hit_marker_pic;

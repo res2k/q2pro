@@ -1090,6 +1090,15 @@ void SCR_ModeChanged(void)
         scr.hud_scale = R_ClampScale(scr_scale);
 }
 
+static void scr_font_changed(cvar_t *self)
+{
+    scr.font_pic = R_RegisterFont(self->string);
+    if (!scr.font_pic && strcmp(self->string, self->default_string)) {
+        Cvar_Reset(self);
+        scr.font_pic = R_RegisterFont(self->default_string);
+    }
+}
+
 /*
 ==================
 SCR_Clear
@@ -1128,7 +1137,6 @@ void SCR_RegisterMedia(void)
     R_GetPicSize(&scr.damage_display_width, &scr.damage_display_height, scr.damage_display_pic);
 
     scr.net_pic = R_RegisterPic("net");
-    scr.font_pic = R_RegisterFont(scr_font->string);
     scr.hit_marker_pic = R_RegisterImage("marker", IT_PIC, IF_PERMANENT | IF_OPTIONAL);
 
     scr_crosshair_changed(scr_crosshair);
@@ -1137,11 +1145,8 @@ void SCR_RegisterMedia(void)
         cgame->TouchPics();
 
     SCR_LoadKFont(&scr.kfont, "fonts/qconfont.kfont");
-}
 
-static void scr_font_changed(cvar_t *self)
-{
-    scr.font_pic = R_RegisterFont(self->string);
+    scr_font_changed(scr_font);
 }
 
 static void scr_scale_changed(cvar_t *self)

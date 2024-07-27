@@ -26,7 +26,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #define MOD_Malloc(size)    Hunk_TryAlloc(&model->hunk, size)
 
-#define OOM_CHECK(x)    if (!(x)) { ret = Q_ERR(ENOMEM); goto fail; }
+#define OOM_CHECK(x)    do { if (!(x)) { ret = Q_ERR(ENOMEM); goto fail; } } while (0)
 #define ENSURE(x, e)    if (!(x)) return e
 
 // this used to be MAX_MODELS * 2, but not anymore. MAX_MODELS is 8192 now and
@@ -769,13 +769,13 @@ static bool MD5_ParseVector(const char **buffer, vec3_t output)
     ret = Q_ERR_INVALID_FORMAT; goto fail;
 
 #define MD5_CHECK(x) \
-    if (!(x)) { MD5_FAIL(); }
+    do { if (!(x)) { MD5_FAIL() } } while (0)
 
 #define MD5_ERROR(e) \
     Com_SetLastError(e); MD5_FAIL();
 
 #define MD5_ENSURE(x, e) \
-    if (!(x)) { MD5_ERROR(e); }
+    do { if (!(x)) { MD5_ERROR(e) } } while (0)
 
 #define MD5_EXPECT(x)   MD5_CHECK(MD5_ParseExpect(&s, x))
 #define MD5_UINT(x)     MD5_CHECK(MD5_ParseUint(&s, &x))

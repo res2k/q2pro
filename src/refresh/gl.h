@@ -103,7 +103,6 @@ typedef struct {
     glbackend_t     backend;
     struct {
         bsp_t       *cache;
-        memhunk_t   hunk;
         vec_t       *vertices;
         GLuint      bufnum;
         vec_t       size;

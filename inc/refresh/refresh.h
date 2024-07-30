@@ -168,6 +168,7 @@ typedef enum {
 
     // not stored in image
     IF_OPTIONAL     = BIT(16),
+    IF_DIRECT       = BIT(17),
 } imageflags_t;
 
 typedef enum {

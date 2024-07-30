@@ -302,12 +302,13 @@ void FS_CleanupPath(char *s)
 FS_NormalizePathBuffer
 
 Simplifies the path, converting backslashes to slashes and removing ./ and ../
-components, as well as duplicated slashes. Any leading slashes are also skipped.
-Return value == size signifies overflow.
+components, as well as duplicated slashes. Any leading/trailing slashes are
+also stripped. Return value == size signifies overflow.
 
 May operate in place if in == out.
 
     ///foo       -> foo
+    foo/         -> foo
     foo\bar      -> foo/bar
     foo/..       -> <empty>
     foo/../bar   -> bar
@@ -341,7 +342,7 @@ size_t FS_NormalizePathBuffer(char *out, const char *in, size_t size)
                     if (c == 0)
                         break;
                     if (out > start)
-                        // save the slash
+                        // keep the slash
                         out++;
                 }
                 pre = '/';
@@ -362,8 +363,12 @@ size_t FS_NormalizePathBuffer(char *out, const char *in, size_t size)
             }
 
             if ((pre & 0xff) == '/') {
-                if (c == 0)
+                if (c == 0) {
+                    if (out > start)
+                        // eat the slash
+                        out--;
                     break;
+                }
                 continue;
             }
 

@@ -831,8 +831,8 @@ static void GL_BuildGammaTables(void)
 static void gl_gamma_changed(cvar_t *self)
 {
     GL_BuildGammaTables();
-    if (vid.update_gamma)
-        vid.update_gamma(gammatable);
+    if (vid && vid->update_gamma)
+        vid->update_gamma(gammatable);
 }
 
 static void GL_InitDefaultTexture(void)

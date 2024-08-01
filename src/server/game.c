@@ -883,8 +883,8 @@ static uint32_t PF_ServerFrame(void)
 static void PF_SendToClipboard(const char* text)
 {
 #if USE_CLIENT
-    if(vid.set_clipboard_data)
-        vid.set_clipboard_data(text);
+    if(vid->set_clipboard_data)
+        vid->set_clipboard_data(text);
 #endif
 }
 

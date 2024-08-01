@@ -576,7 +576,7 @@ static const snddma_driver_t *const s_drivers[] = {
     NULL
 };
 
-static snddma_driver_t  snddma;
+static const snddma_driver_t    *snddma;
 
 static void DMA_SoundInfo(void)
 {
@@ -602,8 +602,8 @@ static bool DMA_Init(void)
 
     for (i = 0; s_drivers[i]; i++) {
         if (!strcmp(s_drivers[i]->name, s_driver->string)) {
-            snddma = *s_drivers[i];
-            ret = snddma.init();
+            snddma = s_drivers[i];
+            ret = snddma->init();
             break;
         }
     }
@@ -613,8 +613,8 @@ static bool DMA_Init(void)
         for (i = 0; s_drivers[i]; i++) {
             if (i == tried)
                 continue;
-            snddma = *s_drivers[i];
-            if ((ret = snddma.init()) == SIS_SUCCESS)
+            snddma = s_drivers[i];
+            if ((ret = snddma->init()) == SIS_SUCCESS)
                 break;
         }
         Cvar_Reset(s_driver);
@@ -638,7 +638,8 @@ static bool DMA_Init(void)
 
 static void DMA_Shutdown(void)
 {
-    snddma.shutdown();
+    snddma->shutdown();
+    snddma = NULL;
     s_numchannels = 0;
 
     s_underwater_gain_hf->changed = NULL;
@@ -647,9 +648,9 @@ static void DMA_Shutdown(void)
 
 static void DMA_Activate(void)
 {
-    if (snddma.activate) {
+    if (snddma->activate) {
         S_StopAllSounds();
-        snddma.activate(s_active);
+        snddma->activate(s_active);
     }
 }
 
@@ -683,10 +684,10 @@ static int DMA_DriftBeginofs(float timeofs)
 
 static void DMA_ClearBuffer(void)
 {
-    snddma.begin_painting();
+    snddma->begin_painting();
     if (dma.buffer)
         memset(dma.buffer, dma.samplebits == 8 ? 0x80 : 0, dma.samples * dma.samplebits / 8);
-    snddma.submit();
+    snddma->submit();
 }
 
 /*
@@ -904,7 +905,7 @@ static void DMA_Update(void)
     }
 #endif
 
-    snddma.begin_painting();
+    snddma->begin_painting();
 
     if (!dma.buffer)
         return;
@@ -931,7 +932,7 @@ static void DMA_Update(void)
 
     PaintChannels(endtime);
 
-    snddma.submit();
+    snddma->submit();
 }
 
 static int DMA_GetSampleRate(void)

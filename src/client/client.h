@@ -589,6 +589,7 @@ typedef struct {
         bool        paused;
         bool        seeking;
         bool        eof;
+        bool        compat;             // demomap compatibility mode
         msgEsFlags_t    esFlags;        // for snapshots/recording
         msgPsFlags_t    psFlags;
     } demo;

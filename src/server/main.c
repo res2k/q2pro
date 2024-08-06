@@ -942,7 +942,7 @@ static void init_pmove_and_es_flags(client_t *newcl)
     newcl->pmp.speedmult = 2;
     newcl->pmp.strafehack = sv_strafejump_hack->integer >= 1;
 
-    // q2pro extensions
+    // Q2PRO extensions
     if (sv_qwmod->integer) {
         PmoveEnableQW(&newcl->pmp);
     }

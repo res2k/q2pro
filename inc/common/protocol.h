@@ -163,7 +163,7 @@ typedef enum {
     // svc_spawnbaselineblast,     // [Kex] A compressed version of svc_spawnbaseline
 // KEX
 
-    // Same meaning as "r1q2 specific operations" below, but different values
+    // Same meaning as "R1Q2 specific operations" below, but different values
     svc_rr_zpacket = 34,
     svc_rr_zdownload,
     svc_rr_gamestate,
@@ -172,13 +172,13 @@ typedef enum {
     svc_rr_configstringstream,
     svc_rr_baselinestream,
 
-    // r1q2 specific operations
+    // R1Q2 specific operations
     svc_q2pro_zpacket = 21,
     svc_q2pro_zdownload,
     svc_q2pro_gamestate, // q2pro specific, means svc_playerupdate in r1q2
     svc_q2pro_setting,
 
-    // q2pro specific operations
+    // Q2PRO specific operations
     svc_q2pro_configstringstream,
     svc_q2pro_baselinestream,
 
@@ -233,10 +233,10 @@ typedef enum {
     clc_userinfo,           // [userinfo string]
     clc_stringcmd,          // [string] message
 
-    // r1q2 specific operations
+    // R1Q2 specific operations
     clc_setting,
 
-    // q2pro specific operations
+    // Q2PRO specific operations
     clc_move_nodelta = 10,
     clc_move_batched,
     clc_userinfo_delta
@@ -264,7 +264,7 @@ typedef enum {
 #define PS_RDFLAGS          BIT(14)
 #define PS_VIEWHEIGHT       BIT(15) // re-release
 
-// r1q2 protocol specific extra flags
+// R1Q2 protocol specific extra flags
 #define EPS_GUNOFFSET       BIT(0)
 #define EPS_GUNANGLES       BIT(1)
 #define EPS_M_VELOCITY2     BIT(2)
@@ -272,7 +272,7 @@ typedef enum {
 #define EPS_VIEWANGLE2      BIT(4)
 #define EPS_STATS           BIT(5)
 
-// q2pro protocol specific extra flags
+// Q2PRO protocol specific extra flags
 #define EPS_CLIENTNUM       BIT(6)
 // KEX
 #define EPS_GUNRATE         BIT(7)
@@ -327,7 +327,7 @@ typedef enum {
 #define CM_BUTTONS      BIT(6)
 #define CM_IMPULSE      BIT(7)
 
-// r1q2 button byte hacks
+// R1Q2 button byte hacks
 #define BUTTON_MASK     (BUTTON_ATTACK|BUTTON_USE|BUTTON_ANY)
 #define BUTTON_FORWARD  BIT(2)
 #define BUTTON_SIDE     BIT(3)
@@ -410,14 +410,14 @@ typedef enum {
 #define PACKED_BSP      31
 
 typedef enum {
-    // r1q2 specific
+    // R1Q2 specific
     CLS_NOGUN,
     CLS_NOBLEND,
     CLS_RECORDING,
     CLS_PLAYERUPDATES,
     CLS_FPS,
 
-    // q2pro specific
+    // Q2PRO specific
     CLS_NOGIBS            = 10,
     CLS_NOFOOTSTEPS,
     CLS_NOPREDICT,
@@ -427,14 +427,14 @@ typedef enum {
 } clientSetting_t;
 
 typedef enum {
-    // r1q2 specific
+    // R1Q2 specific
     SVS_PLAYERUPDATES,
     SVS_FPS,
 
     SVS_MAX
 } serverSetting_t;
 
-// q2pro frame flags sent by the server
+// Q2PRO frame flags sent by the server
 // only SUPPRESSCOUNT_BITS can be used
 #define FF_SUPPRESSED   BIT(0)
 #define FF_CLIENTDROP   BIT(1)

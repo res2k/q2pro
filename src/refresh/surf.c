@@ -238,7 +238,7 @@ static void update_dynamic_lightmap(mface_t *surf)
     add_light_styles(surf);
 
     // add all the dynamic lights
-    if (surf->dlightframe == glr.dlightframe && !gl_static.backend.use_dlights()) {
+    if (surf->dlightframe == glr.dlightframe && !gl_backend->use_dlights()) {
         add_dynamic_lights(surf);
     } else {
         surf->dlightframe = 0;

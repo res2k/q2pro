@@ -382,7 +382,7 @@ void R_SetScale(float scale)
 
 void R_DrawStretchPic(int x, int y, int w, int h, qhandle_t pic)
 {
-    image_t *image = IMG_ForHandle(pic);
+    const image_t *image = IMG_ForHandle(pic);
 
     GL_StretchPic(x, y, w, h, image->sl, image->tl, image->sh, image->th,
                   draw.colors[0].u32, image);
@@ -398,7 +398,7 @@ void R_DrawStretchRotatePic(int x, int y, int w, int h, float angle, int pivot_x
 
 void R_DrawKeepAspectPic(int x, int y, int w, int h, qhandle_t pic)
 {
-    image_t *image = IMG_ForHandle(pic);
+    const image_t *image = IMG_ForHandle(pic);
 
     if (image->flags & IF_SCRAP) {
         R_DrawStretchPic(x, y, w, h, pic);
@@ -417,7 +417,7 @@ void R_DrawKeepAspectPic(int x, int y, int w, int h, qhandle_t pic)
 
 void R_DrawPic(int x, int y, qhandle_t pic)
 {
-    image_t *image = IMG_ForHandle(pic);
+    const image_t *image = IMG_ForHandle(pic);
 
     GL_StretchPic(x, y, image->width, image->height,
                   image->sl, image->tl, image->sh, image->th, draw.colors[0].u32, image);
@@ -501,7 +501,7 @@ void R_DrawStretchChar(int x, int y, int w, int h, int flags, int c, qhandle_t f
 
 int R_DrawString(int x, int y, int flags, size_t maxlen, const char *s, qhandle_t font)
 {
-    image_t *image = IMG_ForHandle(font);
+    const image_t *image = IMG_ForHandle(font);
 
     while (maxlen-- && *s) {
         byte c = *s++;

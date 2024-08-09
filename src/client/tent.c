@@ -52,7 +52,6 @@ qhandle_t   cl_img_flare;
 
 qhandle_t   cl_mod_lightning;
 qhandle_t   cl_mod_heatbeam;
-qhandle_t   cl_mod_explo4_big;
 
 qhandle_t   cl_mod_muzzles[MFLASH_TOTAL];
 
@@ -312,7 +311,6 @@ void CL_RegisterTEntModels(void)
 
     cl_mod_lightning = R_RegisterModel("models/proj/lightning/tris.md2");
     cl_mod_heatbeam = R_RegisterModel("models/proj/beam/tris.md2");
-    cl_mod_explo4_big = R_RegisterModel("models/objects/r_explode2/tris.md2");
 
     for (int i = 0; i < MFLASH_TOTAL; i++)
         cl_mod_muzzles[i] = R_RegisterModel(va("models/weapons/%s/flash/tris.md2", muzzlenames[i]));
@@ -1496,7 +1494,8 @@ void CL_ParseTEnt(void)
 
     case TE_EXPLOSION1_BIG:
         ex = CL_PlainExplosion();
-        ex->ent.model = cl_mod_explo4_big;
+        ex->ent.model = cl_mod_explo4;
+        ex->ent.scale = 2.0f;
         S_StartSound(te.pos1, 0, 0, cl_sfx_rockexp, 1, ATTN_NORM, 0);
         break;
 

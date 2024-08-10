@@ -1055,10 +1055,11 @@ static void GL_PostInit(void)
 
     GL_ClearState();
     GL_InitImages();
+    GL_InitQueries();
     MOD_Init();
 }
 
-static void GL_InitQueries(void)
+void GL_InitQueries(void)
 {
     if (!qglBeginQuery)
         return;
@@ -1067,10 +1068,11 @@ static void GL_InitQueries(void)
     if (gl_config.ver_gl >= QGL_VER(3, 3) || gl_config.ver_es >= QGL_VER(3, 0))
         gl_static.samples_passed = GL_ANY_SAMPLES_PASSED;
 
+    Q_assert(!gl_static.queries);
     gl_static.queries = HashMap_Create(int, glquery_t, HashInt32, NULL);
 }
 
-static void GL_ShutdownQueries(void)
+void GL_DeleteQueries(void)
 {
     if (!gl_static.queries)
         return;
@@ -1081,21 +1083,11 @@ static void GL_ShutdownQueries(void)
         qglDeleteQueries(1, &q->query);
     }
 
+    if (map_size)
+        Com_DPrintf("%s: %u queries deleted\n", __func__, map_size);
+
     HashMap_Destroy(gl_static.queries);
     gl_static.queries = NULL;
-}
-
-static void GL_ClearQueries(void)
-{
-    if (!gl_static.queries)
-        return;
-
-    uint32_t map_size = HashMap_Size(gl_static.queries);
-    for (int i = 0; i < map_size; i++) {
-        glquery_t *q = HashMap_GetValue(glquery_t, gl_static.queries, i);
-        q->pending = q->visible = false;
-        q->frac = 0;
-    }
 }
 
 // ==============================================================================
@@ -1138,8 +1130,6 @@ bool R_Init(bool total)
 
     GL_InitState();
 
-    GL_InitQueries();
-
     GL_InitTables();
 
     GL_PostInit();
@@ -1168,14 +1158,13 @@ void R_Shutdown(bool total)
     Com_DPrintf("GL_Shutdown( %i )\n", total);
 
     GL_FreeWorld();
+    GL_DeleteQueries();
     GL_ShutdownImages();
     MOD_Shutdown();
 
     if (!total) {
         return;
     }
-
-    GL_ShutdownQueries();
 
     GL_ShutdownState();
 
@@ -1241,8 +1230,6 @@ void R_BeginRegistration(const char *name)
         Q_concat(fullname, sizeof(fullname), "maps/", name, ".bsp");
         GL_LoadWorld(fullname);
     }
-
-    GL_ClearQueries();
 
     GL_ClearDebugLines();
 }

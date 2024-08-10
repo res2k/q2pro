@@ -48,6 +48,7 @@ cvar_t *gl_dynamic;
 cvar_t *gl_dlight_falloff;
 cvar_t *gl_modulate_entities;
 cvar_t *gl_glowmap_intensity;
+cvar_t *gl_flarespeed;
 cvar_t *gl_fontshadow;
 cvar_t *gl_shaders;
 #if USE_MD5
@@ -504,7 +505,7 @@ static void GL_DrawFlare(const entity_t *e)
         }
     }
 
-    GL_AdvanceValue(&q->frac, q->visible, 8);
+    GL_AdvanceValue(&q->frac, q->visible, gl_flarespeed->value);
     if (!q->frac)
         return;
 
@@ -932,6 +933,7 @@ static void GL_Register(void)
     gl_modulate_entities = Cvar_Get("gl_modulate_entities", "1", 0);
     gl_modulate_entities->changed = gl_modulate_entities_changed;
     gl_glowmap_intensity = Cvar_Get("gl_glowmap_intensity", "1.0", 0);
+    gl_flarespeed = Cvar_Get("gl_flarespeed", "8", 0);
     gl_fontshadow = Cvar_Get("gl_fontshadow", "0", 0);
     gl_shaders = Cvar_Get("gl_shaders", (gl_config.caps & QGL_CAP_SHADER) ? "1" : "0", CVAR_REFRESH);
 #if USE_MD5

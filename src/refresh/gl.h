@@ -205,6 +205,7 @@ typedef struct {
     int rotatedBoxesCulled;
     int batchesDrawn2D;
     int uniformUploads;
+    int occlusionQueries;
 } statCounters_t;
 
 extern statCounters_t c;

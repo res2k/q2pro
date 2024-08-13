@@ -683,6 +683,9 @@ static inline void GL_DepthRange(GLfloat n, GLfloat f)
 #define GL_NormalPointer(size, stride, ptr) \
     gl_backend->normal_pointer((size), (stride) * sizeof(GLfloat), (ptr))
 
+#define GL_DrawTriangles(num_indices, indices) \
+    qglDrawElements(GL_TRIANGLES, num_indices, QGL_INDEX_ENUM, indices)
+
 enum {
     SHOWTRIS_WORLD  = BIT(0),
     SHOWTRIS_MESH   = BIT(1),

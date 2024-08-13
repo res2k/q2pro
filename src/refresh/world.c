@@ -327,7 +327,6 @@ void R_LightPoint(const vec3_t origin, vec3_t color)
 
 static void GL_MarkLeaves(void)
 {
-    static int lastNodesVisible;
     byte vis1[VIS_MAX_BYTES];
     byte vis2[VIS_MAX_BYTES];
     const mleaf_t *leaf;
@@ -351,11 +350,11 @@ static void GL_MarkLeaves(void)
     }
 
     if (cluster1 == glr.viewcluster1 && cluster2 == glr.viewcluster2) {
-        goto finish;
+        return;
     }
 
     if (gl_lockpvs->integer) {
-        goto finish;
+        return;
     }
 
     glr.visframe++;
@@ -370,8 +369,8 @@ static void GL_MarkLeaves(void)
         for (i = 0; i < bsp->numleafs; i++) {
             bsp->leafs[i].visframe = glr.visframe;
         }
-        lastNodesVisible = bsp->numnodes;
-        goto finish;
+        glr.nodes_visible = bsp->numnodes;
+        return;
     }
 
     BSP_ClusterVis(bsp, vis1, cluster1, DVIS_PVS);
@@ -385,7 +384,7 @@ static void GL_MarkLeaves(void)
         }
     }
 
-    lastNodesVisible = 0;
+    glr.nodes_visible = 0;
     for (i = 0, leaf = bsp->leafs; i < bsp->numleafs; i++, leaf++) {
         cluster1 = leaf->cluster;
         if (cluster1 == -1) {
@@ -397,12 +396,9 @@ static void GL_MarkLeaves(void)
         // mark parent nodes visible
         for (node = (mnode_t *)leaf; node && node->visframe != glr.visframe; node = node->parent) {
             node->visframe = glr.visframe;
-            lastNodesVisible++;
+            glr.nodes_visible++;
         }
     }
-
-finish:
-    c.nodesVisible = lastNodesVisible;
 }
 
 #define BACKFACE_EPSILON    0.01f

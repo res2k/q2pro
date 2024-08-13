@@ -537,27 +537,27 @@ static void shader_array_bits(GLbitfield bits)
 
 static void shader_vertex_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
 {
-    qglVertexAttribPointer(VERT_ATTR_POS, size, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * stride, pointer);
+    qglVertexAttribPointer(VERT_ATTR_POS, size, GL_FLOAT, GL_FALSE, stride, pointer);
 }
 
 static void shader_tex_coord_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
 {
-    qglVertexAttribPointer(VERT_ATTR_TC, size, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * stride, pointer);
+    qglVertexAttribPointer(VERT_ATTR_TC, size, GL_FLOAT, GL_FALSE, stride, pointer);
 }
 
 static void shader_light_coord_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
 {
-    qglVertexAttribPointer(VERT_ATTR_LMTC, size, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * stride, pointer);
+    qglVertexAttribPointer(VERT_ATTR_LMTC, size, GL_FLOAT, GL_FALSE, stride, pointer);
 }
 
 static void shader_color_byte_pointer(GLint size, GLsizei stride, const GLubyte *pointer)
 {
-    qglVertexAttribPointer(VERT_ATTR_COLOR, size, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(GLfloat) * stride, pointer);
+    qglVertexAttribPointer(VERT_ATTR_COLOR, size, GL_UNSIGNED_BYTE, GL_TRUE, stride, pointer);
 }
 
 static void shader_color_float_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
 {
-    qglVertexAttribPointer(VERT_ATTR_COLOR, size, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * stride, pointer);
+    qglVertexAttribPointer(VERT_ATTR_COLOR, size, GL_FLOAT, GL_FALSE, stride, pointer);
 }
 
 static void shader_color(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
@@ -567,7 +567,7 @@ static void shader_color(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 
 static void shader_normal_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
 {
-    qglVertexAttribPointer(VERT_ATTR_NORMAL, size, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * stride, pointer);
+    qglVertexAttribPointer(VERT_ATTR_NORMAL, size, GL_FLOAT, GL_FALSE, stride, pointer);
 }
 
 static void upload_u_block(void)

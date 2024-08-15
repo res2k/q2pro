@@ -851,6 +851,16 @@ static void upload_surface_vbo(int lastvert)
     tess.numverts = 0;
 }
 
+static void check_multitexture(void)
+{
+    if (gl_vertexlight->integer)
+        return;
+    if (qglActiveTexture && (qglClientActiveTexture || gl_static.use_shaders))
+        return;
+    Com_WPrintf("OpenGL doesn't support multitexturing, forcing vertex lighting.\n");
+    Cvar_Set("gl_vertexlight", "1");
+}
+
 static void upload_world_surfaces(void)
 {
     const bsp_t *bsp = gl_static.world.cache;
@@ -859,8 +869,7 @@ static void upload_world_surfaces(void)
     int i, currvert, lastvert;
 
     // force vertex lighting if multitexture is not supported
-    if (!qglActiveTexture || (!qglClientActiveTexture && !gl_static.use_shaders))
-        Cvar_Set("gl_vertexlight", "1");
+    check_multitexture();
 
     // begin building lightmaps
     LM_BeginBuilding();

@@ -27,9 +27,8 @@ void GL_ForceTexture(GLuint tmu, GLuint texnum)
 {
     GL_ActiveTexture(tmu);
 
-    if (gls.texnums[tmu] == texnum) {
+    if (gls.texnums[tmu] == texnum)
         return;
-    }
 
     qglBindTexture(GL_TEXTURE_2D, texnum);
     gls.texnums[tmu] = texnum;
@@ -41,14 +40,12 @@ void GL_ForceTexture(GLuint tmu, GLuint texnum)
 void GL_BindTexture(GLuint tmu, GLuint texnum)
 {
 #if USE_DEBUG
-    if (gl_nobind->integer && !tmu) {
+    if (gl_nobind->integer && !tmu)
         texnum = TEXNUM_DEFAULT;
-    }
 #endif
 
-    if (gls.texnums[tmu] == texnum) {
+    if (gls.texnums[tmu] == texnum)
         return;
-    }
 
     GL_ActiveTexture(tmu);
 
@@ -65,40 +62,36 @@ void GL_CommonStateBits(GLbitfield bits)
     if (diff & GLS_BLEND_MASK) {
         if (bits & GLS_BLEND_MASK) {
             qglEnable(GL_BLEND);
-            if (bits & GLS_BLEND_BLEND) {
+            if (bits & GLS_BLEND_BLEND)
                 qglBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            } else if (bits & GLS_BLEND_ADD) {
+            else if (bits & GLS_BLEND_ADD)
                 qglBlendFunc(GL_SRC_ALPHA, GL_ONE);
-            } else if (bits & GLS_BLEND_MODULATE) {
+            else if (bits & GLS_BLEND_MODULATE)
                 qglBlendFunc(GL_DST_COLOR, GL_ONE);
-            }
         } else {
             qglDisable(GL_BLEND);
         }
     }
 
     if (diff & GLS_DEPTHMASK_FALSE) {
-        if (bits & GLS_DEPTHMASK_FALSE) {
+        if (bits & GLS_DEPTHMASK_FALSE)
             qglDepthMask(GL_FALSE);
-        } else {
+        else
             qglDepthMask(GL_TRUE);
-        }
     }
 
     if (diff & GLS_DEPTHTEST_DISABLE) {
-        if (bits & GLS_DEPTHTEST_DISABLE) {
+        if (bits & GLS_DEPTHTEST_DISABLE)
             qglDisable(GL_DEPTH_TEST);
-        } else {
+        else
             qglEnable(GL_DEPTH_TEST);
-        }
     }
 
     if (diff & GLS_CULL_DISABLE) {
-        if (bits & GLS_CULL_DISABLE) {
+        if (bits & GLS_CULL_DISABLE)
             qglDisable(GL_CULL_FACE);
-        } else {
+        else
             qglEnable(GL_CULL_FACE);
-        }
     }
 }
 
@@ -128,27 +121,27 @@ void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat zn
     GLfloat width, height, depth;
     GLfloat matrix[16];
 
-    width = xmax - xmin;
+    width  = xmax - xmin;
     height = ymax - ymin;
-    depth = zfar - znear;
+    depth  = zfar - znear;
 
-    matrix[0] = 2 / width;
-    matrix[4] = 0;
-    matrix[8] = 0;
+    matrix[ 0] = 2 / width;
+    matrix[ 4] = 0;
+    matrix[ 8] = 0;
     matrix[12] = -(xmax + xmin) / width;
 
-    matrix[1] = 0;
-    matrix[5] = 2 / height;
-    matrix[9] = 0;
+    matrix[ 1] = 0;
+    matrix[ 5] = 2 / height;
+    matrix[ 9] = 0;
     matrix[13] = -(ymax + ymin) / height;
 
-    matrix[2] = 0;
-    matrix[6] = 0;
+    matrix[ 2] = 0;
+    matrix[ 6] = 0;
     matrix[10] = -2 / depth;
     matrix[14] = -(zfar + znear) / depth;
 
-    matrix[3] = 0;
-    matrix[7] = 0;
+    matrix[ 3] = 0;
+    matrix[ 7] = 0;
     matrix[11] = 0;
     matrix[15] = 1;
 

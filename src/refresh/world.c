@@ -596,7 +596,7 @@ void GL_DrawWorld(void)
     if (gl_dynamic->integer)
         GL_UploadLightmaps();
 
-        GL_DrawSolidFaces();
+    GL_DrawSolidFaces();
 
     GL_Flush3D();
 

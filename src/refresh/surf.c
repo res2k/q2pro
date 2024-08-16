@@ -928,17 +928,13 @@ static void upload_world_surfaces(void)
     vertexlight_modified = gl_vertexlight->modified_count;
 }
 
-static void set_world_size(void)
+static void set_world_size(const mnode_t *node)
 {
-    const mnode_t *node = gl_static.world.cache->nodes;
-    vec_t size, temp;
+    vec_t size;
     int i;
 
-    for (i = 0, size = 0; i < 3; i++) {
-        temp = node->maxs[i] - node->mins[i];
-        if (temp > size)
-            size = temp;
-    }
+    for (i = 0, size = 0; i < 3; i++)
+        size = max(size, node->maxs[i] - node->mins[i]);
 
     if (size > 4096)
         gl_static.world.size = 8192;
@@ -1028,7 +1024,7 @@ void GL_LoadWorld(const char *name)
     gl_static.world.cache = bsp;
 
     // calculate world size for far clip plane and sky box
-    set_world_size();
+    set_world_size(bsp->nodes);
 
     // register all texinfo
     for (i = 0, info = bsp->texinfo; i < bsp->numtexinfo; i++, info++) {

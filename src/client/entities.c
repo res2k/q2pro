@@ -1072,7 +1072,6 @@ static int shell_effect_hack(void)
 static float player_alpha_hack(void)
 {
     centity_t   *ent;
-    int         flags = 0;
 
     ent = &cl_entities[cl.frame.clientNum + 1];
     if (ent->serverframe != cl.frame.number)

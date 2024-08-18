@@ -83,6 +83,7 @@ typedef struct {
 typedef struct {
     GLuint query;
     float frac;
+    unsigned timestamp;
     bool pending;
     bool visible;
 } glquery_t;

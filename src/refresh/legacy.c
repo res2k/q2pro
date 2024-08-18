@@ -131,41 +131,40 @@ static void legacy_array_bits(GLbitfield bits)
     }
 }
 
-static void legacy_vertex_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
+static void legacy_array_pointers(const glVaDesc_t *desc, const GLfloat *ptr)
 {
-    qglVertexPointer(size, GL_FLOAT, stride, pointer);
+    uintptr_t base = (uintptr_t)ptr;
+
+    qglVertexPointer(desc->size, GL_FLOAT, desc->stride, (void *)(base + desc->offset));
+    desc++;
+
+    if (desc->size) {
+        GL_ClientActiveTexture(0);
+        qglTexCoordPointer(desc->size, GL_FLOAT, desc->stride, (void *)(base + desc->offset));
+    }
+    desc++;
+
+    if (desc->size && lm.nummaps) {
+        GL_ClientActiveTexture(1);
+        qglTexCoordPointer(desc->size, GL_FLOAT, desc->stride, (void *)(base + desc->offset));
+    }
+    desc++;
+
+    if (desc->size) {
+        const GLenum type = desc->type ? GL_UNSIGNED_BYTE : GL_FLOAT;
+        qglColorPointer(desc->size, type, desc->stride, (void *)(base + desc->offset));
+    }
 }
 
-static void legacy_tex_coord_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
+static void legacy_tex_coord_pointer(const GLfloat *ptr)
 {
     GL_ClientActiveTexture(0);
-    qglTexCoordPointer(size, GL_FLOAT, stride, pointer);
-}
-
-static void legacy_light_coord_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
-{
-    GL_ClientActiveTexture(1);
-    qglTexCoordPointer(size, GL_FLOAT, stride, pointer);
-}
-
-static void legacy_color_byte_pointer(GLint size, GLsizei stride, const GLubyte *pointer)
-{
-    qglColorPointer(size, GL_UNSIGNED_BYTE, stride, pointer);
-}
-
-static void legacy_color_float_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
-{
-    qglColorPointer(size, GL_FLOAT, stride, pointer);
+    qglTexCoordPointer(2, GL_FLOAT, 0, ptr);
 }
 
 static void legacy_color(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 {
     qglColor4f(r, g, b, a);
-}
-
-static void legacy_normal_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
-{
-    // no-op
 }
 
 static void legacy_load_view_matrix(const GLfloat *model, const GLfloat *view)
@@ -275,12 +274,9 @@ const glbackend_t backend_legacy = {
     .state_bits = legacy_state_bits,
     .array_bits = legacy_array_bits,
 
-    .vertex_pointer = legacy_vertex_pointer,
+    .array_pointers = legacy_array_pointers,
     .tex_coord_pointer = legacy_tex_coord_pointer,
-    .light_coord_pointer = legacy_light_coord_pointer,
-    .color_byte_pointer = legacy_color_byte_pointer,
-    .color_float_pointer = legacy_color_float_pointer,
+
     .color = legacy_color,
-    .normal_pointer = legacy_normal_pointer,
     .use_dlights = legacy_use_dlights
 };

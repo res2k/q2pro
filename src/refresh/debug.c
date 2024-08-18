@@ -498,7 +498,7 @@ void GL_DrawDebugLines(void)
     qglEnable(GL_LINE_SMOOTH);
     qglLineWidth(r_debug_linewidth->value);
 
-    GL_VertexPointer(3, 0, tess.vertices);
+    GL_BindArrays(VA_DEBUG);
 
     GLfloat *pos_out = tess.vertices;
     tess.numverts = 0;

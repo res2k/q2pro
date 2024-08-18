@@ -334,7 +334,7 @@ void R_DrawSkyBox(void)
     if (!skyfaces)
         return; // nothing visible
 
-    GL_BindArrays(VAO_SPRITE);
+    GL_BindArrays(VA_SPRITE);
     if (sky_classic) {
         GL_StateBits(GLS_CLASSIC_SKY | GLS_TEXTURE_REPLACE);
         GL_ArrayBits(GLA_VERTEX);

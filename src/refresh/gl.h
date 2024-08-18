@@ -55,6 +55,13 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define NUM_TEXNUMS     7
 
 typedef struct {
+    uint8_t size;
+    bool type;
+    uint8_t stride;
+    uint8_t offset;
+} glVaDesc_t;
+
+typedef struct {
     const char *name;
 
     void (*init)(void);
@@ -69,13 +76,10 @@ typedef struct {
     void (*state_bits)(GLbitfield bits);
     void (*array_bits)(GLbitfield bits);
 
-    void (*vertex_pointer)(GLint size, GLsizei stride, const GLfloat *pointer);
-    void (*tex_coord_pointer)(GLint size, GLsizei stride, const GLfloat *pointer);
-    void (*light_coord_pointer)(GLint size, GLsizei stride, const GLfloat *pointer);
-    void (*color_byte_pointer)(GLint size, GLsizei stride, const GLubyte *pointer);
-    void (*color_float_pointer)(GLint size, GLsizei stride, const GLfloat *pointer);
+    void (*array_pointers)(const glVaDesc_t *desc, const GLfloat *ptr);
+    void (*tex_coord_pointer)(const GLfloat *ptr);
+
     void (*color)(GLfloat r, GLfloat g, GLfloat b, GLfloat a);
-    void (*normal_pointer)(GLint size, GLsizei stride, const GLfloat *pointer);
 
     bool (*use_dlights)(void);
 } glbackend_t;
@@ -100,19 +104,21 @@ enum {
 typedef struct glprogram_s glprogram_t;
 
 typedef enum {
-    VAO_NONE,
+    VA_NONE,
 
-    VAO_SPRITE,
-    VAO_EFFECT,
-    VAO_NULLMODEL,
-    VAO_OCCLUDE,
-    VAO_WATERWARP,
-    VAO_MESH_SHADE,
-    VAO_MESH_FLAT,  // also used for per-pixel lighting
-    VAO_2D,
-    VAO_3D,
+    VA_SPRITE,
+    VA_EFFECT,
+    VA_NULLMODEL,
+    VA_OCCLUDE,
+    VA_WATERWARP,
+    VA_MESH_SHADE,
+    VA_MESH_FLAT,  // also used for per-pixel lighting
+    VA_2D,
+    VA_3D,
 
-    VAO_TOTAL
+    VA_TOTAL,
+
+    VA_DEBUG = VA_OCCLUDE // VA_OCCLUDE happens to have the layout needed to debug lines
 } glVertexArray_t;
 
 typedef struct {
@@ -542,12 +548,22 @@ typedef enum glStateBits_e {
 } glStateBits_t;
 
 typedef enum {
+    VERT_ATTR_POS,
+    VERT_ATTR_TC,
+    VERT_ATTR_LMTC,
+    VERT_ATTR_COLOR,
+    VERT_ATTR_NORMAL,
+
+    VERT_ATTR_COUNT
+} glVertexAttr_t;
+
+typedef enum {
     GLA_NONE        = 0,
-    GLA_VERTEX      = BIT(0),
-    GLA_TC          = BIT(1),
-    GLA_LMTC        = BIT(2),
-    GLA_COLOR       = BIT(3),
-    GLA_NORMAL      = BIT(4),
+    GLA_VERTEX      = BIT(VERT_ATTR_POS),
+    GLA_TC          = BIT(VERT_ATTR_TC),
+    GLA_LMTC        = BIT(VERT_ATTR_LMTC),
+    GLA_COLOR       = BIT(VERT_ATTR_COLOR),
+    GLA_NORMAL      = BIT(VERT_ATTR_NORMAL),
 } glArrayBits_t;
 
 typedef struct {
@@ -562,7 +578,7 @@ typedef struct {
     GLuint          texnums[MAX_TMUS];
     GLbitfield      state_bits;
     GLbitfield      array_bits;
-    glVertexArray_t currentvao;
+    glVertexArray_t currentva;
     const GLfloat   *currentviewmatrix;
     const GLfloat   *currentmodelmatrix;
     struct {
@@ -683,27 +699,7 @@ static inline void GL_DepthRange(GLfloat n, GLfloat f)
         qglDepthRange(n, f);
 }
 
-#define VBO_OFS(n)   ((void *)(sizeof(GLfloat) * (n)))
-
-#define GL_VertexPointer(size, stride, ptr) \
-    gl_backend->vertex_pointer((size), (stride) * sizeof(GLfloat), (ptr))
-
-#define GL_TexCoordPointer(size, stride, ptr) \
-    gl_backend->tex_coord_pointer((size), (stride) * sizeof(GLfloat), (ptr))
-
-#define GL_LightCoordPointer(size, stride, ptr) \
-    gl_backend->light_coord_pointer((size), (stride) * sizeof(GLfloat), (ptr))
-
-#define GL_ColorBytePointer(size, stride, ptr) \
-    gl_backend->color_byte_pointer((size), (stride) * sizeof(GLfloat), (ptr))
-
-#define GL_ColorFloatPointer(size, stride, ptr) \
-    gl_backend->color_float_pointer((size), (stride) * sizeof(GLfloat), (ptr))
-
 #define GL_Color(r, g, b, a) gl_backend->color(r, g, b, a)
-
-#define GL_NormalPointer(size, stride, ptr) \
-    gl_backend->normal_pointer((size), (stride) * sizeof(GLfloat), (ptr))
 
 #define GL_DrawTriangles(num_indices, indices) \
     qglDrawElements(GL_TRIANGLES, num_indices, QGL_INDEX_ENUM, indices)
@@ -801,7 +797,7 @@ void GL_DrawParticles(void);
 void GL_DrawBeams(void);
 void GL_DrawFlares(void);
 
-void GL_BindArrays(glVertexArray_t vao);
+void GL_BindArrays(glVertexArray_t va);
 void GL_Flush3D(void);
 
 void GL_AddAlphaFace(mface_t *face, entity_t *ent);

@@ -334,18 +334,16 @@ void R_DrawSkyBox(void)
     if (!skyfaces)
         return; // nothing visible
 
+    GL_BindArrays(VAO_SPRITE);
     if (sky_classic) {
         GL_StateBits(GLS_CLASSIC_SKY | GLS_TEXTURE_REPLACE);
         GL_ArrayBits(GLA_VERTEX);
-        GL_VertexPointer(3, 5, tess.vertices);
         
         GL_BindTexture(0, sky_images[0]);
         GL_BindTexture(1, sky_images[1]);
     } else {
         GL_StateBits(GLS_SKY_FOG);
         GL_ArrayBits(GLA_VERTEX | GLA_TC);
-        GL_VertexPointer(3, 5, tess.vertices);
-        GL_TexCoordPointer(2, 5, tess.vertices + 3);
     }
 
     for (i = 0; i < 6; i++) {

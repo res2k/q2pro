@@ -409,7 +409,13 @@ static void LM_BeginBuilding(void)
         return;
 
     // use larger lightmaps for DECOUPLED_LM maps
-    bits = min(8 + bsp->lm_decoupled * 2, gl_config.max_texture_size_log2);
+    if (gl_lightmap_bits->integer)
+        bits = Cvar_ClampInteger(gl_lightmap_bits, 7, 10);
+    else
+        bits = 8 + bsp->lm_decoupled * 2;
+
+    // clamp to maximum texture size
+    bits = min(bits, gl_config.max_texture_size_log2);
 
     lm.block_size = 1 << bits;
     lm.block_shift = bits + 2;
@@ -530,6 +536,7 @@ POLYGONS BUILDING
 
 static int32_t fullbright_modified;
 static int32_t vertexlight_modified;
+static int32_t lightmap_bits_modified;
 
 static uint32_t color_for_surface(const mface_t *surf)
 {
@@ -926,6 +933,7 @@ static void upload_world_surfaces(void)
 
     fullbright_modified = gl_fullbright->modified_count;
     vertexlight_modified = gl_vertexlight->modified_count;
+    lightmap_bits_modified = gl_lightmap_bits->modified_count;
 }
 
 static void set_world_size(const mnode_t *node)
@@ -960,7 +968,7 @@ void GL_RebuildLighting(void)
         return;
 
     // rebuild all surfaces if doing vertex lighting (and not fullbright)
-    if (gl_vertexlight->integer) {
+    if (gl_vertexlight->integer || gl_lightmap_bits->modified_count != lightmap_bits_modified) {
         upload_world_surfaces();
         return;
     }

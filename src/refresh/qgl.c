@@ -115,6 +115,7 @@ static const glsection_t sections[] = {
         .functions = (const glfunction_t []) {
             QGL_FN(ClearDepth),
             QGL_FN(DepthRange),
+            QGL_FN(PolygonMode),
             { NULL }
         }
     },
@@ -124,10 +125,6 @@ static const glsection_t sections[] = {
         .ver_gl = QGL_VER(1, 1),
         .excl_gl = QGL_VER(3, 1),
         .caps = QGL_CAP_TEXTURE_BITS,
-        .functions = (const glfunction_t []) {
-            QGL_FN(PolygonMode),
-            { NULL }
-        }
     },
 
     // GL 1.1, ES 3.0

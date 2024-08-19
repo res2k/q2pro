@@ -134,6 +134,9 @@ typedef struct {
     GLuint          warp_renderbuffer;
     GLuint          warp_framebuffer;
     GLuint          u_blocks[NUM_UBLOCKS];
+    GLuint          array_object;
+    GLuint          index_buffer;
+    GLuint          vertex_buffer;
     glprogram_t     *programs_head;
     glprogram_t     *programs_hash[PROGRAM_HASH_SIZE];
     GLuint          texnums[NUM_TEXNUMS];
@@ -188,6 +191,7 @@ typedef enum {
     QGL_CAP_TEXTURE_ANISOTROPY          = BIT(7),
     QGL_CAP_UNPACK_SUBIMAGE             = BIT(8),
     QGL_CAP_QUERY_RESULT_NO_WAIT        = BIT(9),
+    QGL_CAP_CLIENT_VA                   = BIT(10),
 } glcap_t;
 
 #define QGL_VER(major, minor)   ((major) * 100 + (minor))
@@ -454,6 +458,8 @@ typedef struct {
         maliasframe_t *frames;
         mspriteframe_t *spriteframes;
     };
+
+    GLuint buffer;
 } model_t;
 
 // world: xyz[3] | color[1]  | st[2]    | lmst[2]   | normal[3] | unused[1]
@@ -578,6 +584,7 @@ typedef struct {
     GLuint          texnums[MAX_TMUS];
     GLbitfield      state_bits;
     GLbitfield      array_bits;
+    GLuint          currentbuffer[2];
     glVertexArray_t currentva;
     const GLfloat   *currentviewmatrix;
     const GLfloat   *currentmodelmatrix;
@@ -656,18 +663,6 @@ static inline void GL_ArrayBits(GLbitfield bits)
     }
 }
 
-static inline void GL_LockArrays(GLsizei count)
-{
-    if (qglLockArraysEXT)
-        qglLockArraysEXT(0, count);
-}
-
-static inline void GL_UnlockArrays(void)
-{
-    if (qglUnlockArraysEXT)
-        qglUnlockArraysEXT();
-}
-
 static inline void GL_ForceMatrix(const GLfloat *model, const GLfloat *view)
 {
     gl_backend->load_view_matrix(model, view);
@@ -680,6 +675,15 @@ static inline void GL_LoadMatrix(const GLfloat *model, const GLfloat *view)
     if (gls.currentmodelmatrix != model ||
         gls.currentviewmatrix != view) {
         GL_ForceMatrix(model, view);
+    }
+}
+
+static inline void GL_BindBuffer(GLenum target, GLuint buffer)
+{
+    const int i = target == GL_ELEMENT_ARRAY_BUFFER;
+    if (gls.currentbuffer[i] != buffer) {
+        qglBindBuffer(target, buffer);
+        gls.currentbuffer[i] = buffer;
     }
 }
 
@@ -704,18 +708,18 @@ static inline void GL_DepthRange(GLfloat n, GLfloat f)
 #define GL_DrawTriangles(num_indices, indices) \
     qglDrawElements(GL_TRIANGLES, num_indices, QGL_INDEX_ENUM, indices)
 
-enum {
+typedef enum {
     SHOWTRIS_WORLD  = BIT(0),
     SHOWTRIS_MESH   = BIT(1),
     SHOWTRIS_PIC    = BIT(2),
     SHOWTRIS_FX     = BIT(3),
-};
+} showtris_t;
 
 void GL_ForceTexture(GLuint tmu, GLuint texnum);
 void GL_BindTexture(GLuint tmu, GLuint texnum);
 void GL_CommonStateBits(GLbitfield bits);
 void GL_ScrollSpeed(vec2_t scroll, GLbitfield bits);
-void GL_DrawOutlines(GLsizei count, const QGL_INDEX_TYPE *indices);
+void GL_DrawOutlines(GLsizei count, const QGL_INDEX_TYPE *indices, bool indexed);
 void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat znear, GLfloat zfar);
 void GL_Frustum(GLfloat fov_x, GLfloat fov_y, GLfloat reflect_x);
 void GL_Setup2D(void);
@@ -798,6 +802,11 @@ void GL_DrawBeams(void);
 void GL_DrawFlares(void);
 
 void GL_BindArrays(glVertexArray_t va);
+void GL_InitArrays(void);
+void GL_ShutdownArrays(void);
+void GL_LockArrays(GLsizei count);
+void GL_UnlockArrays(void);
+
 void GL_Flush3D(void);
 
 void GL_AddAlphaFace(mface_t *face, entity_t *ent);

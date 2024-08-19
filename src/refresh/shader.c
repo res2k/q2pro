@@ -391,7 +391,7 @@ static GLuint create_and_use_program(GLbitfield bits)
         return program;
     }
 
-    qglUniformBlockBinding(program, index, UBLOCK_MAIN);
+    qglUniformBlockBinding(program, index, UNIFORM_BUFFER_MAIN);
     
     if (bits & GLS_DYNAMIC_LIGHTS) {
         index = qglGetUniformBlockIndex(program, "u_dlights");
@@ -407,7 +407,7 @@ static GLuint create_and_use_program(GLbitfield bits)
             return program;
         }
 
-        qglUniformBlockBinding(program, index, UBLOCK_DLIGHTS);
+        qglUniformBlockBinding(program, index, UNIFORM_BUFFER_DLIGHTS);
     }
 
     qglUseProgram(program);
@@ -532,14 +532,14 @@ static void shader_color(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 
 static void upload_u_block(void)
 {
-    qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.u_blocks[UBLOCK_MAIN]);
+    qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_MAIN]);
     qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(gls.u_block), &gls.u_block);
     c.uniformUploads++;
 }
 
 static void upload_dlight_block(void)
 {
-    qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.u_blocks[UBLOCK_DLIGHTS]);
+    qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_DLIGHTS]);
     qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(gls.u_dlights.lights[0]) * gls.u_block.num_dlights, &gls.u_dlights);
     c.uniformUploads++;
 }
@@ -645,14 +645,14 @@ static void shader_clear_state(void)
 
 static void shader_init(void)
 {
-    qglGenBuffers(NUM_UBLOCKS, gl_static.u_blocks);
+    qglGenBuffers(NUM_UNIFORM_BUFFERS, gl_static.uniform_buffers);
 
-    qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.u_blocks[UBLOCK_MAIN]);
-    qglBindBufferBase(GL_UNIFORM_BUFFER, UBLOCK_MAIN, gl_static.u_blocks[UBLOCK_MAIN]);
+    qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_MAIN]);
+    qglBindBufferBase(GL_UNIFORM_BUFFER, UNIFORM_BUFFER_MAIN, gl_static.uniform_buffers[UNIFORM_BUFFER_MAIN]);
     qglBufferData(GL_UNIFORM_BUFFER, sizeof(gls.u_block), NULL, GL_DYNAMIC_DRAW);
 
-    qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.u_blocks[UBLOCK_DLIGHTS]);
-    qglBindBufferBase(GL_UNIFORM_BUFFER, UBLOCK_DLIGHTS, gl_static.u_blocks[UBLOCK_DLIGHTS]);
+    qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_DLIGHTS]);
+    qglBindBufferBase(GL_UNIFORM_BUFFER, UNIFORM_BUFFER_DLIGHTS, gl_static.uniform_buffers[UNIFORM_BUFFER_DLIGHTS]);
     qglBufferData(GL_UNIFORM_BUFFER, sizeof(gls.u_dlights), NULL, GL_DYNAMIC_DRAW);
 
     // precache common shader
@@ -676,8 +676,8 @@ static void shader_shutdown(void)
     memset(gl_static.programs_hash, 0, sizeof(gl_static.programs_hash));
 
     qglBindBuffer(GL_UNIFORM_BUFFER, 0);
-    qglDeleteBuffers(NUM_UBLOCKS, gl_static.u_blocks);
-    memset(gl_static.u_blocks, 0, sizeof(gl_static.u_blocks));
+    qglDeleteBuffers(NUM_UNIFORM_BUFFERS, gl_static.uniform_buffers);
+    memset(gl_static.uniform_buffers, 0, sizeof(gl_static.uniform_buffers));
 }
 
 static bool shader_use_dlights(void)

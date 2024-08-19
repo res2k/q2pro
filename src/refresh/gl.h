@@ -94,11 +94,11 @@ typedef struct {
 
 #define PROGRAM_HASH_SIZE   16
 
-#define NUM_UBLOCKS 2
+#define NUM_UNIFORM_BUFFERS 2
 
 enum {
-    UBLOCK_MAIN,
-    UBLOCK_DLIGHTS
+    UNIFORM_BUFFER_MAIN,
+    UNIFORM_BUFFER_DLIGHTS
 };
 
 typedef struct glprogram_s glprogram_t;
@@ -127,13 +127,13 @@ typedef struct {
     struct {
         bsp_t       *cache;
         vec_t       *vertices;
-        GLuint      bufnum;
+        GLuint      buffer;
         vec_t       size;
     } world;
     GLuint          warp_texture;
     GLuint          warp_renderbuffer;
     GLuint          warp_framebuffer;
-    GLuint          u_blocks[NUM_UBLOCKS];
+    GLuint          uniform_buffers[NUM_UNIFORM_BUFFERS];
     GLuint          array_object;
     GLuint          index_buffer;
     GLuint          vertex_buffer;

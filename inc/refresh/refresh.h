@@ -128,12 +128,21 @@ typedef struct {
     fog_params_t    fog;
 } refdef_t;
 
+enum {
+    QGL_PROFILE_NONE,
+    QGL_PROFILE_CORE,
+    QGL_PROFILE_ES,
+};
+
 typedef struct {
     uint8_t     colorbits;
     uint8_t     depthbits;
     uint8_t     stencilbits;
     uint8_t     multisamples;
     bool        debug;
+    uint8_t     profile;
+    uint8_t     major_ver;
+    uint8_t     minor_ver;
 } r_opengl_config_t;
 
 typedef enum {

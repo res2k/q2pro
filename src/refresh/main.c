@@ -413,6 +413,7 @@ static void make_flare_quad(const entity_t *e, float scale)
 
 static void GL_OccludeFlares(void)
 {
+    const bsp_t *bsp = gl_static.world.cache;
     const entity_t *e;
     glquery_t *q;
     int i, j;
@@ -462,7 +463,10 @@ static void GL_OccludeFlares(void)
             set = true;
         }
 
-        make_flare_quad(e, 2.5f);
+        if (bsp && BSP_PointLeaf(bsp->nodes, e->origin)->contents == CONTENTS_SOLID)
+            make_flare_quad(e, 2.5f * e->scale);
+        else
+            make_flare_quad(e, 2.5f);
 
         GL_LockArrays(4);
         qglBeginQuery(gl_static.samples_passed, q->query);

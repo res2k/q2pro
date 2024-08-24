@@ -245,6 +245,7 @@ extern statCounters_t c;
 // regular variables
 extern cvar_t *gl_partscale;
 extern cvar_t *gl_partstyle;
+extern cvar_t *gl_beamstyle;
 extern cvar_t *gl_celshading;
 extern cvar_t *gl_dotshading;
 extern cvar_t *gl_shadows;
@@ -290,6 +291,7 @@ extern cvar_t *gl_per_pixel_lighting; // use_shaders only
 
 #define GL_rand()   Q_rand_state(&glr.rand_seed)
 #define GL_frand()  ((int32_t)GL_rand() * 0x1p-32f + 0.5f)
+#define GL_crand()  ((int32_t)GL_rand() * 0x1p-31f)
 
 typedef enum {
     CULL_OUT,

@@ -67,6 +67,7 @@ static inline vec_t PlaneDiffFast(const vec3_t v, const cplane_t *p)
 #if USE_REF
 
 void SetupRotationMatrix(vec3_t matrix[3], const vec3_t dir, float degrees);
+void RotatePointAroundVector(vec3_t out, const vec3_t dir, const vec3_t in, float degrees);
 
 void Matrix_TransformVec4(const vec4_t a, const mat4_t m, vec4_t out);
 void Matrix_Multiply(const mat4_t a, const mat4_t b, mat4_t out);

@@ -493,7 +493,7 @@ void R_AddDebugText(const vec3_t origin, const char *text, float size, const vec
 void GL_DrawDebugLines(void)
 {
     GL_LoadMatrix(NULL, glr.viewmatrix);
-    GL_BindTexture(0, TEXNUM_WHITE);
+    GL_BindTexture(TMU_TEXTURE, TEXNUM_WHITE);
     GL_ArrayBits(GLA_VERTEX);
     qglEnable(GL_LINE_SMOOTH);
     qglLineWidth(r_debug_linewidth->value);

@@ -252,7 +252,6 @@ game_src = [
   'src/shared/base85.c',
   'src/shared/m_flash.c',
   'src/shared/shared.c',
-  'src/common/pmove.c',
 ]
 
 cc = meson.get_compiler('c')

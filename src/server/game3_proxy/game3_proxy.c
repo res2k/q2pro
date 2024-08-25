@@ -20,8 +20,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "shared/game3_shared.h"
 #include "shared/game3.h"
 #include "game3_proxy.h"
-#include "game3_pmove.h"
 #include "shared/base85.h"
+#include "common/game3_pmove.h"
 #include "common/game3_convert.h"
 
 #include <assert.h>

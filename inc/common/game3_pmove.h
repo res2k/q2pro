@@ -18,6 +18,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #pragma once
 
+#include "pmove.h"
+
 /*
 ==============================================================
 
@@ -28,4 +30,4 @@ Common between server and client so prediction matches
 ==============================================================
 */
 
-void game3_Pmove(game3_pmove_t *pmove, pmoveParams_t *params);
+void game3_Pmove(game3_pmove_t *pmove, const pmoveParams_t *params);

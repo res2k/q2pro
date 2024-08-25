@@ -571,6 +571,7 @@ static void GL_DrawIndexed(showtris_t showtris)
     }
 
     GL_DrawTriangles(tess.numindices, indices);
+    c.trisDrawn += tess.numindices / 3;
 
     if (gl_showtris->integer & showtris)
         GL_DrawOutlines(tess.numindices, indices, true);
@@ -728,7 +729,6 @@ static void GL_DrawFace(const mface_t *surf)
     tess.texnum[2] = texnum[2];
     tess.flags = surf->statebits | GLS_FOG_ENABLE;
 
-    c.trisDrawn += numtris;
     c.facesTris += numtris;
     c.facesDrawn++;
 }

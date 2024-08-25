@@ -18,6 +18,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #pragma once
 
+#include "shared/game3_shared.h"
 #include "pmove.h"
 
 /*

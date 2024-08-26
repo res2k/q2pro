@@ -49,13 +49,14 @@ static void write_block(sizebuf_t *buf)
         mat4 m_view;
         mat4 m_proj;
         float u_time; float u_modulate; float u_add; float u_intensity;
+        float u_intensity2; float fog_sky_factor;
         vec2 w_amp; vec2 w_phase;
-        vec2 u_scroll; float fog_sky_factor; float u_intensity2;
+        vec2 u_scroll;
+        float height_fog_falloff; float height_fog_density; int num_dlights; float pad;
         vec4 view_org;
         vec4 global_fog;
         vec4 height_fog_start;
         vec4 height_fog_end;
-        float height_fog_falloff; float height_fog_density; int num_dlights; float pad;
     )
     GLSF("};\n");
 }
@@ -79,7 +80,7 @@ static void write_dynamic_light_block(sizebuf_t *buf)
     GLSF("};\n");
 }
 
-static void write_vertex_shader(sizebuf_t *buf, GLbitfield bits)
+static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
 {
     write_header(buf);
     write_block(buf);
@@ -128,7 +129,7 @@ static void write_vertex_shader(sizebuf_t *buf, GLbitfield bits)
     GLSF("}\n");
 }
 
-static void write_fragment_shader(sizebuf_t *buf, GLbitfield bits)
+static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
 {
     write_header(buf);
 
@@ -321,7 +322,7 @@ static GLuint create_shader(GLenum type, const sizebuf_t *buf)
     return shader;
 }
 
-static GLuint create_and_use_program(GLbitfield bits)
+static GLuint create_and_use_program(glStateBits_t bits)
 {
     char buffer[MAX_SHADER_CHARS];
     sizebuf_t sb;
@@ -451,7 +452,7 @@ static void find_and_use_program(GLbitfield bits)
     }
 }
 
-static void shader_state_bits(GLbitfield bits)
+static void shader_state_bits(glStateBits_t bits)
 {
     // disable per-pixel lighting if requested
     if (!gl_per_pixel_lighting->integer) {
@@ -471,7 +472,7 @@ static void shader_state_bits(GLbitfield bits)
         }
     }
 
-    GLbitfield diff = bits ^ gls.state_bits;
+    glStateBits_t diff = bits ^ gls.state_bits;
 
     if (diff & GLS_COMMON_MASK)
         GL_CommonStateBits(bits);
@@ -493,9 +494,9 @@ static void shader_state_bits(GLbitfield bits)
     }
 }
 
-static void shader_array_bits(GLbitfield bits)
+static void shader_array_bits(glArrayBits_t bits)
 {
-    GLbitfield diff = bits ^ gls.array_bits;
+    glArrayBits_t diff = bits ^ gls.array_bits;
 
     for (int i = 0; i < VERT_ATTR_COUNT; i++) {
         if (!(diff & BIT(i)))

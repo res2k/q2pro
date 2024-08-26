@@ -92,6 +92,8 @@ cvar_t *gl_polyblend;
 cvar_t *gl_showerrors;
 cvar_t *gl_damageblend_frac;
 
+int32_t gl_shaders_modified;
+
 // ==============================================================================
 
 static void GL_SetupFrustum(void)
@@ -888,7 +890,7 @@ static void GL_Register(void)
     gl_glowmap_intensity = Cvar_Get("gl_glowmap_intensity", "1.0", 0);
     gl_flarespeed = Cvar_Get("gl_flarespeed", "8", 0);
     gl_fontshadow = Cvar_Get("gl_fontshadow", "0", 0);
-    gl_shaders = Cvar_Get("gl_shaders", (gl_config.caps & QGL_CAP_SHADER) ? "1" : "0", CVAR_REFRESH);
+    gl_shaders = Cvar_Get("gl_shaders", "1", CVAR_FILES);
 #if USE_MD5
     gl_md5_load = Cvar_Get("gl_md5_load", "1", CVAR_FILES);
     gl_md5_use = Cvar_Get("gl_md5_use", "1", 0);
@@ -1028,6 +1030,11 @@ static void GL_PostInit(void)
 {
     r_registration_sequence = 1;
 
+    if (gl_shaders->modified_count != gl_shaders_modified) {
+        GL_ShutdownState();
+        GL_InitState();
+        gl_shaders_modified = gl_shaders->modified_count;
+    }
     GL_ClearState();
     GL_InitImages();
     GL_InitQueries();

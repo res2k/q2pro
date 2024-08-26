@@ -627,7 +627,7 @@ static void shader_setup_3d(void)
     }
 }
 
-static void shader_clear_state(void)
+static void shader_disable_state(void)
 {
     qglActiveTexture(GL_TEXTURE2);
     qglBindTexture(GL_TEXTURE_2D, 0);
@@ -640,6 +640,11 @@ static void shader_clear_state(void)
 
     for (int i = 0; i < VERT_ATTR_COUNT; i++)
         qglDisableVertexAttribArray(i);
+}
+
+static void shader_clear_state(void)
+{
+    shader_disable_state();
 
     find_and_use_program(GLS_DEFAULT);
 }
@@ -664,6 +669,8 @@ static void shader_init(void)
 
 static void shader_shutdown(void)
 {
+    shader_disable_state();
+
     qglUseProgram(0);
 
     for (glprogram_t *head = gl_static.programs_head; head; ) {

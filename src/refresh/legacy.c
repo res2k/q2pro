@@ -186,12 +186,8 @@ static void legacy_load_proj_matrix(const GLfloat *matrix)
     qglLoadMatrixf(matrix);
 }
 
-static void legacy_clear_state(void)
+static void legacy_disable_state(void)
 {
-    qglDisable(GL_ALPHA_TEST);
-    qglAlphaFunc(GL_GREATER, 0.666f);
-    qglShadeModel(GL_FLAT);
-
     if (qglActiveTexture && qglClientActiveTexture) {
         qglActiveTexture(GL_TEXTURE1);
         qglBindTexture(GL_TEXTURE_2D, 0);
@@ -210,9 +206,6 @@ static void legacy_clear_state(void)
         qglDisableClientState(GL_TEXTURE_COORD_ARRAY);
     }
 
-    qglMatrixMode(GL_TEXTURE);
-    qglLoadIdentity();
-
     qglDisableClientState(GL_VERTEX_ARRAY);
     qglDisableClientState(GL_COLOR_ARRAY);
 
@@ -220,6 +213,18 @@ static void legacy_clear_state(void)
         qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, 0);
         qglDisable(GL_FRAGMENT_PROGRAM_ARB);
     }
+}
+
+static void legacy_clear_state(void)
+{
+    qglDisable(GL_ALPHA_TEST);
+    qglAlphaFunc(GL_GREATER, 0.666f);
+    qglShadeModel(GL_FLAT);
+
+    legacy_disable_state();
+
+    qglMatrixMode(GL_TEXTURE);
+    qglLoadIdentity();
 }
 
 static void legacy_init(void)
@@ -249,6 +254,8 @@ static void legacy_init(void)
 
 static void legacy_shutdown(void)
 {
+    legacy_disable_state();
+
     if (gl_static.programs_head) {
         qglDeleteProgramsARB(1, &gl_static.programs_head->id);
         Z_Free(gl_static.programs_head);

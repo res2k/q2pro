@@ -238,6 +238,8 @@ extern cvar_t *gl_lightgrid;
 extern cvar_t *gl_showerrors;
 extern cvar_t *gl_per_pixel_lighting; // use_shaders only
 
+extern int32_t gl_shaders_modified;
+
 typedef enum {
     CULL_OUT,
     CULL_IN,

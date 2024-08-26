@@ -300,6 +300,8 @@ void GL_InitState(void)
         }
     }
 
+    gl_shaders_modified = gl_shaders->modified_count;
+
     gl_backend = gl_static.use_shaders ? &backend_shader : &backend_legacy;
     gl_backend->init();
 
@@ -308,6 +310,8 @@ void GL_InitState(void)
 
 void GL_ShutdownState(void)
 {
-    gl_backend->shutdown();
-    gl_backend = NULL;
+    if (gl_backend) {
+        gl_backend->shutdown();
+        gl_backend = NULL;
+    }
 }

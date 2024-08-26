@@ -639,6 +639,7 @@ void GL_Flush3D(void)
             if (gls.texnums[i] != tess.texnum[i]) {
                 gls.texnums[i] = tess.texnum[i];
                 count = i + 1;
+                c.texSwitches++;
             }
         }
         if (count)

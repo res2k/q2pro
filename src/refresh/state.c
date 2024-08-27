@@ -98,7 +98,7 @@ void GL_CommonStateBits(glStateBits_t bits)
     }
 }
 
-void GL_ScrollSpeed(vec2_t scroll, glStateBits_t bits)
+void GL_ScrollPos(vec2_t scroll, glStateBits_t bits)
 {
     float speed = 1.6f;
 
@@ -109,6 +109,8 @@ void GL_ScrollSpeed(vec2_t scroll, glStateBits_t bits)
 
     if (bits & GLS_SCROLL_FLIP)
         speed = -speed;
+
+    speed *= glr.fd.time;
 
     if (bits & GLS_SCROLL_Y) {
         scroll[0] = 0;

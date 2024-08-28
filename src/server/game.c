@@ -21,6 +21,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "game3_proxy/game3_proxy.h"
 #include "common/loc.h"
 #include "common/gamedll.h"
+#include "shared/debug.h"
 
 #if USE_CLIENT
 #include "client/video.h"
@@ -813,45 +814,45 @@ static void PF_Loc_Print(edict_t* ent, int level, const char* base, const char**
 
 static void PF_Draw_Line(const vec3_t start, const vec3_t end, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugLine(start, end, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugLine(start, end, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Point(const vec3_t point, const float size, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugPoint(point, size, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugPoint(point, size, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Circle(const vec3_t origin, const float radius, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugCircle(origin, radius, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugCircle(origin, radius, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Bounds(const vec3_t mins, const vec3_t maxs, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugBounds(mins, maxs, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugBounds(mins, maxs, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Sphere(const vec3_t origin, const float radius, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugSphere(origin, radius, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugSphere(origin, radius, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_OrientedWorldText(const vec3_t origin, const char * text, const rgba_t* color, const float size, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugText(origin, text, size, NULL, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugText(origin, NULL, text, size, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_StaticWorldText(const vec3_t origin, const vec3_t angles, const char * text, const rgba_t* color, const float size, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugText(origin, text, size, angles, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugText(origin, angles, text, size, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Cylinder(const vec3_t origin, const float halfHeight, const float radius, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugCylinder(origin, halfHeight, radius, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugCylinder(origin, halfHeight, radius, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Ray(const vec3_t origin, const vec3_t direction, const float length, const float size, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugRay(origin, direction, length, size, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) },
-                  (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugRay(origin, direction, length, size, MakeColor(color->r, color->g, color->b, color->a),
+                  MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Arrow(const vec3_t start, const vec3_t end, const float size, const rgba_t* lineColor, const rgba_t* arrowColor, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugArrow(start, end, size, (const color_t) { .u32 = MakeColor(lineColor->r, lineColor->g, lineColor->b, lineColor->a) },
-                    (const color_t) { .u32 = MakeColor(arrowColor->r, arrowColor->g, arrowColor->b, arrowColor->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugArrow(start, end, size, MakeColor(lineColor->r, lineColor->g, lineColor->b, lineColor->a),
+                    MakeColor(arrowColor->r, arrowColor->g, arrowColor->b, arrowColor->a), lifeTime * 1000, depthTest);
 }
 #else
 static void PF_Draw_Line(const vec3_t start, const vec3_t end, const rgba_t* color, const float lifeTime, const bool depthTest) {}
@@ -1002,8 +1003,17 @@ static void *PF_GetExtension(const char *name)
 {
     if (!name)
         return NULL;
+
     if (!strcmp(name, "FILESYSTEM_API_V1"))
         return (void *)&filesystem_api_v1;
+
+#if USE_REF && USE_DEBUG
+    if (!strcmp(name, DEBUG_DRAW_API_V1) && !dedicated->integer) {
+        extern const debug_draw_api_v1_t debug_draw_api_v1;
+        return (void *)&debug_draw_api_v1;
+    }
+#endif
+
     return NULL;
 }
 

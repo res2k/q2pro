@@ -269,19 +269,19 @@ void    R_TileClear(int x, int y, int w, int h, qhandle_t pic);
 void    R_DrawFill8(int x, int y, int w, int h, int c);
 void    R_DrawFill32(int x, int y, int w, int h, uint32_t color);
 
-void    R_AddDebugLine(const vec3_t start, const vec3_t end, color_t color, int time, bool depth_test);
-void    R_AddDebugPoint(const vec3_t point, float size, color_t color, int time, bool depth_test);
-void    R_AddDebugAxis(const vec3_t point, float size, int time, bool depth_test);
-void    R_AddDebugCircle(const vec3_t origin, float radius, color_t color, int time, bool depth_test);
-void    R_AddDebugBounds(const vec3_t absmins, const vec3_t absmaxs, color_t color, int time, bool depth_test);
-void    R_AddDebugSphere(const vec3_t origin, float radius, color_t color, int time, bool depth_test);
+void    R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugPoint(const vec3_t point, float size, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugAxis(const vec3_t origin, const vec3_t angles, float size, uint32_t time, qboolean depth_test);
+void    R_AddDebugCircle(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugBounds(const vec3_t absmins, const vec3_t absmaxs, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugSphere(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test);
 // angles = null to make oriented text
-void    R_AddDebugText(const vec3_t origin, const char *text, float size, const vec3_t angles, color_t color, int time, bool depth_test);
-void    R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, color_t color, int time, bool depth_test);
-void    R_AddDebugRay(const vec3_t start, const vec3_t dir, float length, float size, color_t line_color, color_t arrow_color, int time, bool depth_test);
-void    R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, color_t line_color, color_t arrow_color, int time, bool depth_test);
+void    R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text, float size, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugRay(const vec3_t start, const vec3_t dir, float length, float size, uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test);
+void    R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test);
 
-void    R_AddDebugCurveArrow(const vec3_t start, const vec3_t ctrl, const vec3_t end, float size, color_t line_color, color_t arrow_color, int time, bool depth_test);
+void    R_AddDebugCurveArrow(const vec3_t start, const vec3_t ctrl, const vec3_t end, float size, uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test);
 
 // video mode and refresh state management entry points
 void    R_BeginFrame(void);

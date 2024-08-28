@@ -744,16 +744,16 @@ static PathInfo Nav_Path_(nav_path_t *path)
 }
 
 #if USE_REF
-static inline color_t ColorFromU32A(uint32_t c, uint8_t alpha)
+static inline uint32_t ColorFromU32A(uint32_t c, uint8_t alpha)
 {
     color_t color = { .u32 = c };
     color.u8[3] = alpha;
-    return color;
+    return color.u32;
 }
 
 static void Nav_DebugPath(const PathInfo *path, const PathRequest *request)
 {
-    GL_ClearDebugLines();
+    R_ClearDebugLines();
 
     int time = (request->debugging.drawTime * 1000) + 6000;
 
@@ -1017,7 +1017,7 @@ static void Nav_Debug(void)
         VectorCopy(node->origin, t);
         t[2] += 64;
 
-        R_AddDebugText(t, va("%td", node - nav_data.nodes), 0.25f, NULL, ColorFromU32A(U32_CYAN, alpha), SV_FRAMETIME, true);
+        R_AddDebugText(t, NULL, va("%td", node - nav_data.nodes), 0.25f, ColorFromU32A(U32_CYAN, alpha), SV_FRAMETIME, true);
 
         t[2] -= 18;
 
@@ -1054,7 +1054,7 @@ static void Nav_Debug(void)
             Q_strlcat(node_text_buffer, "CHECK DOORS\n", sizeof(node_text_buffer));
 
         if (*node_text_buffer)
-            R_AddDebugText(t, node_text_buffer, 0.1f, NULL, ColorFromU32A(U32_GREEN, alpha), SV_FRAMETIME, true);
+            R_AddDebugText(t, NULL, node_text_buffer, 0.1f, ColorFromU32A(U32_GREEN, alpha), SV_FRAMETIME, true);
         
         for (const nav_link_t *link = node->links; link != node->links + node->num_links; link++) {
             vec3_t e;

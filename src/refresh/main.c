@@ -1114,6 +1114,8 @@ bool R_Init(bool total)
 
     GL_InitTables();
 
+    GL_InitDebugDraw();
+
     GL_PostInit();
 
     GL_ShowErrors(__func__);
@@ -1146,6 +1148,8 @@ void R_Shutdown(bool total)
 
     if (!total)
         return;
+
+    GL_ShutdownDebugDraw();
 
     GL_ShutdownState();
 
@@ -1236,7 +1240,7 @@ void R_BeginRegistration(const char *name)
 
     GL_LoadWorld(name);
 
-    GL_ClearDebugLines();
+    R_ClearDebugLines();
 }
 
 /*

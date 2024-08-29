@@ -869,16 +869,6 @@ static void wrap_ServerCommand(void)
     sync_edicts_game_to_server();
 }
 
-static void wrap_Pmove_export(pmove_t *pmove)
-{
-    // FIXME Correct?
-    if (sv_client) {
-        Pmove(pmove, &sv_client->pmp);
-    } else {
-        Pmove(pmove, &sv_pmp);
-    }
-}
-
 static void *wrap_GetExtension_export(const char *name)
 {
     if (game3_export_ex && strcmp(name, game_q2pro_restart_filesystem_ext) == 0) {
@@ -1016,7 +1006,7 @@ game_export_t *GetGame3Proxy(game_import_t *import, void *game3_entry, void *gam
     game_export.RunFrame = wrap_RunFrame;
     game_export.PrepFrame = wrap_PrepFrame;
     game_export.ServerCommand = wrap_ServerCommand;
-    game_export.Pmove = wrap_Pmove_export;
+    game_export.Pmove = NULL; // the engine doesn't actually use the game exported Pmove, so don't bother providing it...
     game_export.GetExtension = wrap_GetExtension_export;
     game_export.Bot_SetWeapon = wrap_Bot_SetWeapon;
     game_export.Bot_TriggerEdict = wrap_Bot_TriggerEdict;

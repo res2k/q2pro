@@ -193,9 +193,9 @@ static qboolean wrap_inPHS(const vec3_t p1, const vec3_t p2)
 static void wrap_Pmove_import(game3_pmove_t *pmove)
 {
     if (sv_client) {
-        game3_Pmove(pmove, &sv_client->pmp);
+        game3_Pmove(pmove, NULL, &sv_client->pmp);
     } else {
-        game3_Pmove(pmove, &sv_pmp);
+        game3_Pmove(pmove, NULL, &sv_pmp);
     }
 }
 

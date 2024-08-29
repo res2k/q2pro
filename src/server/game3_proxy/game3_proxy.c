@@ -22,6 +22,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "game3_proxy.h"
 #include "game3_pmove.h"
 #include "shared/base85.h"
+#include "common/game3_convert.h"
 
 #include <assert.h>
 #include <malloc.h>
@@ -428,22 +429,9 @@ static void sync_edicts_server_to_game(void)
     game3_export->num_edicts = game_export.num_edicts;
 }
 
-static void game_pmove_state_to_server(pmove_state_t* server_pmove_state, const game3_pmove_state_t* game_pmove_state)
-{
-    server_pmove_state->pm_type = pmtype_from_game3(game_pmove_state->pm_type);
-    VectorScale(game_pmove_state->origin, 0.125f, server_pmove_state->origin);
-    VectorScale(game_pmove_state->velocity, 0.125f, server_pmove_state->velocity);
-    server_pmove_state->pm_flags = pmflags_from_game3(game_pmove_state->pm_flags);
-    server_pmove_state->pm_time = game_pmove_state->pm_time * 8;
-    server_pmove_state->gravity = game_pmove_state->gravity;
-    server_pmove_state->delta_angles[0] = SHORT2ANGLE(game_pmove_state->delta_angles[0]);
-    server_pmove_state->delta_angles[1] = SHORT2ANGLE(game_pmove_state->delta_angles[1]);
-    server_pmove_state->delta_angles[2] = SHORT2ANGLE(game_pmove_state->delta_angles[2]);
-}
-
 static void game_client_to_server(struct gclient_s *server_client, const struct game3_gclient_s *game_client)
 {
-    game_pmove_state_to_server(&server_client->ps.pmove, &game_client->ps.pmove);
+    ConvertFromGame3_pmove_state(&server_client->ps.pmove, &game_client->ps.pmove);
 
     VectorCopy(game_client->ps.viewangles, server_client->ps.viewangles);
     VectorCopy(game_client->ps.viewoffset, server_client->ps.viewoffset);

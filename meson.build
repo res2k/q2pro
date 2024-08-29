@@ -19,6 +19,7 @@ common_src = [
   'src/common/field.c',
   'src/common/fifo.c',
   'src/common/files.c',
+  'src/common/game3_convert.c',
   'src/common/natsort.c',
   'src/common/hash_map.c',
   'src/common/loc.c',

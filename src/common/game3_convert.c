@@ -43,3 +43,22 @@ void ConvertFromGame3_pmove_state(pmove_state_t *pmove_state, const game3_pmove_
     pmove_state->delta_angles[1] = SHORT2ANGLE(game_pmove_state->delta_angles[1]);
     pmove_state->delta_angles[2] = SHORT2ANGLE(game_pmove_state->delta_angles[2]);
 }
+
+void ConvertToGame3_usercmd(game3_usercmd_t *game_cmd, const usercmd_t *server_cmd)
+{
+    game_cmd->msec = server_cmd->msec;
+    game_cmd->buttons = server_cmd->buttons;
+    game_cmd->angles[0] = ANGLE2SHORT(server_cmd->angles[0]);
+    game_cmd->angles[1] = ANGLE2SHORT(server_cmd->angles[1]);
+    game_cmd->angles[2] = ANGLE2SHORT(server_cmd->angles[2]);
+    game_cmd->forwardmove = server_cmd->forwardmove;
+    game_cmd->sidemove = server_cmd->sidemove;
+    if(server_cmd->buttons & BUTTON_JUMP)
+        game_cmd->upmove = 200;
+    else if(server_cmd->buttons & BUTTON_CROUCH)
+        game_cmd->upmove = -200;
+    else
+        game_cmd->upmove = 0;
+    game_cmd->impulse = 0;
+    game_cmd->lightlevel = 128; // FIXME
+}

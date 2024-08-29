@@ -802,31 +802,12 @@ static void wrap_ClientCommand(edict_t *ent)
     sync_edicts_game_to_server();
 }
 
-static void server_usercmd_to_game(game3_usercmd_t *game_cmd, const usercmd_t *server_cmd)
-{
-    game_cmd->msec = server_cmd->msec;
-    game_cmd->buttons = server_cmd->buttons;
-    game_cmd->angles[0] = ANGLE2SHORT(server_cmd->angles[0]);
-    game_cmd->angles[1] = ANGLE2SHORT(server_cmd->angles[1]);
-    game_cmd->angles[2] = ANGLE2SHORT(server_cmd->angles[2]);
-    game_cmd->forwardmove = server_cmd->forwardmove;
-    game_cmd->sidemove = server_cmd->sidemove;
-    if(server_cmd->buttons & BUTTON_JUMP)
-        game_cmd->upmove = 200;
-    else if(server_cmd->buttons & BUTTON_CROUCH)
-        game_cmd->upmove = -200;
-    else
-        game_cmd->upmove = 0;
-    game_cmd->impulse = 0;
-    game_cmd->lightlevel = 128; // FIXME
-}
-
 static void wrap_ClientThink(edict_t *ent, usercmd_t *cmd)
 {
     // ClientThink() may spawn new entitities, so sync them all
     sync_edicts_server_to_game();
     game3_usercmd_t game_cmd;
-    server_usercmd_to_game(&game_cmd, cmd);
+    ConvertToGame3_usercmd(&game_cmd, cmd);
     game3_export->ClientThink(translate_edict_to_game(ent), &game_cmd);
     sync_edicts_game_to_server();
 }

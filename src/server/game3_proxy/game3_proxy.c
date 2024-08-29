@@ -431,7 +431,7 @@ static void sync_edicts_server_to_game(void)
 
 static void game_client_to_server(struct gclient_s *server_client, const struct game3_gclient_s *game_client)
 {
-    ConvertFromGame3_pmove_state(&server_client->ps.pmove, &game_client->ps.pmove);
+    ConvertFromGame3_pmove_state(&server_client->ps.pmove, &game_client->ps.pmove, game_csr->extended);
 
     VectorCopy(game_client->ps.viewangles, server_client->ps.viewangles);
     VectorCopy(game_client->ps.viewoffset, server_client->ps.viewoffset);

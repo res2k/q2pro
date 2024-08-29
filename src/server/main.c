@@ -2181,7 +2181,7 @@ void SV_Init(void)
 
     // set up default pmove parameters
     PmoveInit(&sv_pmp);
-    sv_pmp.remaster_rules = true;
+    sv_pmp.extended_server = true;
 
     Nav_Init();
 

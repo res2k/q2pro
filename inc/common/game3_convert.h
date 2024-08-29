@@ -26,9 +26,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 //
 
 // Convert pmove_state_t to game3_pmove_state_t
-void ConvertToGame3_pmove_state(game3_pmove_state_t *game_pmove_state, const pmove_state_t *server_pmove_state);
+void ConvertToGame3_pmove_state(game3_pmove_state_t *game_pmove_state, const pmove_state_t *server_pmove_state, bool extended);
 // Convert game3_pmove_state_t to pmove_state_t
-void ConvertFromGame3_pmove_state(pmove_state_t *pmove_state, const game3_pmove_state_t *game_pmove_state);
+void ConvertFromGame3_pmove_state(pmove_state_t *pmove_state, const game3_pmove_state_t *game_pmove_state, bool extended);
 
 // Convert usercmd_t to game3_usercmd_t
 void ConvertToGame3_usercmd(game3_usercmd_t *game_cmd, const usercmd_t *server_cmd);

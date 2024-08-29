@@ -68,7 +68,7 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
     pm_clipmask = MASK_PLAYERSOLID;
 
     // remaster player collision rules
-    if (params->remaster_rules) {
+    if (params->extended_server) {
         if (pmove->s.pm_type == PM_DEAD || pmove->s.pm_type == PM_GIB)
             pm_clipmask = MASK_DEADSOLID;
 
@@ -77,7 +77,7 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
     }
 
     game3_pmove_t game3_pmove;
-    ConvertToGame3_pmove_state(&game3_pmove.s, &pmove->s);
+    ConvertToGame3_pmove_state(&game3_pmove.s, &pmove->s, params->extended_server);
 
     ConvertToGame3_usercmd(&game3_pmove.cmd, &pmove->cmd);
     game3_pmove.snapinitial = pmove->snapinitial;
@@ -89,7 +89,7 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
     current_pmove_pointcontents = pmove->pointcontents;
     game3_Pmove(&game3_pmove, &pmove->groundplane, params);
 
-    ConvertFromGame3_pmove_state(&pmove->s, &game3_pmove.s);
+    ConvertFromGame3_pmove_state(&pmove->s, &game3_pmove.s, params->extended_server);
     /* viewheight is now added to the viewoffset; this didn't happen in vanilla,
      * so clear out the viewheight */
     pmove->s.viewheight = 0;

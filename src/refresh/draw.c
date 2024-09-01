@@ -141,7 +141,7 @@ static inline void _GL_StretchRotatePic(
 #define GL_StretchRotatePic(x,y,w,h,s1,t1,s2,t2,angle,px,py,color,image) \
     _GL_StretchRotatePic(x,y,w,h,s1,t1,s2,t2,angle,px,py,color,(image)->texnum,(image)->flags)
 
-static void GL_DrawVignette(int distance, color_t outer, color_t inner)
+static void GL_DrawVignette(float frac, color_t outer, color_t inner)
 {
     vec_t *dst_vert;
     glIndex_t *dst_indices;
@@ -155,6 +155,7 @@ static void GL_DrawVignette(int distance, color_t outer, color_t inner)
 
     int x = 0, y = 0;
     int w = glr.fd.width, h = glr.fd.height;
+    int distance = min(w, h) * frac;
 
     // outer vertices
     dst_vert = tess.vertices + tess.numverts * 5;
@@ -253,7 +254,7 @@ void GL_Blend(void)
         inner.u32 = outer.u32 & U32_RGB;
 
         if (gl_damageblend_frac->value > 0)
-            GL_DrawVignette(min(glr.fd.width, glr.fd.height) * gl_damageblend_frac->value, outer, inner);
+            GL_DrawVignette(Cvar_ClampValue(gl_damageblend_frac, 0, 0.5f), outer, inner);
         else
             GL_StretchPic_(glr.fd.x, glr.fd.y, glr.fd.width, glr.fd.height, 0, 0, 1, 1,
                            outer.u32, TEXNUM_WHITE, 0);

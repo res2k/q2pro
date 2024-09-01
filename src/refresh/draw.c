@@ -440,7 +440,7 @@ static inline void draw_char(int x, int y, int w, int h, int flags, int c, const
     t = (c >> 4) * 0.0625f;
 
     if (((flags & UI_DROPSHADOW) || gl_fontshadow->integer > 0) && c != 0x83) {
-        uint32_t black = MakeColor(0, 0, 0, draw.colors[0].u8[3]);
+        uint32_t black = draw.colors[0].u32 & U32_ALPHA;
 
         GL_StretchPic(x + 1, y + 1, w, h, s, t,
                       s + 0.0625f, t + 0.0625f, black, image);

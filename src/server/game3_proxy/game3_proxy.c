@@ -20,8 +20,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "shared/game3_shared.h"
 #include "shared/game3.h"
 #include "game3_proxy.h"
-#include "game3_pmove.h"
 #include "shared/base85.h"
+#include "common/game3_pmove.h"
+#include "common/game3_convert.h"
 
 #include <assert.h>
 #include <malloc.h>
@@ -192,9 +193,9 @@ static qboolean wrap_inPHS(const vec3_t p1, const vec3_t p2)
 static void wrap_Pmove_import(game3_pmove_t *pmove)
 {
     if (sv_client) {
-        game3_Pmove(pmove, &sv_client->pmp);
+        game3_Pmove(pmove, NULL, &sv_client->pmp);
     } else {
-        game3_Pmove(pmove, &sv_pmp);
+        game3_Pmove(pmove, NULL, &sv_pmp);
     }
 }
 
@@ -428,22 +429,9 @@ static void sync_edicts_server_to_game(void)
     game3_export->num_edicts = game_export.num_edicts;
 }
 
-static void game_pmove_state_to_server(pmove_state_t* server_pmove_state, const game3_pmove_state_t* game_pmove_state)
-{
-    server_pmove_state->pm_type = pmtype_from_game3(game_pmove_state->pm_type);
-    VectorScale(game_pmove_state->origin, 0.125f, server_pmove_state->origin);
-    VectorScale(game_pmove_state->velocity, 0.125f, server_pmove_state->velocity);
-    server_pmove_state->pm_flags = pmflags_from_game3(game_pmove_state->pm_flags);
-    server_pmove_state->pm_time = game_pmove_state->pm_time * 8;
-    server_pmove_state->gravity = game_pmove_state->gravity;
-    server_pmove_state->delta_angles[0] = SHORT2ANGLE(game_pmove_state->delta_angles[0]);
-    server_pmove_state->delta_angles[1] = SHORT2ANGLE(game_pmove_state->delta_angles[1]);
-    server_pmove_state->delta_angles[2] = SHORT2ANGLE(game_pmove_state->delta_angles[2]);
-}
-
 static void game_client_to_server(struct gclient_s *server_client, const struct game3_gclient_s *game_client)
 {
-    game_pmove_state_to_server(&server_client->ps.pmove, &game_client->ps.pmove);
+    ConvertFromGame3_pmove_state(&server_client->ps.pmove, &game_client->ps.pmove, game_csr->extended);
 
     VectorCopy(game_client->ps.viewangles, server_client->ps.viewangles);
     VectorCopy(game_client->ps.viewoffset, server_client->ps.viewoffset);
@@ -814,31 +802,12 @@ static void wrap_ClientCommand(edict_t *ent)
     sync_edicts_game_to_server();
 }
 
-static void server_usercmd_to_game(game3_usercmd_t *game_cmd, const usercmd_t *server_cmd)
-{
-    game_cmd->msec = server_cmd->msec;
-    game_cmd->buttons = server_cmd->buttons;
-    game_cmd->angles[0] = ANGLE2SHORT(server_cmd->angles[0]);
-    game_cmd->angles[1] = ANGLE2SHORT(server_cmd->angles[1]);
-    game_cmd->angles[2] = ANGLE2SHORT(server_cmd->angles[2]);
-    game_cmd->forwardmove = server_cmd->forwardmove;
-    game_cmd->sidemove = server_cmd->sidemove;
-    if(server_cmd->buttons & BUTTON_JUMP)
-        game_cmd->upmove = 200;
-    else if(server_cmd->buttons & BUTTON_CROUCH)
-        game_cmd->upmove = -200;
-    else
-        game_cmd->upmove = 0;
-    game_cmd->impulse = 0;
-    game_cmd->lightlevel = 128; // FIXME
-}
-
 static void wrap_ClientThink(edict_t *ent, usercmd_t *cmd)
 {
     // ClientThink() may spawn new entitities, so sync them all
     sync_edicts_server_to_game();
     game3_usercmd_t game_cmd;
-    server_usercmd_to_game(&game_cmd, cmd);
+    ConvertToGame3_usercmd(&game_cmd, cmd);
     game3_export->ClientThink(translate_edict_to_game(ent), &game_cmd);
     sync_edicts_game_to_server();
 }
@@ -867,16 +836,6 @@ static void wrap_ServerCommand(void)
     sync_edicts_server_to_game();
     game3_export->ServerCommand();
     sync_edicts_game_to_server();
-}
-
-static void wrap_Pmove_export(pmove_t *pmove)
-{
-    // FIXME Correct?
-    if (sv_client) {
-        Pmove(pmove, &sv_client->pmp);
-    } else {
-        Pmove(pmove, &sv_pmp);
-    }
 }
 
 static void *wrap_GetExtension_export(const char *name)
@@ -1016,7 +975,7 @@ game_export_t *GetGame3Proxy(game_import_t *import, void *game3_entry, void *gam
     game_export.RunFrame = wrap_RunFrame;
     game_export.PrepFrame = wrap_PrepFrame;
     game_export.ServerCommand = wrap_ServerCommand;
-    game_export.Pmove = wrap_Pmove_export;
+    game_export.Pmove = NULL; // the engine doesn't actually use the game exported Pmove, so don't bother providing it...
     game_export.GetExtension = wrap_GetExtension_export;
     game_export.Bot_SetWeapon = wrap_Bot_SetWeapon;
     game_export.Bot_TriggerEdict = wrap_Bot_TriggerEdict;

@@ -19,6 +19,8 @@ common_src = [
   'src/common/field.c',
   'src/common/fifo.c',
   'src/common/files.c',
+  'src/common/game3_convert.c',
+  'src/common/game3_pmove.c',
   'src/common/natsort.c',
   'src/common/hash_map.c',
   'src/common/loc.c',
@@ -121,7 +123,6 @@ client_src = [
   'src/server/commands.c',
   'src/server/entities.c',
   'src/server/game.c',
-  'src/server/game3_proxy/game3_pmove.c',
   'src/server/game3_proxy/game3_proxy.c',
   'src/server/init.c',
   'src/server/main.c',
@@ -187,7 +188,6 @@ server_src = [
   'src/server/commands.c',
   'src/server/entities.c',
   'src/server/game.c',
-  'src/server/game3_proxy/game3_pmove.c',
   'src/server/game3_proxy/game3_proxy.c',
   'src/server/init.c',
   'src/server/main.c',
@@ -252,7 +252,6 @@ game_src = [
   'src/shared/base85.c',
   'src/shared/m_flash.c',
   'src/shared/shared.c',
-  'src/common/pmove.c',
 ]
 
 cc = meson.get_compiler('c')

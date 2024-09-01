@@ -978,7 +978,7 @@ void MSG_WriteDeltaPlayerstate_Default(const player_packed_t *from, const player
         if(flags & MSG_PS_RERELEASE)
             MSG_WriteShort(to->pmove.pm_flags);
         else
-            MSG_WriteByte(pmflags_to_game3(to->pmove.pm_flags));
+            MSG_WriteByte(pmflags_to_game3(to->pmove.pm_flags, flags & MSG_PS_EXTENSIONS));
     }
 
     if (pflags & PS_M_GRAVITY)
@@ -1264,7 +1264,7 @@ int MSG_WriteDeltaPlayerstate_Enhanced(const player_packed_t    *from,
         if(flags & MSG_PS_RERELEASE)
             MSG_WriteShort(to->pmove.pm_flags);
         else
-            MSG_WriteByte(pmflags_to_game3(to->pmove.pm_flags));
+            MSG_WriteByte(pmflags_to_game3(to->pmove.pm_flags, flags & MSG_PS_EXTENSIONS));
     }
 
     if (pflags & PS_M_GRAVITY)
@@ -2197,7 +2197,7 @@ void MSG_ParseDeltaPlayerstate_Default(const player_state_t *from,
         if (psflags & MSG_PS_RERELEASE)
             to->pmove.pm_flags = MSG_ReadShort();
         else
-            to->pmove.pm_flags = pmflags_from_game3(MSG_ReadByte());
+            to->pmove.pm_flags = pmflags_from_game3(MSG_ReadByte(), psflags & MSG_PS_EXTENSIONS);
     }
 
     if (flags & PS_M_GRAVITY)
@@ -2352,7 +2352,7 @@ void MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t    *from,
         if (psflags & MSG_PS_RERELEASE)
             to->pmove.pm_flags = MSG_ReadShort();
         else
-            to->pmove.pm_flags = pmflags_from_game3(MSG_ReadByte());
+            to->pmove.pm_flags = pmflags_from_game3(MSG_ReadByte(), psflags & MSG_PS_EXTENSIONS);
     }
 
     if (flags & PS_M_GRAVITY)

@@ -18,14 +18,17 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #pragma once
 
-/*
-==============================================================
+#include "shared/shared.h"
+#include "shared/game3_shared.h"
 
-PLAYER MOVEMENT CODE
+//
+// Conversions from/to game3 types
+//
 
-Common between server and client so prediction matches
+// Convert pmove_state_t to game3_pmove_state_t
+void ConvertToGame3_pmove_state(game3_pmove_state_t *game_pmove_state, const pmove_state_t *server_pmove_state, bool extended);
+// Convert game3_pmove_state_t to pmove_state_t
+void ConvertFromGame3_pmove_state(pmove_state_t *pmove_state, const game3_pmove_state_t *game_pmove_state, bool extended);
 
-==============================================================
-*/
-
-void game3_Pmove(game3_pmove_t *pmove, pmoveParams_t *params);
+// Convert usercmd_t to game3_usercmd_t
+void ConvertToGame3_usercmd(game3_usercmd_t *game_cmd, const usercmd_t *server_cmd);

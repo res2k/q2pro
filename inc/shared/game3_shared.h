@@ -83,7 +83,7 @@ static inline game3_pmtype_t pmtype_to_game3(pmtype_t pmtype)
 #define G3PMF_TELEPORT_BIT    BIT(7)      // used by Q2PRO (non-extended servers)
 
 #if !defined(GAME3_INCLUDE)
-static inline pmflags_t pmflags_from_game3(byte pmflags)
+static inline pmflags_t pmflags_from_game3(byte pmflags, bool extended)
 {
     pmflags_t new_pmflags = 0;
     if(pmflags & G3PMF_DUCKED)
@@ -100,12 +100,14 @@ static inline pmflags_t pmflags_from_game3(byte pmflags)
         new_pmflags |= PMF_TIME_TELEPORT;
     if(pmflags & G3PMF_NO_PREDICTION)
         new_pmflags |= PMF_NO_PREDICTION;
-    if(pmflags & G3PMF_TELEPORT_BIT)
-        new_pmflags |= PMF_TELEPORT_BIT;
+    if (!extended) {
+        if(pmflags & G3PMF_TELEPORT_BIT)
+            new_pmflags |= PMF_TELEPORT_BIT;
+    }
     return new_pmflags;
 }
 
-static inline byte pmflags_to_game3(pmflags_t pmflags)
+static inline byte pmflags_to_game3(pmflags_t pmflags, bool extended)
 {
     byte new_pmflags = 0;
     if(pmflags & PMF_DUCKED)
@@ -122,8 +124,10 @@ static inline byte pmflags_to_game3(pmflags_t pmflags)
         new_pmflags |= G3PMF_TIME_TELEPORT;
     if(pmflags & PMF_NO_PREDICTION)
         new_pmflags |= G3PMF_NO_PREDICTION;
-    if(pmflags & PMF_TELEPORT_BIT)
-        new_pmflags |= G3PMF_TELEPORT_BIT;
+    if (!extended) {
+        if(pmflags & PMF_TELEPORT_BIT)
+            new_pmflags |= G3PMF_TELEPORT_BIT;
+    }
     return new_pmflags;
 }
 #endif // #if !defined(GAME3_INCLUDE)

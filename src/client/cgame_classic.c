@@ -20,6 +20,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "cgame_classic.h"
 
 #include "common/cvar.h"
+#include "common/game3_convert.h"
+#include "common/game3_pmove.h"
 #include "common/utils.h"
 
 #include <malloc.h>
@@ -849,10 +851,6 @@ static uint32_t CGC_GetOwnedWeaponWheelWeapons(const player_state_t *ps)
 static void CGC_Pmove(pmove_t *pmove)
 {
     Pmove(pmove, cgix.GetPmoveParams());
-
-    /* viewheight is now added to the viewoffset; this didn't happen in vanilla,
-     * so clear out the viewheight */
-    pmove->s.viewheight = 0;
 }
 
 static void CGC_ParseConfigString(int32_t i, const char *s) {}

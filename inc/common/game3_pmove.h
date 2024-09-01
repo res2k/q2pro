@@ -18,6 +18,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #pragma once
 
+#include "shared/game3_shared.h"
+#include "pmove.h"
+
 /*
 ==============================================================
 
@@ -28,24 +31,4 @@ Common between server and client so prediction matches
 ==============================================================
 */
 
-#define STEPSIZE    18
-
-typedef struct {
-    bool        qwmode;
-    bool        airaccelerate;
-    bool        strafehack;
-    bool        flyhack;
-    bool        waterhack;
-    bool        extended_server;
-    float       speedmult;
-    float       watermult;
-    float       maxspeed;
-    float       friction;
-    float       waterfriction;
-    float       flyfriction;
-} pmoveParams_t;
-
-void Pmove(pmove_t *pmove, const pmoveParams_t *params);
-
-void PmoveInit(pmoveParams_t *pmp);
-void PmoveEnableQW(pmoveParams_t *pmp);
+void game3_Pmove(game3_pmove_t *pmove, cplane_t* groundplane, const pmoveParams_t *params);

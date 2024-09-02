@@ -1138,7 +1138,7 @@ static void CL_AddViewWeapon(void)
         gun.oldframe = gun_frame;   // development tool
     } else {
 // KEX
-        if (cl.csr.extended) {
+        if (cl.is_rerelease_game) {
             if (ops->gunindex != ps->gunindex) { // just changed weapons, don't lerp from old
                 cl.weapon.frame = cl.weapon.last_frame = ps->gunframe;
                 cl.weapon.server_time = cl.servertime;

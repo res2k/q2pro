@@ -1486,7 +1486,7 @@ static void SCR_DrawLoading(void)
 
 static void SCR_DrawHitMarkers(void)
 {
-    if (!cl.csr.extended || !scr_hit_markers->integer) {
+    if (!cl.is_rerelease_game || !scr_hit_markers->integer) {
         return;
     }
 

@@ -21,7 +21,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "game3_proxy/game3_proxy.h"
 #include "common/loc.h"
 #include "common/gamedll.h"
-#include "shared/debug.h"
 
 #if USE_CLIENT
 #include "client/video.h"
@@ -999,6 +998,22 @@ static const filesystem_api_v1_t filesystem_api_v1 = {
     .ErrorString = Q_ErrorString,
 };
 
+#if USE_REF && USE_DEBUG
+static const debug_draw_api_v1_t debug_draw_api_v1 = {
+    .ClearDebugLines = R_ClearDebugLines,
+    .AddDebugLine = R_AddDebugLine,
+    .AddDebugPoint = R_AddDebugPoint,
+    .AddDebugAxis = R_AddDebugAxis,
+    .AddDebugBounds = R_AddDebugBounds,
+    .AddDebugSphere = R_AddDebugSphere,
+    .AddDebugCircle = R_AddDebugCircle,
+    .AddDebugCylinder = R_AddDebugCylinder,
+    .AddDebugArrow = R_AddDebugArrow,
+    .AddDebugCurveArrow = R_AddDebugCurveArrow,
+    .AddDebugText = R_AddDebugText,
+};
+#endif
+
 static void *PF_GetExtension(const char *name)
 {
     if (!name)
@@ -1008,10 +1023,8 @@ static void *PF_GetExtension(const char *name)
         return (void *)&filesystem_api_v1;
 
 #if USE_REF && USE_DEBUG
-    if (!strcmp(name, DEBUG_DRAW_API_V1) && !dedicated->integer) {
-        extern const debug_draw_api_v1_t debug_draw_api_v1;
+    if (!strcmp(name, DEBUG_DRAW_API_V1) && !dedicated->integer)
         return (void *)&debug_draw_api_v1;
-    }
 #endif
 
     return NULL;

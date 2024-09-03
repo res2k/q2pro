@@ -18,6 +18,34 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #pragma once
 
+/*
+==============================================================================
+
+SERVER API EXTENSIONS
+
+==============================================================================
+*/
+
+#define FILESYSTEM_API_V1 "FILESYSTEM_API_V1"
+
+typedef struct {
+    int64_t     (*OpenFile)(const char *path, qhandle_t *f, unsigned mode); // returns file length
+    int         (*CloseFile)(qhandle_t f);
+    int         (*LoadFile)(const char *path, void **buffer, unsigned flags, unsigned tag);
+
+    int         (*ReadFile)(void *buffer, size_t len, qhandle_t f);
+    int         (*WriteFile)(const void *buffer, size_t len, qhandle_t f);
+    int         (*FlushFile)(qhandle_t f);
+    int64_t     (*TellFile)(qhandle_t f);
+    int         (*SeekFile)(qhandle_t f, int64_t offset, int whence);
+    int         (*ReadLine)(qhandle_t f, char *buffer, size_t size);
+
+    void        **(*ListFiles)(const char *path, const char *filter, unsigned flags, int *count_p);
+    void        (*FreeFileList)(void **list);
+
+    const char  *(*ErrorString)(int error);
+} filesystem_api_v1_t;
+
 #define DEBUG_DRAW_API_V1 "DEBUG_DRAW_API_V1"
 
 typedef struct {
@@ -28,7 +56,8 @@ typedef struct {
     void (*AddDebugBounds)(const vec3_t mins, const vec3_t maxs, uint32_t color, uint32_t time, qboolean depth_test);
     void (*AddDebugSphere)(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test);
     void (*AddDebugCircle)(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test);
-    void (*AddDebugCylinder)(const vec3_t origin, float half_height, float radius, uint32_t color, uint32_t time, qboolean depth_test);
+    void (*AddDebugCylinder)(const vec3_t origin, float half_height, float radius, uint32_t color, uint32_t time,
+                             qboolean depth_test);
     void (*AddDebugArrow)(const vec3_t start, const vec3_t end, float size, uint32_t line_color,
                           uint32_t arrow_color, uint32_t time, qboolean depth_test);
     void (*AddDebugCurveArrow)(const vec3_t start, const vec3_t ctrl, const vec3_t end, float size,

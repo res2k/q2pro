@@ -19,7 +19,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "gl.h"
 #include "shared/list.h"
-#include "shared/debug.h"
 #include "client/client.h"
 #include "common/prompt.h"
 #include "debug_fonts/cursive.h"
@@ -325,8 +324,8 @@ void R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, ui
     }
 }
 
-static void R_DrawArrowCap(const vec3_t apex, const vec3_t dir, float size,
-                           uint32_t color, uint32_t time, qboolean depth_test)
+void R_DrawArrowCap(const vec3_t apex, const vec3_t dir, float size,
+                    uint32_t color, uint32_t time, qboolean depth_test)
 {
     vec3_t cap_end;
     VectorMA(apex, size, dir, cap_end);
@@ -345,7 +344,7 @@ static void R_DrawArrowCap(const vec3_t apex, const vec3_t dir, float size,
 }
 
 void R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, uint32_t line_color,
-                            uint32_t arrow_color, uint32_t time, qboolean depth_test)
+                     uint32_t arrow_color, uint32_t time, qboolean depth_test)
 {
     vec3_t dir;
     VectorSubtract(end, start, dir);
@@ -362,7 +361,7 @@ void R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, uint32_t 
 }
 
 void R_AddDebugCurveArrow(const vec3_t start, const vec3_t ctrl, const vec3_t end, float size,
-                                 uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test)
+                          uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test)
 {
     int num_points = Q_clip(Distance(start, end) / 32, 3, 24);
     vec3_t last_point;
@@ -578,17 +577,3 @@ void GL_ShutdownDebugDraw(void)
 {
     Cmd_RemoveCommand("cleardebuglines");
 }
-
-const debug_draw_api_v1_t debug_draw_api_v1 = {
-    .ClearDebugLines = R_ClearDebugLines,
-    .AddDebugLine = R_AddDebugLine,
-    .AddDebugPoint = R_AddDebugPoint,
-    .AddDebugAxis = R_AddDebugAxis,
-    .AddDebugBounds = R_AddDebugBounds,
-    .AddDebugSphere = R_AddDebugSphere,
-    .AddDebugCircle = R_AddDebugCircle,
-    .AddDebugCylinder = R_AddDebugCylinder,
-    .AddDebugArrow = R_AddDebugArrow,
-    .AddDebugCurveArrow = R_AddDebugCurveArrow,
-    .AddDebugText = R_AddDebugText,
-};

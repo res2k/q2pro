@@ -134,7 +134,7 @@ void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32
         } else {
             debug_line_t *next;
             LIST_FOR_EACH_SAFE(debug_line_t, l, next, &debug_lines_active, entry) {
-                if (l->time <= com_localTime) {
+                if (l->time <= com_localTime2) {
                     List_Remove(&l->entry);
                     List_Insert(&debug_lines_free, &l->entry);
                 }
@@ -154,8 +154,8 @@ void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32
     VectorCopy(start, l->start);
     VectorCopy(end, l->end);
     l->color = color;
-    l->time = com_localTime + time;
-    if (l->time < com_localTime)
+    l->time = com_localTime2 + time;
+    if (l->time < com_localTime2)
         l->time = UINT32_MAX;
     l->bits = GLS_DEPTHMASK_FALSE;
     if (!depth_test)
@@ -496,7 +496,7 @@ void GL_DrawDebugLines(void)
     dst_vert = tess.vertices;
     numverts = 0;
     LIST_FOR_EACH_SAFE(debug_line_t, l, next, &debug_lines_active, entry) {
-        if (l->time < com_localTime) { // expired
+        if (l->time < com_localTime2) { // expired
             List_Remove(&l->entry);
             List_Insert(&debug_lines_free, &l->entry);
             continue;

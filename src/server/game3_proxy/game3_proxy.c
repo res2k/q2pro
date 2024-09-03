@@ -1030,7 +1030,7 @@ game_export_t *GetGame3Proxy(game_import_t *import, void *game3_entry, void *gam
     if (game3_ex_entry)
     {
         game3_export_ex = entry_ex(&game3_import_ex);
-        if (game3_export_ex->apiversion < GAME3_API_VERSION_EX_MINIMUM)
+        if (game3_export_ex && game3_export_ex->apiversion < GAME3_API_VERSION_EX_MINIMUM)
             game3_export_ex = NULL;
         else
             Com_DPrintf("Game supports Q2PRO extended API version %d.\n", game3_export_ex->apiversion);

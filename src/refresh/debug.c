@@ -529,7 +529,6 @@ void GL_DrawDebugLines(void)
         GL_LockArrays(numverts);
         qglDrawArrays(GL_LINES, 0, numverts);
         GL_UnlockArrays();
-        numverts = 0;
     }
 
     if (gl_config.caps & QGL_CAP_LINE_SMOOTH)

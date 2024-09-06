@@ -22,7 +22,6 @@ static float    skyrotate;
 static bool     skyautorotate;
 static vec3_t   skyaxis;
 static GLuint   sky_images[6];
-static bool     sky_classic;
 
 static const vec3_t skyclip[6] = {
     { 1, 1, 0 },
@@ -335,12 +334,12 @@ void R_DrawSkyBox(void)
         return; // nothing visible
 
     GL_BindArrays(VA_SPRITE);
-    if (sky_classic) {
-        GL_StateBits(GLS_CLASSIC_SKY | GLS_TEXTURE_REPLACE);
+
+    if (gl_static.classic_sky && gl_drawsky->integer == 1) {
+        GL_StateBits(GLS_TEXTURE_REPLACE | GLS_CLASSIC_SKY);
         GL_ArrayBits(GLA_VERTEX);
-        
-        GL_BindTexture(TMU_TEXTURE, sky_images[0]);
-        GL_BindTexture(TMU_ALPHAMAP, sky_images[1]);
+        GL_BindTexture(TMU_TEXTURE,  gl_static.classic_sky->texnum);
+        GL_BindTexture(TMU_LIGHTMAP, gl_static.classic_sky->texnum2);
     } else {
         GL_StateBits(GLS_SKY_FOG);
         GL_ArrayBits(GLA_VERTEX | GLA_TC);
@@ -351,7 +350,7 @@ void R_DrawSkyBox(void)
             skymins[1][i] >= skymaxs[1][i])
             continue;
 
-        if (!sky_classic)
+        if (!gl_static.classic_sky || gl_drawsky->integer != 1)
             GL_BindTexture(TMU_TEXTURE, sky_images[i]);
 
         MakeSkyVec(skymaxs[0][i], skymins[1][i], i, tess.vertices);
@@ -385,9 +384,7 @@ void R_SetSky(const char *name, float rotate, bool autorotate, const vec3_t axis
     char            pathname[MAX_QPATH];
     const image_t   *image;
 
-    sky_classic = false;
-
-    if (!gl_drawsky->integer) {
+    if (!gl_drawsky->integer || (gl_static.classic_sky && gl_drawsky->integer == 1)) {
         R_UnsetSky();
         return;
     }
@@ -424,7 +421,6 @@ bool R_SetClassicSky(const char *name)
     if (!gl_static.use_shaders)
         return false;
 
-    sky_classic = name;
     R_UnsetSky();
     
     char    pathname[MAX_QPATH];

@@ -101,6 +101,7 @@ typedef struct {
     byte            lightstylemap[MAX_LIGHTSTYLES];
     hash_map_t      *queries;
     hash_map_t      *programs;
+    image_t         *classic_sky;
 } glStatic_t;
 
 typedef struct {
@@ -573,7 +574,7 @@ typedef struct {
     GLfloat     height_fog_density;
     GLint       num_dlights;
     GLfloat     pad;
-    GLfloat     view_org[4];
+    GLfloat     vieworg[4];
     GLfloat     global_fog[4];
     GLfloat     height_fog_start[4];
     GLfloat     height_fog_end[4];

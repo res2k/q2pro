@@ -2006,7 +2006,7 @@ static image_t *find_or_load_image(const char *name, size_t len,
             check_for_glow_map(image);
     }
 
-    if (type == IT_CLASSIC_SKY) {
+    if (type == IT_SKY && flags & IF_CLASSIC_SKY) {
         // upload the top half of the image (solid)
         image->height /= 2;
         image->upload_height /= 2;

@@ -1574,7 +1574,7 @@ static void IMG_List_f(void)
         Com_Printf("%c%c%c%c %4i %4i %s: %s\n",
                    types[image->type > IT_MAX ? IT_MAX : image->type],
                    (image->flags & IF_TRANSPARENT) ? 'T' : ' ',
-                   (image->flags & IF_SCRAP) ? 'S' : image->glow_texnum ? 'G' : ' ',
+                   (image->flags & IF_SCRAP) ? 'S' : image->texnum2 ? 'G' : ' ',
                    (image->flags & IF_PERMANENT) ? '*' : ' ',
                    image->upload_width,
                    image->upload_height,
@@ -1907,7 +1907,7 @@ static void check_for_glow_map(image_t *image)
     }
 
     IMG_Load(&temporary, glow_pic);
-    image->glow_texnum = temporary.texnum;
+    image->texnum2 = temporary.texnum;
 
     Z_Free(glow_pic);
 }
@@ -2024,7 +2024,7 @@ static image_t *find_or_load_image(const char *name, size_t len,
         };
 
         IMG_Load(&temporary, pic);
-        image->glow_texnum = temporary.texnum;
+        image->texnum2 = temporary.texnum;
     } else {
         // upload the image
         IMG_Load(image, pic);

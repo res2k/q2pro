@@ -440,7 +440,7 @@ bool R_SetClassicSky(const char *name)
         return false;
     }
     sky_images[0] = image->texnum;
-    sky_images[1] = image->glow_texnum;
+    sky_images[1] = image->texnum2;
 
     return true;
 }

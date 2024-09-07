@@ -24,7 +24,7 @@ void ConvertToGame3_pmove_state(game3_pmove_state_t *game_pmove_state, const pmo
     VectorScale(server_pmove_state->origin, 8, game_pmove_state->origin);
     VectorScale(server_pmove_state->velocity, 8, game_pmove_state->velocity);
     game_pmove_state->pm_flags = pmflags_to_game3(server_pmove_state->pm_flags, extended);
-    game_pmove_state->pm_time = server_pmove_state->pm_time;
+    game_pmove_state->pm_time = server_pmove_state->pm_time / 8;
     game_pmove_state->gravity = server_pmove_state->gravity;
     game_pmove_state->delta_angles[0] = ANGLE2SHORT(server_pmove_state->delta_angles[0]);
     game_pmove_state->delta_angles[1] = ANGLE2SHORT(server_pmove_state->delta_angles[1]);

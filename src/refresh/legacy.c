@@ -61,11 +61,11 @@ static void legacy_state_bits(glStateBits_t bits)
             qglDisable(GL_TEXTURE_2D);
     }
 
-    if ((diff & GLS_WARP_ENABLE) && gl_static.programs_head) {
+    if ((diff & GLS_WARP_ENABLE) && gl_static.warp_program) {
         if (bits & GLS_WARP_ENABLE) {
             vec4_t param = { glr.fd.time, glr.fd.time };
             qglEnable(GL_FRAGMENT_PROGRAM_ARB);
-            qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, gl_static.programs_head->id);
+            qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, gl_static.warp_program);
             qglProgramLocalParameter4fvARB(GL_FRAGMENT_PROGRAM_ARB, 0, param);
         } else {
             qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, 0);
@@ -209,7 +209,7 @@ static void legacy_disable_state(void)
     qglDisableClientState(GL_VERTEX_ARRAY);
     qglDisableClientState(GL_COLOR_ARRAY);
 
-    if (gl_static.programs_head) {
+    if (gl_static.warp_program) {
         qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, 0);
         qglDisable(GL_FRAGMENT_PROGRAM_ARB);
     }
@@ -248,18 +248,16 @@ static void legacy_init(void)
     }
 
     qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, 0);
-    gl_static.programs_head = Z_TagMallocz(sizeof(glprogram_t), TAG_RENDERER);
-    gl_static.programs_head->id = prog;
+    gl_static.warp_program = prog;
 }
 
 static void legacy_shutdown(void)
 {
     legacy_disable_state();
 
-    if (gl_static.programs_head) {
-        qglDeleteProgramsARB(1, &gl_static.programs_head->id);
-        Z_Free(gl_static.programs_head);
-        gl_static.programs_head = NULL;
+    if (gl_static.warp_program) {
+        qglDeleteProgramsARB(1, &gl_static.warp_program);
+        gl_static.warp_program = 0;
     }
 }
 

@@ -87,8 +87,7 @@ typedef struct {
     GLuint          array_object;
     GLuint          index_buffer;
     GLuint          vertex_buffer;
-    glprogram_t     *programs_head;
-    glprogram_t     *programs_hash[PROGRAM_HASH_SIZE];
+    GLuint          warp_program;
     GLuint          texnums[NUM_AUTO_TEXTURES];
     GLenum          samples_passed;
     GLbitfield      stencil_buffer_bit;
@@ -101,6 +100,7 @@ typedef struct {
     byte            latlngtab[NUMVERTEXNORMALS][2];
     byte            lightstylemap[MAX_LIGHTSTYLES];
     hash_map_t      *queries;
+    hash_map_t      *programs;
 } glStatic_t;
 
 typedef struct {
@@ -488,8 +488,6 @@ typedef enum glStateBits_e {
     GLS_SKY_FOG             = BIT(14),
     GLS_CLASSIC_SKY         = BIT(15),
     GLS_DYNAMIC_LIGHTS      = BIT(16),
-
-    GLS_SHADER_START_BIT    = 6,
 
     GLS_SHADE_SMOOTH        = BIT(17),
     GLS_SCROLL_X            = BIT(18),

@@ -317,7 +317,7 @@ void CL_RegisterTEntModels(void)
 
     cl_mod_marker = R_RegisterModel("models/objects/pointer/tris.md2");
 
-    cl_img_flare = R_RegisterSprite("misc/flare.tga");
+    cl_img_flare = R_RegisterImage("misc/flare.tga", IT_SPRITE, IF_DEFAULT_FLARE);
 
     // check for remaster powerscreen model (ugly!)
     len = FS_LoadFile("models/items/armor/effect/tris.md2", &data);

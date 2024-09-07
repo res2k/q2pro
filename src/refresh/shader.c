@@ -430,31 +430,15 @@ static GLuint create_and_use_program(glStateBits_t bits)
     return program;
 }
 
-static void find_and_use_program(GLbitfield bits)
+static void shader_use_program(glStateBits_t key)
 {
-    GLuint hash = bits >> GLS_SHADER_START_BIT;
-    hash = HashInt32(&hash) & (PROGRAM_HASH_SIZE - 1);
-    glStateBits_t shader_bits = bits & GLS_SHADER_MASK;
-
-    glprogram_t *prog = gl_static.programs_hash[hash];
+    GLuint *prog = HashMap_Lookup(GLuint, gl_static.programs, &key);
 
     if (prog) {
-        for (; prog && prog->bits != shader_bits; prog = prog->hash_next) ;
-    }
-
-    if (prog)
-        qglUseProgram(prog->id);
-    else {
-        GLuint program = create_and_use_program(shader_bits);
-
-        prog = Z_TagMallocz(sizeof(glprogram_t), TAG_RENDERER);
-        prog->bits = bits;
-        prog->id = program;
-        prog->hash_next = gl_static.programs_hash[hash];
-        gl_static.programs_hash[hash] = prog;
-
-        prog->next = gl_static.programs_head;
-        gl_static.programs_head = prog;
+        qglUseProgram(*prog);
+    } else {
+        GLuint val = create_and_use_program(key);
+        HashMap_Insert(gl_static.programs, &key, &val);
     }
 }
 
@@ -483,9 +467,8 @@ static void shader_state_bits(glStateBits_t bits)
     if (diff & GLS_COMMON_MASK)
         GL_CommonStateBits(bits);
 
-    if (diff & GLS_SHADER_MASK) {
-        find_and_use_program(bits);
-    }
+    if (diff & GLS_SHADER_MASK)
+        shader_use_program(bits & GLS_SHADER_MASK);
 
     if (diff & GLS_UBLOCK_MASK) {
         if (bits & GLS_SCROLL_ENABLE) {
@@ -651,12 +634,13 @@ static void shader_disable_state(void)
 static void shader_clear_state(void)
 {
     shader_disable_state();
-
-    find_and_use_program(GLS_DEFAULT);
+    shader_use_program(GLS_DEFAULT);
 }
 
 static void shader_init(void)
 {
+    gl_static.programs = HashMap_Create(glStateBits_t, GLuint, HashInt32, NULL);
+
     qglGenBuffers(NUM_UNIFORM_BUFFERS, gl_static.uniform_buffers);
 
     qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_MAIN]);
@@ -668,7 +652,7 @@ static void shader_init(void)
     qglBufferData(GL_UNIFORM_BUFFER, sizeof(gls.u_dlights), NULL, GL_DYNAMIC_DRAW);
 
     // precache common shader
-    find_and_use_program(GLS_DEFAULT);
+    shader_use_program(GLS_DEFAULT);
 
     gl_per_pixel_lighting = Cvar_Get("gl_per_pixel_lighting", "1", 0);
 }
@@ -676,18 +660,17 @@ static void shader_init(void)
 static void shader_shutdown(void)
 {
     shader_disable_state();
-
     qglUseProgram(0);
 
-    for (glprogram_t *head = gl_static.programs_head; head; ) {
-        qglDeleteProgram(head->id);
-        glprogram_t *next = head->next;
-        Z_Free(head);
-        head = next;
+    if (gl_static.programs) {
+        uint32_t map_size = HashMap_Size(gl_static.programs);
+        for (int i = 0; i < map_size; i++) {
+            GLuint *prog = HashMap_GetValue(GLuint, gl_static.programs, i);
+            qglDeleteProgram(*prog);
+        }
+        HashMap_Destroy(gl_static.programs);
+        gl_static.programs = NULL;
     }
-
-    gl_static.programs_head = NULL;
-    memset(gl_static.programs_hash, 0, sizeof(gl_static.programs_hash));
 
     qglBindBuffer(GL_UNIFORM_BUFFER, 0);
     qglDeleteBuffers(NUM_UNIFORM_BUFFERS, gl_static.uniform_buffers);

@@ -64,7 +64,7 @@ static cvar_t   *ch_scale;
 static cvar_t   *ch_x;
 static cvar_t   *ch_y;
 
-static cvar_t   *scr_hit_markers; // 1 = sound + pic, 2 = pic
+cvar_t          *scr_hit_markers; // 1 = sound + pic, 2 = pic
 static cvar_t   *scr_hit_marker_time;
 
 static cvar_t   *scr_damage_indicators;
@@ -1490,17 +1490,9 @@ static void SCR_DrawHitMarkers(void)
         return;
     }
 
-    if (cl.frame.ps.stats[STAT_HIT_MARKER] && cl.hit_marker_frame != cl.frame.number) {
-        cl.hit_marker_frame = cl.frame.number;
-        cl.hit_marker_time = cls.realtime + scr_hit_marker_time->integer;
-
-        if (scr_hit_markers->integer == 1) {
-            S_StartLocalSound("weapons/marker.wav");
-        }
-    }
-
-    if (cl.hit_marker_time > cls.realtime) {
-        float frac = 1.0f - ((cl.hit_marker_time - cls.realtime) / scr_hit_marker_time->value);
+    int hit_marker_end = cl.hit_marker_time + scr_hit_marker_time->integer;
+    if (hit_marker_end > cls.realtime) {
+        float frac = 1.0f - ((hit_marker_end - cls.realtime) / scr_hit_marker_time->value);
         float alpha = 1.0f - (frac * frac);
         float scale = frac;
 

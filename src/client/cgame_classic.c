@@ -848,6 +848,11 @@ static uint32_t CGC_GetOwnedWeaponWheelWeapons(const player_state_t *ps)
     return 0;
 }
 
+static int16_t CGC_GetHitMarkerDamage(const player_state_t *ps)
+{
+    return 0;
+}
+
 static void CGC_Pmove(pmove_t *pmove)
 {
     Pmove(pmove, cgix.GetPmoveParams());
@@ -897,6 +902,7 @@ cgame_export_t cgame_classic = {
     .TouchPics = CGC_TouchPics,
 
     .GetOwnedWeaponWheelWeapons = CGC_GetOwnedWeaponWheelWeapons,
+    .GetHitMarkerDamage = CGC_GetHitMarkerDamage,
 
     .Pmove = CGC_Pmove,
 

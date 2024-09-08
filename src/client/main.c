@@ -101,6 +101,8 @@ extern cvar_t *gl_modulate_entities;
 extern cvar_t *gl_brightness;
 #endif
 
+extern cvar_t *scr_hit_markers;
+
 client_static_t cls;
 client_state_t  cl;
 
@@ -3200,6 +3202,21 @@ void CL_UpdateFrameTimes(void)
                  __func__, sync_names[sync_mode], main_msec, ref_msec, phys_msec);
 }
 
+static void CL_UpdateHitMarkers(void)
+{
+    if (!cl.is_rerelease_game || !scr_hit_markers->integer)
+        return;
+
+    if (cgame->GetHitMarkerDamage(&cl.frame.ps) && cl.hit_marker_frame != cl.frame.number) {
+        cl.hit_marker_frame = cl.frame.number;
+        cl.hit_marker_time = cls.realtime;
+
+        if (scr_hit_markers->integer == 1) {
+            S_StartLocalSound("weapons/marker.wav");
+        }
+    }
+}
+
 /*
 ==================
 CL_Frame
@@ -3328,6 +3345,9 @@ unsigned CL_Frame(unsigned msec)
     Con_RunConsole();
 
     SCR_RunCinematic();
+
+    // Update hit marker status from cgame
+    CL_UpdateHitMarkers();
 
     UI_Frame(main_extra);
 

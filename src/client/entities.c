@@ -798,7 +798,7 @@ static void CL_AddPacketEntities(void)
         if (effects & EF_GRENADE_LIGHT)
             V_AddLight(ent.origin, 100, 1, 1, 0);
 
-        if (s1->number == cl.frame.clientNum + 1) {
+        if (s1->number == cl.frame.clientNum + 1 && !cl.thirdPersonView) {
             if (effects & EF_FLAG1)
                 V_AddLight(ent.origin, 225, 1.0f, 0.1f, 0.1f);
             else if (effects & EF_FLAG2)
@@ -807,10 +807,7 @@ static void CL_AddPacketEntities(void)
                 V_AddLight(ent.origin, 225, 1.0f, 1.0f, 0.0f);
             else if (effects & EF_TRACKERTRAIL)
                 V_AddLight(ent.origin, 225, -1.0f, -1.0f, -1.0f);
-            if (!cl.thirdPersonView) {
-                //ent.flags |= RF_VIEWERMODEL;    // only draw from mirrors
-                goto skip;
-            }
+            goto skip;
         }
 
         // if set to invisible, skip

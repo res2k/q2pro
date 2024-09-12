@@ -325,35 +325,26 @@ static GLuint create_shader(GLenum type, const char *src)
     return shader;
 }
 
-static void create_and_use_program(GLbitfield bits, uint32_t hash)
+static GLuint create_and_use_program(GLbitfield bits)
 {
     char buffer[MAX_SHADER_CHARS];
 
     GLuint program = qglCreateProgram();
     if (!program) {
         Com_EPrintf("Couldn't create program\n");
-        return;
+        return program;
     }
-
-    glprogram_t *prog = Z_TagMallocz(sizeof(glprogram_t), TAG_RENDERER);
-    prog->bits = bits;
-    prog->id = program;
-    prog->hash_next = gl_static.programs_hash[hash];
-    gl_static.programs_hash[hash] = prog;
-
-    prog->next = gl_static.programs_head;
-    gl_static.programs_head = prog;
 
     write_vertex_shader(buffer, bits);
     GLuint shader_v = create_shader(GL_VERTEX_SHADER, buffer);
     if (!shader_v)
-        return;
+        return program;
 
     write_fragment_shader(buffer, bits);
     GLuint shader_f = create_shader(GL_FRAGMENT_SHADER, buffer);
     if (!shader_f) {
         qglDeleteShader(shader_v);
-        return;
+        return program;
     }
 
     qglAttachShader(program, shader_v);
@@ -384,20 +375,20 @@ static void create_and_use_program(GLbitfield bits, uint32_t hash)
             Com_Printf("%s", buffer);
 
         Com_EPrintf("Error linking program\n");
-        return;
+        return program;
     }
 
     GLuint index = qglGetUniformBlockIndex(program, "u_block");
     if (index == GL_INVALID_INDEX) {
         Com_EPrintf("Uniform block not found\n");
-        return;
+        return program;
     }
 
     GLint size = 0;
     qglGetActiveUniformBlockiv(program, index, GL_UNIFORM_BLOCK_DATA_SIZE, &size);
     if (size != sizeof(gls.u_block)) {
         Com_EPrintf("Uniform block size mismatch: %d != %zu\n", size, sizeof(gls.u_block));
-        return;
+        return program;
     }
 
     qglUniformBlockBinding(program, index, UBLOCK_MAIN);
@@ -406,14 +397,14 @@ static void create_and_use_program(GLbitfield bits, uint32_t hash)
         index = qglGetUniformBlockIndex(program, "u_dlights");
         if (index == GL_INVALID_INDEX) {
             Com_EPrintf("DLight uniform block not found\n");
-            return;
+            return program;
         }
 
         size = 0;
         qglGetActiveUniformBlockiv(program, index, GL_UNIFORM_BLOCK_DATA_SIZE, &size);
         if (size != sizeof(gls.u_dlights)) {
             Com_EPrintf("DLight uniform block size mismatch: %d != %zu\n", size, sizeof(gls.u_dlights));
-            return;
+            return program;
         }
 
         qglUniformBlockBinding(program, index, UBLOCK_DLIGHTS);
@@ -428,6 +419,8 @@ static void create_and_use_program(GLbitfield bits, uint32_t hash)
         qglUniform1i(qglGetUniformLocation(program, "u_alphamap"), 1);
     if (bits & GLS_GLOWMAP_ENABLE)
         qglUniform1i(qglGetUniformLocation(program, "u_glowmap"), 2);
+
+    return program;
 }
 
 static void find_and_use_program(GLbitfield bits)
@@ -444,8 +437,18 @@ static void find_and_use_program(GLbitfield bits)
 
     if (prog)
         qglUseProgram(prog->id);
-    else
-        create_and_use_program(shader_bits, hash);
+    else {
+        GLuint program = create_and_use_program(shader_bits);
+
+        prog = Z_TagMallocz(sizeof(glprogram_t), TAG_RENDERER);
+        prog->bits = bits;
+        prog->id = program;
+        prog->hash_next = gl_static.programs_hash[hash];
+        gl_static.programs_hash[hash] = prog;
+
+        prog->next = gl_static.programs_head;
+        gl_static.programs_head = prog;
+    }
 }
 
 static void shader_state_bits(GLbitfield bits)

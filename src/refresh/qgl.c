@@ -100,6 +100,7 @@ static const glsection_t sections[] = {
             QGL_FN(LoadIdentity),
             QGL_FN(LoadMatrixf),
             QGL_FN(MatrixMode),
+            QGL_FN(MultMatrixf),
             QGL_FN(Scalef),
             QGL_FN(ShadeModel),
             QGL_FN(TexCoordPointer),

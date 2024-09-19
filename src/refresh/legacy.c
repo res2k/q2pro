@@ -177,7 +177,7 @@ static void legacy_load_view_matrix(const GLfloat *model, const GLfloat *view)
         qglLoadIdentity();
 
     if (model)
-        glMultMatrixf(model);
+        qglMultMatrixf(model);
 }
 
 static void legacy_load_proj_matrix(const GLfloat *matrix)

@@ -86,6 +86,7 @@ QGLAPI void (APIENTRYP qglEnableClientState)(GLenum cap);
 QGLAPI void (APIENTRYP qglLoadIdentity)(void);
 QGLAPI void (APIENTRYP qglLoadMatrixf)(const GLfloat *m);
 QGLAPI void (APIENTRYP qglMatrixMode)(GLenum mode);
+QGLAPI void (APIENTRYP qglMultMatrixf)(const GLfloat *m);
 QGLAPI void (APIENTRYP qglScalef)(GLfloat x, GLfloat y, GLfloat z);
 QGLAPI void (APIENTRYP qglShadeModel)(GLenum mode);
 QGLAPI void (APIENTRYP qglTexCoordPointer)(GLint size, GLenum type, GLsizei stride, const GLvoid *ptr);

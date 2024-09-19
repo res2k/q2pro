@@ -34,11 +34,13 @@ env:
     -Dwindows-crash-dumps=disabled
     -Dwrap_mode=nofallback
     -Dx11=disabled
+    --force-fallback-for=fmt,jsoncpp
 
   MESON_ARGS_FREEBSD: >-
     -Dicmp-errors=disabled
     -Dwindows-crash-dumps=disabled
     -Dwrap_mode=nofallback
+    --force-fallback-for=fmt,jsoncpp
 
 jobs:
   mingw:

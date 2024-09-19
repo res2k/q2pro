@@ -115,7 +115,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        cc: [gcc, clang]
+        include:
+          - cc: gcc
+            cxx: g++
+          - cc: clang
+            cxx: clang++
     steps:
       - uses: actions/checkout@v4
         with:
@@ -136,6 +140,7 @@ jobs:
           meson install -C builddir --tags runtime --destdir ${{ github.workspace }}/installdir
         env:
           CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
 
       - name: Setup variables
         uses: actions/github-script@v6

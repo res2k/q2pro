@@ -1907,6 +1907,24 @@ void MSG_ReadPos(vec3_t pos, msgEsFlags_t flags)
 }
 
 #if USE_CLIENT
+static inline void MSG_ReadPosP(vec3_t pos, msgPsFlags_t flags)
+{
+    if (flags & MSG_PS_RERELEASE) {
+        pos[0] = MSG_ReadFloat();
+        pos[1] = MSG_ReadFloat();
+        pos[2] = MSG_ReadFloat();
+    } else if (flags & MSG_PS_EXTENSIONS_2) {
+        VectorClear(pos);
+        MSG_ReadDeltaCoord(&pos[0]);
+        MSG_ReadDeltaCoord(&pos[1]);
+        MSG_ReadDeltaCoord(&pos[2]);
+    } else {
+        pos[0] = SHORT2COORD(MSG_ReadShort());
+        pos[1] = SHORT2COORD(MSG_ReadShort());
+        pos[2] = SHORT2COORD(MSG_ReadShort());
+    }
+}
+
 void MSG_ReadDir(vec3_t dir)
 {
     int     b;
@@ -2309,11 +2327,11 @@ void MSG_ParseDeltaPlayerstate_Default(const player_state_t *from,
     }
 
     if (flags & PS_M_ORIGIN) {
-        MSG_ReadPos(to->pmove.origin, psflags);
+        MSG_ReadPosP(to->pmove.origin, psflags);
     }
 
     if (flags & PS_M_VELOCITY) {
-        MSG_ReadPos(to->pmove.velocity, psflags);
+        MSG_ReadPosP(to->pmove.velocity, psflags);
     }
 
     if (flags & PS_M_TIME) {

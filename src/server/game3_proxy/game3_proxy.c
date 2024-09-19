@@ -25,7 +25,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/game3_convert.h"
 
 #include <assert.h>
+#if HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 #include <stdlib.h>
 
 static const cs_remap_t *game_csr;

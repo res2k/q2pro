@@ -627,6 +627,7 @@ if not win32
   have_backtrace = cc.has_header('execinfo.h') and cc.has_function('backtrace')
   config.set10('HAVE_BACKTRACE',  have_backtrace)
 endif
+config.set10('HAVE_MALLOC_H', cc.has_header('malloc.h'))
 # new game API flag is *always on* for engine,
 # and can be enabled here for game as well
 if get_option('game-new-api')

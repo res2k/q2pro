@@ -24,7 +24,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/game3_pmove.h"
 #include "common/utils.h"
 
+#if HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 
 /* Some definitions copied from client.h
  * This file is deliberately not included to make sure only functions from

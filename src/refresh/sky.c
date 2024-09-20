@@ -341,7 +341,7 @@ void R_DrawSkyBox(void)
         GL_BindTexture(TMU_TEXTURE,  gl_static.classic_sky->texnum);
         GL_BindTexture(TMU_LIGHTMAP, gl_static.classic_sky->texnum2);
     } else {
-        GL_StateBits(GLS_SKY_FOG);
+        GL_StateBits(GLS_TEXTURE_REPLACE | GLS_SKY_FOG);
         GL_ArrayBits(GLA_VERTEX | GLA_TC);
     }
 

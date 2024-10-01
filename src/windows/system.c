@@ -1231,8 +1231,7 @@ static bool Sys_ParseLibraryVDF(const char **file_contents, char *out_dir, size_
         if (!*key || !strcmp(key, "}")) {
             return false;
         } else if (!strcmp(key, "path")) {
-            char *value = COM_ParseEx(file_contents, PARSE_FLAG_ESCAPE, NULL, 0);
-            Q_strlcpy(library_path, value, sizeof(library_path));
+            COM_ParseToken(file_contents, library_path, sizeof(library_path), PARSE_FLAG_ESCAPE);
         } else if (!strcmp(key, "apps")) {
             if (Sys_ParseAppsList(file_contents)) {
                 Q_strlcat(library_path, "\\steamapps\\common\\Quake 2", sizeof(library_path));

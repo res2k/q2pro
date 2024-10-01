@@ -329,9 +329,9 @@ void Loc_ReloadFile(void)
     while (true) {
         loc_string_t loc; 
 
-        char *key = COM_ParseEx(&parse_buf, 0, loc.key, sizeof(loc.key));
+        COM_ParseToken(&parse_buf, loc.key, sizeof(loc.key), PARSE_FLAG_NONE);
 
-        if (!*key) {
+        if (!*loc.key) {
             break;
         }
 
@@ -357,7 +357,7 @@ void Loc_ReloadFile(void)
             break;
         }
 
-        COM_ParseEx(&parse_buf, PARSE_FLAG_ESCAPE, loc.format, sizeof(loc.format));
+        COM_ParseToken(&parse_buf, loc.format, sizeof(loc.format), PARSE_FLAG_ESCAPE);
 
         // skip platform specifiers
         if (has_platform_spec) {
@@ -390,7 +390,7 @@ void Loc_ReloadFile(void)
         continue;
 
 line_error:
-        Com_WPrintf("%s (%s): %s\n", loc_file->string, key, Com_GetLastError());
+        Com_WPrintf("%s (%s): %s\n", loc_file->string, loc.key, Com_GetLastError());
     }
 
 	FS_FreeFile(buffer);

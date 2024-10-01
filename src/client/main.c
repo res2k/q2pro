@@ -870,7 +870,7 @@ static void CL_ParseStatusResponse(serverStatus_t *status, const char *string)
         player = &status->players[status->numPlayers];
         player->score = Q_atoi(COM_Parse(&s));
         player->ping = Q_atoi(COM_Parse(&s));
-        Q_strlcpy(player->name, COM_Parse(&s), sizeof(player->name));
+        COM_ParseToken(&s, player->name, sizeof(player->name), PARSE_FLAG_NONE);
         if (!s)
             break;
         status->numPlayers++;

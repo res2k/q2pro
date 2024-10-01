@@ -637,16 +637,21 @@ bool COM_IsUint(const char *s);
 bool COM_IsPath(const char *s);
 bool COM_IsWhite(const char *s);
 
-// flags for COM_ParseEx
+// flags for COM_ParseToken
 
 // parse as UTF8
 // transform escape sequences into their
 // string counterparts (\\n becomes \n, \\ becomes \, etc)
 #define PARSE_FLAG_ESCAPE    BIT(0)
 
-char *COM_ParseEx(const char **data_p, int32_t flags, char *output, size_t output_length);
+#define PARSE_FLAG_NONE      0
 
-#define COM_Parse(data_p) COM_ParseEx(data_p, 0, NULL, 0)
+extern unsigned com_linenum;
+
+#define COM_SkipToken(data_p) COM_ParseToken(data_p, NULL, 0, PARSE_FLAG_NONE)
+size_t COM_ParseToken(const char **data_p, char *buffer, size_t size, int flags);
+char *COM_ParseEx(const char **data_p, int flags);
+#define COM_Parse(p) COM_ParseEx(p, PARSE_FLAG_NONE)
 
 // data is an in/out parm, returns a parsed out token
 size_t COM_Compress(char *data);

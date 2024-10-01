@@ -460,8 +460,29 @@ char *vtos(const vec3_t v)
     return str[index];
 }
 
-static char     com_token[4][MAX_TOKEN_CHARS];
-static int      com_tokidx;
+unsigned com_linenum;
+
+/*
+=============
+COM_ParseEscapeSequence
+=============
+*/
+static bool COM_ParseEscapeSequence(char **data_p, int *c)
+{
+    *c = *(*data_p)++;
+
+    if (*c == 'n') {
+        *c = '\n';
+    } else if (*c == 't') {
+        *c = '\t';
+    } else if (*c == 'r') {
+        *c = '\r';
+    } else if (*c == '\0') {
+        return false;
+    }
+
+    return true;
+}
 
 /*
 ==============
@@ -471,29 +492,20 @@ Parse a token out of a string.
 Handles C and C++ comments.
 ==============
 */
-char *COM_ParseEx(const char **data_p, int32_t flags, char *output, size_t output_length)
+size_t COM_ParseToken(const char **data_p, char *buffer, size_t size, int flags)
 {
     int         c;
-    int         len;
+    size_t      len;
     const char  *data;
-    
-    if (!output) {
-        output = com_token[com_tokidx];
-        output_length = sizeof(com_token[0]);
-        com_tokidx = (com_tokidx + 1) & 3;
-    }
-
-    Q_assert(output_length);
-        
-    char        *s = output;
 
     data = *data_p;
     len = 0;
-    s[0] = 0;
+    if (size)
+        *buffer = 0;
 
     if (!data) {
         *data_p = NULL;
-        return s;
+        return len;
     }
 
 // skip whitespace
@@ -501,7 +513,10 @@ skipwhite:
     while ((c = *data) <= ' ') {
         if (c == 0) {
             *data_p = NULL;
-            return s;
+            return len;
+        }
+        if (c == '\n') {
+            com_linenum++;
         }
         data++;
     }
@@ -522,6 +537,9 @@ skipwhite:
                 data += 2;
                 break;
             }
+            if (data[0] == '\n') {
+                com_linenum++;
+            }
             data++;
         }
         goto skipwhite;
@@ -537,51 +555,52 @@ skipwhite:
             }
 
             if (c == '\\' && (flags & PARSE_FLAG_ESCAPE)) {
-                c = *data++;
-
-                if (c == 'n') {
-                    c = '\n';
-                } else if (c == 't') {
-                    c = '\t';
-                } else if (c == '\0') {
+                if (!COM_ParseEscapeSequence(&data, &c)) {
                     goto finish;
                 }
             }
-
-            if (len < output_length - 1) {
-                s[len++] = c;
+            if (c == '\n') {
+                com_linenum++;
             }
+            if (len + 1 < size) {
+                *buffer++ = c;
+            }
+            len++;
         }
     }
 
 // parse a regular word
     do {
-
         if (c == '\\' && (flags & PARSE_FLAG_ESCAPE)) {
-            c = *data++;
-
-            if (c == 'n') {
-                c = '\n';
-            } else if (c == 't') {
-                c = '\t';
-            } else if (c == 'r') {
-                c = '\r';
-            } else if (c == '\0') {
+            if (!COM_ParseEscapeSequence(&data, &c)) {
                 break;
             }
         }
 
-        if (len < output_length - 1) {
-            s[len++] = c;
+        if (len + 1 < size) {
+            *buffer++ = c;
         }
+        len++;
         data++;
         c = *data;
     } while (c > 32);
 
 finish:
-    s[len] = 0;
+    if (size)
+        *buffer = 0;
 
     *data_p = data;
+    return len;
+}
+
+char *COM_ParseEx(const char **data_p, int flags)
+{
+    static char     com_token[4][MAX_TOKEN_CHARS];
+    static int      com_tokidx;
+    char            *s = com_token[com_tokidx];
+
+    COM_ParseToken(data_p, s, sizeof(com_token[0]), flags);
+    com_tokidx = (com_tokidx + 1) & 3;
     return s;
 }
 

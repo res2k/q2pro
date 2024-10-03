@@ -828,7 +828,6 @@ void GL_DrawSolidFaces(void);
 void GL_ClearSolidFaces(void);
 
 // gl_debug.c
-void R_ClearDebugLines(void);
 void GL_DrawDebugLines(void);
 void GL_InitDebugDraw(void);
 void GL_ShutdownDebugDraw(void);
@@ -870,12 +869,6 @@ void HQ2x_Init(void);
  * debug.c
  *
  */
-#if USE_DEBUG
 void GL_InitDebugDraw(void);
 void GL_ShutdownDebugDraw(void);
 void GL_DrawDebugLines(void);
-#else
-#define GL_InitDebugDraw()      (void)0
-#define GL_ShutdownDebugDraw()  (void)0
-#define GL_DrawDebugLines()     (void)0
-#endif

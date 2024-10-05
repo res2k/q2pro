@@ -610,11 +610,12 @@ static void CL_ParseServerData(void)
                       cls.serverProtocol, protocol);
         }
         // BIG HACK to let demos from release work with the 3.0x patch!!!
-        if (protocol == PROTOCOL_VERSION_RERELEASE || protocol == PROTOCOL_VERSION_EXTENDED_OLD) {
+        if (protocol == PROTOCOL_VERSION_RERELEASE) {
             // keep protocol as-is
-        } else if (protocol == PROTOCOL_VERSION_EXTENDED) {
+            cls.serverProtocol = protocol;
+        } else if (protocol == PROTOCOL_VERSION_EXTENDED || protocol == PROTOCOL_VERSION_EXTENDED_OLD) {
             cl.csr = cs_remap_q2pro_new;
-            protocol = PROTOCOL_VERSION_DEFAULT;
+            cls.serverProtocol = PROTOCOL_VERSION_DEFAULT;
         } else if (protocol < PROTOCOL_VERSION_OLD || protocol > PROTOCOL_VERSION_DEFAULT) {
             Com_Error(ERR_DROP, "Demo uses unsupported protocol version %d.", protocol);
         } else {

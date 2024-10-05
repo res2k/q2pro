@@ -1416,6 +1416,7 @@ void CL_CalcViewValues(void)
             cl.refdef.vieworg[i] = ops->pmove.origin[i] +
                 lerp * (ps->pmove.origin[i] - ops->pmove.origin[i]);
         }
+        cl.refdef.vieworg[2] += ops->pmove.viewheight;
     }
 
     // if not running a demo or on a locked frame, add the local angle movement

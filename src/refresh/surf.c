@@ -1087,7 +1087,7 @@ void GL_LoadWorld(const char *name)
     if (create_surface_vbo(size)) {
         Com_DPrintf("%s: %zu bytes of vertex data as VBO\n", __func__, size);
     } else {
-        gl_static.world.vertices = Z_TagMalloc(size, TAG_RENDERER);
+        gl_static.world.vertices = R_Malloc(size);
         Com_DPrintf("%s: %zu bytes of vertex data on heap\n", __func__, size);
     }
 

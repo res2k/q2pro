@@ -45,8 +45,10 @@ static cvar_t *map_visibility_patch;
 ===============================================================================
 */
 
-#define ALLOC(size) \
-    Hunk_Alloc(&bsp->hunk, size)
+#define BSP_ALIGN   64
+
+#define BSP_ALLOC(size) \
+    Hunk_Alloc(&bsp->hunk, size, BSP_ALIGN)
 
 #define LOAD(func) \
     static int BSP_Load##func(bsp_t *const bsp, const byte *in, \
@@ -88,7 +90,7 @@ LOAD(Visibility)
     ENSURE(count >= hdrsize, "Too small header");
 
     bsp->numvisibility = count;
-    bsp->vis = ALLOC(count);
+    bsp->vis = BSP_ALLOC(count);
     bsp->vis->numclusters = numclusters;
     bsp->visrowsize = (numclusters + 7) >> 3;
 
@@ -110,7 +112,7 @@ LOAD(Texinfo)
     mtexinfo_t  *out;
 
     bsp->numtexinfo = count;
-    bsp->texinfo = out = ALLOC(sizeof(*out) * count);
+    bsp->texinfo = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
 #if USE_REF
@@ -174,7 +176,7 @@ LOAD(Planes)
     cplane_t    *out;
 
     bsp->numplanes = count;
-    bsp->planes = out = ALLOC(sizeof(*out) * count);
+    bsp->planes = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, in += 4, out++) {
         BSP_Vector(out->normal);
@@ -191,7 +193,7 @@ LOAD(BrushSides)
     mbrushside_t    *out;
 
     bsp->numbrushsides = count;
-    bsp->brushsides = out = ALLOC(sizeof(*out) * count);
+    bsp->brushsides = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         uint32_t planenum = BSP_ExtLong();
@@ -215,7 +217,7 @@ LOAD(Brushes)
     mbrush_t    *out;
 
     bsp->numbrushes = count;
-    bsp->brushes = out = ALLOC(sizeof(*out) * count);
+    bsp->brushes = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         uint32_t firstside = BSP_Long();
@@ -235,7 +237,7 @@ LOAD(LeafBrushes)
     mbrush_t    **out;
 
     bsp->numleafbrushes = count;
-    bsp->leafbrushes = out = ALLOC(sizeof(*out) * count);
+    bsp->leafbrushes = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         uint32_t brushnum = BSP_ExtLong();
@@ -252,7 +254,7 @@ LOAD(Lightmap)
 {
     if (count) {
         bsp->numlightmapbytes = count;
-        bsp->lightmap = ALLOC(count);
+        bsp->lightmap = BSP_ALLOC(count);
         memcpy(bsp->lightmap, in, count);
     }
 
@@ -264,7 +266,7 @@ LOAD(Vertices)
     mvertex_t   *out;
 
     bsp->numvertices = count;
-    bsp->vertices = out = ALLOC(sizeof(*out) * count);
+    bsp->vertices = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++)
         BSP_Vector(out->point);
@@ -277,7 +279,7 @@ LOAD(Edges)
     medge_t     *out;
 
     bsp->numedges = count;
-    bsp->edges = out = ALLOC(sizeof(*out) * count);
+    bsp->edges = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         for (int j = 0; j < 2; j++) {
@@ -295,7 +297,7 @@ LOAD(SurfEdges)
     msurfedge_t *out;
 
     bsp->numsurfedges = count;
-    bsp->surfedges = out = ALLOC(sizeof(*out) * count);
+    bsp->surfedges = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         uint32_t index = BSP_Long();
@@ -315,7 +317,7 @@ LOAD(Faces)
     mface_t     *out;
 
     bsp->numfaces = count;
-    bsp->faces = out = ALLOC(sizeof(*out) * count);
+    bsp->faces = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0, j; i < count; i++, out++) {
         uint32_t planenum = BSP_ExtLong();
@@ -360,7 +362,7 @@ LOAD(LeafFaces)
     mface_t     **out;
 
     bsp->numleaffaces = count;
-    bsp->leaffaces = out = ALLOC(sizeof(*out) * count);
+    bsp->leaffaces = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         uint32_t facenum = BSP_ExtLong();
@@ -379,7 +381,7 @@ LOAD(Leafs)
     ENSURE(count > 0, "Map with no leafs");
 
     bsp->numleafs = count;
-    bsp->leafs = out = ALLOC(sizeof(*out) * count);
+    bsp->leafs = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         out->plane = NULL;
@@ -436,7 +438,7 @@ LOAD(Nodes)
     ENSURE(count > 0, "Map with no nodes");
 
     bsp->numnodes = count;
-    bsp->nodes = out = ALLOC(sizeof(*out) * count);
+    bsp->nodes = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         uint32_t planenum = BSP_Long();
@@ -482,7 +484,7 @@ LOAD(SubModels)
     ENSURE(count <= MAX_MODELS - 2, "Too many models");
 
     bsp->nummodels = count;
-    bsp->models = out = ALLOC(sizeof(*out) * count);
+    bsp->models = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         // spread the mins / maxs by a pixel
@@ -526,7 +528,7 @@ LOAD(AreaPortals)
     mareaportal_t   *out;
 
     bsp->numareaportals = count;
-    bsp->areaportals = out = ALLOC(sizeof(*out) * count);
+    bsp->areaportals = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         out->portalnum = BSP_Long();
@@ -543,7 +545,7 @@ LOAD(Areas)
     ENSURE(count <= MAX_MAP_AREAS, "Too many areas");
 
     bsp->numareas = count;
-    bsp->areas = out = ALLOC(sizeof(*out) * count);
+    bsp->areas = out = BSP_ALLOC(sizeof(*out) * count);
 
     for (int i = 0; i < count; i++, out++) {
         uint32_t numareaportals = BSP_Long();
@@ -560,7 +562,7 @@ LOAD(Areas)
 LOAD(EntString)
 {
     bsp->numentitychars = count;
-    bsp->entitystring = ALLOC(count + 1);
+    bsp->entitystring = BSP_ALLOC(count + 1);
     memcpy(bsp->entitystring, in, count);
     bsp->entitystring[count] = 0;
 
@@ -1049,9 +1051,9 @@ static size_t BSP_ParseLightgridHeader(bsp_t *bsp, const byte *in, size_t filele
     }
 
     return
-        Q_ALIGN(sizeof(grid->nodes[0]) * grid->numnodes, 64) +
-        Q_ALIGN(sizeof(grid->leafs[0]) * grid->numleafs, 64) +
-        Q_ALIGN(sizeof(grid->samples[0]) * grid->numsamples * grid->numstyles, 64);
+        Q_ALIGN(sizeof(grid->nodes[0]) * grid->numnodes, BSP_ALIGN) +
+        Q_ALIGN(sizeof(grid->leafs[0]) * grid->numleafs, BSP_ALIGN) +
+        Q_ALIGN(sizeof(grid->samples[0]) * grid->numsamples * grid->numstyles, BSP_ALIGN);
 }
 
 static bool BSP_ValidateLightgrid_r(const lightgrid_t *grid, uint32_t nodenum)
@@ -1103,7 +1105,7 @@ static void BSP_ParseLightgrid(bsp_t *bsp, const byte *in, size_t filelen)
 
     SZ_InitRead(&s, in, filelen);
 
-    grid->nodes = ALLOC(sizeof(grid->nodes[0]) * grid->numnodes);
+    grid->nodes = BSP_ALLOC(sizeof(grid->nodes[0]) * grid->numnodes);
 
     // load children first
     s.readcount = 45;
@@ -1128,11 +1130,11 @@ static void BSP_ParseLightgrid(bsp_t *bsp, const byte *in, size_t filelen)
         s.readcount += 32;
     }
 
-    grid->leafs = ALLOC(sizeof(grid->leafs[0]) * grid->numleafs);
+    grid->leafs = BSP_ALLOC(sizeof(grid->leafs[0]) * grid->numleafs);
 
     // init samples to fully occluded
     size = sizeof(grid->samples[0]) * grid->numsamples * grid->numstyles;
-    grid->samples = sample = memset(ALLOC(size), 255, size);
+    grid->samples = sample = memset(BSP_ALLOC(size), 255, size);
 
     remaining = grid->numsamples;
     s.readcount += 4;
@@ -1377,7 +1379,7 @@ int BSP_Load(const char *name, bsp_t **bsp_p)
             count++;
 
         // round to cacheline
-        memsize += Q_ALIGN(count * info->memsize, 64);
+        memsize += Q_ALIGN(count * info->memsize, BSP_ALIGN);
         maxpos = max(maxpos, ofs + len);
     }
 

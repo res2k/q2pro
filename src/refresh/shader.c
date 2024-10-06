@@ -26,9 +26,6 @@ cvar_t *gl_per_pixel_lighting;
 #define GLSL(x)     SZ_Write(buf, CONST_STR_LEN(#x "\n"));
 #define GLSF(x)     SZ_Write(buf, CONST_STR_LEN(x))
 
-static void upload_u_block(void);
-static void upload_dlight_block(void);
-
 static void write_header(sizebuf_t *buf)
 {
     if (gl_config.ver_es) {
@@ -485,16 +482,13 @@ static void shader_state_bits(glStateBits_t bits)
     if (diff & GLS_SHADER_MASK)
         shader_use_program(bits & GLS_SHADER_MASK);
 
-    if (diff & GLS_UBLOCK_MASK) {
-        if (bits & GLS_SCROLL_ENABLE) {
-            GL_ScrollPos(gls.u_block.scroll, bits);
-        }
-
-        upload_u_block();
+    if (diff & GLS_SCROLL_MASK && bits & GLS_SCROLL_ENABLE) {
+        GL_ScrollPos(gls.u_block.scroll, bits);
+        gls.u_block_dirtybits |= GLU_BLOCK;
     }
 
     if (diff & GLS_DYNAMIC_LIGHTS) {
-        upload_dlight_block();
+        gls.u_block_dirtybits |= GLU_DLIGHT;
     }
 }
 
@@ -535,19 +529,20 @@ static void shader_color(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
     qglVertexAttrib4f(VERT_ATTR_COLOR, r, g, b, a);
 }
 
-static void upload_u_block(void)
+static void shader_load_uniforms(void)
 {
-    qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_MAIN]);
-    qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(gls.u_block), &gls.u_block);
-    c.uniformUploads++;
+    if (gls.u_block_dirtybits & GLU_BLOCK) {
+        qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_MAIN]);
+        qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(gls.u_block), &gls.u_block);
+        c.uniformUploads++;
+    }
+    if (gls.u_block_dirtybits & GLU_DLIGHT) {
+        qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_DLIGHTS]);
+        qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(gls.u_dlights.lights[0]) * gls.u_block.num_dlights, &gls.u_dlights);
+        c.uniformUploads++;
+    }
 }
 
-static void upload_dlight_block(void)
-{
-    qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_DLIGHTS]);
-    qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(gls.u_dlights.lights[0]) * gls.u_block.num_dlights, &gls.u_dlights);
-    c.uniformUploads++;
-}
 
 static void shader_load_view_matrix(const GLfloat *model, const GLfloat *view)
 {
@@ -560,13 +555,13 @@ static void shader_load_view_matrix(const GLfloat *model, const GLfloat *view)
     
     memcpy(gls.u_block.model, model, sizeof(gls.u_block.model));
     memcpy(gls.u_block.view, view, sizeof(gls.u_block.view));
-    upload_u_block();
+    gls.u_block_dirtybits |= GLU_BLOCK;
 }
 
 static void shader_load_proj_matrix(const GLfloat *matrix)
 {
     memcpy(gls.u_block.proj, matrix, sizeof(gls.u_block.proj));
-    upload_u_block();
+    gls.u_block_dirtybits |= GLU_BLOCK;
 }
 
 static void shader_setup_2d(void)
@@ -710,6 +705,7 @@ const glbackend_t backend_shader = {
 
     .load_proj_matrix = shader_load_proj_matrix,
     .load_view_matrix = shader_load_view_matrix,
+    .load_uniforms = shader_load_uniforms,
 
     .state_bits = shader_state_bits,
     .array_bits = shader_array_bits,

@@ -582,6 +582,11 @@ typedef struct {
     glDlight_t     lights[MAX_DLIGHTS];
 } glUniformDlights_t;
 
+typedef enum {
+    GLU_BLOCK  = BIT(0),
+    GLU_DLIGHT = BIT(1)
+} glUniformBlockDirtyBits_t;
+
 typedef struct {
     glTmu_t             client_tmu;
     glTmu_t             server_tmu;
@@ -594,6 +599,7 @@ typedef struct {
     const GLfloat      *currentmodelmatrix;
     glUniformBlock_t    u_block;
     glUniformDlights_t  u_dlights;
+    glUniformBlockDirtyBits_t   u_block_dirtybits;
 } glState_t;
 
 typedef struct glprogram_s {
@@ -624,6 +630,7 @@ typedef struct {
 
     void (*load_proj_matrix)(const GLfloat *matrix);
     void (*load_view_matrix)(const GLfloat *model, const GLfloat *view);
+    void (*load_uniforms)(void);
 
     void (*state_bits)(glStateBits_t bits);
     void (*array_bits)(glArrayBits_t bits);
@@ -682,6 +689,14 @@ static inline void GL_LoadMatrix(const GLfloat *model, const GLfloat *view)
     if (gls.currentmodelmatrix != model ||
         gls.currentviewmatrix != view) {
         GL_ForceMatrix(model, view);
+    }
+}
+
+static inline void GL_LoadUniforms(void)
+{
+    if (gls.u_block_dirtybits && gl_backend->load_uniforms) {
+        gl_backend->load_uniforms();
+        gls.u_block_dirtybits = 0;
     }
 }
 

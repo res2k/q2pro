@@ -480,6 +480,7 @@ void GL_DrawDebugLines(void)
         return;
 
     GL_LoadMatrix(NULL, glr.viewmatrix);
+    GL_LoadUniforms();
     GL_BindTexture(TMU_TEXTURE, TEXNUM_WHITE);
     GL_BindArrays(VA_NULLMODEL);
     GL_ArrayBits(GLA_VERTEX | GLA_COLOR);

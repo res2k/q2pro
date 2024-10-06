@@ -742,6 +742,7 @@ typedef enum {
 
 void GL_ForceTexture(glTmu_t tmu, GLuint texnum);
 void GL_BindTexture(glTmu_t tmu, GLuint texnum);
+void GL_DeleteBuffer(GLuint buffer);
 void GL_CommonStateBits(glStateBits_t bits);
 void GL_ScrollPos(vec2_t scroll, glStateBits_t bits);
 void GL_DrawOutlines(GLsizei count, const glIndex_t *indices, bool indexed);

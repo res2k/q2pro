@@ -993,17 +993,11 @@ void GL_FreeWorld(void)
 
     BSP_Free(gl_static.world.cache);
     gl_static.classic_sky = NULL;
+    Z_Free(gl_static.world.vertices);
+    GL_DeleteBuffer(gl_static.world.buffer);
 
-    if (gl_static.world.vertices)
-        Z_Free(gl_static.world.vertices);
-    else if (qglDeleteBuffers)
-        qglDeleteBuffers(1, &gl_static.world.buffer);
-
-    // invalidate bindings
     if (gls.currentva == VA_3D)
         gls.currentva = VA_NONE;
-    if (gls.currentbuffer[0] == gl_static.world.buffer)
-        gls.currentbuffer[0] = 0;
 
     memset(&gl_static.world, 0, sizeof(gl_static.world));
 }

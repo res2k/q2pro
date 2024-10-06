@@ -294,6 +294,7 @@ static const glsection_t sections[] = {
         // ensure full hardware support, including mipmaps.
         .caps = QGL_CAP_TEXTURE_MAX_LEVEL | QGL_CAP_TEXTURE_NON_POWER_OF_TWO,
         .functions = (const glfunction_t []) {
+            QGL_FN(BindBufferBase),
             QGL_FN(BindVertexArray),
             QGL_FN(DeleteVertexArrays),
             QGL_FN(GenVertexArrays),
@@ -310,7 +311,6 @@ static const glsection_t sections[] = {
         .ver_es = QGL_VER(3, 0),
         .caps = QGL_CAP_SHADER,
         .functions = (const glfunction_t []) {
-            QGL_FN(BindBufferBase),
             QGL_FN(GetActiveUniformBlockiv),
             QGL_FN(GetUniformBlockIndex),
             QGL_FN(UniformBlockBinding),

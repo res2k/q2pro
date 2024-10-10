@@ -1099,22 +1099,25 @@ void SV_InitGameProgs(void)
     void* entry_ex = Sys_GetProcAddress(game_library, "GetGameAPIEx");
 
     if (ge->apiversion != GAME_API_VERSION) {
-        svs.is_game_rerelease = false;
         if (ge->apiversion == GAME3_API_VERSION_OLD || ge->apiversion == GAME3_API_VERSION_NEW) {
             Com_DPrintf("... using proxy game\n");
+            if (ge->apiversion == GAME3_API_VERSION_NEW)
+                svs.game_type = Q2PROTO_GAME_Q2PRO_EXTENDED_V2;
+            else
+                svs.game_type = Q2PROTO_GAME_VANILLA; // may also be Q2PROTO_GAME_Q2PRO_EXTENDED, we'll know after checking g_features
             ge = GetGame3Proxy(&import, entry, entry_ex);
         } else {
             Com_Error(ERR_DROP, "...but expected %d\n", GAME_API_VERSION);
         }
     } else {
-        svs.is_game_rerelease = true;
+        svs.game_type = Q2PROTO_GAME_RERELEASE;
         Cvar_SetInteger(g_features, GMF_PROTOCOL_EXTENSIONS | GMF_ENHANCED_SAVEGAMES | GMF_PROPERINUSE | GMF_WANT_ALL_DISCONNECTS, FROM_CODE);
     }
 
     // initialize
     /* Note: Those functions may already call configstring(). They also decide the features...
      * So start with an extended csr, and possible choose a smaller one later. */
-    if (svs.is_game_rerelease)
+    if (svs.game_type == Q2PROTO_GAME_RERELEASE)
         svs.csr = cs_remap_rerelease;
     else
         svs.csr = cs_remap_q2pro_new;
@@ -1124,8 +1127,12 @@ void SV_InitGameProgs(void)
     g_restart_fs = (game_q2pro_restart_filesystem_t *)ge->GetExtension(game_q2pro_restart_filesystem_ext);
     g_customize_entity = (game_q2pro_customize_entity_t *)ge->GetExtension(game_q2pro_customize_entity_ext);
 
-    if (!svs.is_game_rerelease && (g_features->integer & GMF_PROTOCOL_EXTENSIONS) == 0)
-        svs.csr = cs_remap_old;
+    if (svs.game_type == Q2PROTO_GAME_VANILLA) {
+        if ((g_features->integer & GMF_PROTOCOL_EXTENSIONS) != 0)
+            svs.game_type = Q2PROTO_GAME_Q2PRO_EXTENDED;
+        else
+            svs.csr = cs_remap_old;
+    }
 
     // sanitize edict_size
     unsigned min_size = sizeof(edict_t);

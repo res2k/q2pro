@@ -300,7 +300,7 @@ static int q2pro_protocol_flags(void)
     if (sv_client->esFlags & MSG_ES_EXTENSIONS_2)
         flags |= Q2PRO_PF_EXTENSIONS_2;
 
-    if (!svs.is_game_rerelease)
+    if (svs.game_type != Q2PROTO_GAME_RERELEASE)
         flags |= Q2PRO_PF_GAME3_COMPAT;
 
     return flags;

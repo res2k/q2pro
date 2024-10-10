@@ -48,6 +48,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "server/mvd/client.h"
 #endif
 
+#include "q2proto/q2proto_gametype.h"
+
 #if USE_ZLIB
 #include <zlib.h>
 #endif
@@ -475,7 +477,7 @@ typedef struct {
 #endif
 
     cs_remap_t      csr;
-    bool            is_game_rerelease;
+    q2proto_game_type_t game_type;
     pmoveParams_t   pmp;
 
     unsigned        last_heartbeat;

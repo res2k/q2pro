@@ -457,10 +457,13 @@ static void CL_Record_f(void)
         MSG_WriteShort(PROTOCOL_VERSION_Q2PRO_CURRENT);
         MSG_WriteByte(cl.serverstate);
         int protocol_flags = 0;
-        if (cl.csr.extended)
-            protocol_flags |= Q2PRO_PF_EXTENSIONS;
-        if (!cl.is_rerelease_game)
+        if (cl.game_type != Q2PROTO_GAME_RERELEASE) {
+            if (cl.game_type >= Q2PROTO_GAME_Q2PRO_EXTENDED)
+                protocol_flags |= Q2PRO_PF_EXTENSIONS;
+            if (cl.game_type >= Q2PROTO_GAME_Q2PRO_EXTENDED_V2)
+                protocol_flags |= Q2PRO_PF_EXTENSIONS_2;
             protocol_flags |= Q2PRO_PF_GAME3_COMPAT;
+        }
         MSG_WriteShort(protocol_flags);
         int rate = cl.frametime_inv / 0.001f;
         MSG_WriteByte(rate);

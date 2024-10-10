@@ -3233,7 +3233,7 @@ void CL_AddHitMarker(void)
 
 static void CL_UpdateHitMarkers(void)
 {
-    if (!cl.is_rerelease_game || !cl_hit_markers->integer)
+    if (cl.game_type != Q2PROTO_GAME_RERELEASE || !cl_hit_markers->integer)
         return;
 
     if (cgame->GetHitMarkerDamage(&cl.frame.ps))

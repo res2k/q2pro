@@ -52,6 +52,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "client/ui.h"
 #include "client/video.h"
 
+#include "q2proto/q2proto_gametype.h"
+
 #if USE_ZLIB
 #include <zlib.h>
 #endif
@@ -342,7 +344,7 @@ typedef struct {
     configstring_t  baseconfigstrings[MAX_CONFIGSTRINGS];
     configstring_t  configstrings[MAX_CONFIGSTRINGS];
     cs_remap_t      csr;
-    bool            is_rerelease_game;
+    q2proto_game_type_t game_type;
 
     char        mapname[MAX_QPATH]; // short format - q2dm1, etc
 

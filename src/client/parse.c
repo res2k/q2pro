@@ -576,7 +576,16 @@ static void read_q2pro_protocol_flags(void)
             cl.psFlags |= MSG_PS_MOREBITS;
         PmoveEnableExt(&cl.pmp);
     }
-    cl.is_rerelease_game = (cls.serverProtocol == PROTOCOL_VERSION_RERELEASE) && (i & Q2PRO_PF_GAME3_COMPAT) == 0;
+    if ((cls.serverProtocol == PROTOCOL_VERSION_RERELEASE) && (i & Q2PRO_PF_GAME3_COMPAT) == 0)
+        cl.game_type = Q2PROTO_GAME_RERELEASE;
+    else {
+        if (i & Q2PRO_PF_EXTENSIONS_2)
+            cl.game_type = Q2PROTO_GAME_Q2PRO_EXTENDED_V2;
+        else if (i & Q2PRO_PF_EXTENSIONS)
+            cl.game_type = Q2PROTO_GAME_Q2PRO_EXTENDED;
+        else
+            cl.game_type = Q2PROTO_GAME_VANILLA;
+    }
 }
 
 static void set_server_fps(int value)
@@ -746,7 +755,7 @@ static void CL_ParseServerData(void)
         cinematic = cl.serverstate == ss_pic || cl.serverstate == ss_cinematic;
         // FIXME: The pmove flags shouldn't really matter, as they should be handled by the game/client library...
         read_q2pro_protocol_flags();
-        if (cl.is_rerelease_game)
+        if (cl.game_type == Q2PROTO_GAME_RERELEASE)
             cl.csr = cs_remap_rerelease;
         cl.psFlags |= MSG_PS_RERELEASE | MSG_PS_EXTENSIONS;
         cl.esFlags |= MSG_ES_RERELEASE | CL_ES_EXTENDED_MASK;
@@ -756,7 +765,7 @@ static void CL_ParseServerData(void)
          * non-rerelease games w/ variable FPS (eg OpenFFA) seem to assume
          * certain things still happen at 10Hz.
          * (For one, view weapon looks janky if the divider is 1.)*/
-        if (cl.is_rerelease_game)
+        if (cl.game_type == Q2PROTO_GAME_RERELEASE)
             cl.frametime.div = 1;
 
         cl.pmp.speedmult = 2;
@@ -793,7 +802,7 @@ static void CL_ParseServerData(void)
     }
 
     // Load cgame (after we know all the timings)
-    CG_Load(cl.gamedir, cl.is_rerelease_game);
+    CG_Load(cl.gamedir, cl.game_type == Q2PROTO_GAME_RERELEASE);
     cgame->Init();
 
     if (cinematic) {

@@ -388,7 +388,6 @@ Resend a connect message if the last one has timed out
 */
 void CL_CheckForResend(void)
 {
-    char tail[MAX_QPATH];
     char userinfo[MAX_INFO_STRING];
     int maxmsglen;
 
@@ -449,29 +448,34 @@ void CL_CheckForResend(void)
         maxmsglen = MAX_PACKETLEN_WRITABLE;
     }
 
-    // add protocol dependent stuff
-    switch (cls.serverProtocol) {
-    case PROTOCOL_VERSION_R1Q2:
-        Q_snprintf(tail, sizeof(tail), " %d %d",
-                   maxmsglen, PROTOCOL_VERSION_R1Q2_CURRENT);
-        cls.quakePort = net_qport->integer & 0xff;
-        break;
-    case PROTOCOL_VERSION_Q2PRO:
-        Q_snprintf(tail, sizeof(tail), " %d %d %d %d",
-                   maxmsglen, net_chantype->integer, USE_ZLIB,
-                   PROTOCOL_VERSION_Q2PRO_CURRENT);
-        cls.quakePort = net_qport->integer & 0xff;
-        break;
-    default:
-        tail[0] = 0;
-        cls.quakePort = net_qport->integer;
-        break;
-    }
-
     Cvar_BitInfo(userinfo, CVAR_USERINFO);
+
+    q2proto_connect_t connect;
+    memset(&connect, 0, sizeof(connect));
+    connect.protocol = q2proto_protocol_from_netver(cls.serverProtocol);
+    connect.qport = net_qport->integer;
+    connect.challenge = cls.challenge;
+    connect.userinfo = q2proto_make_string(userinfo);
+    connect.packet_length = maxmsglen;
+    connect.q2pro_nctype = net_chantype->integer;
+
+    int err = q2proto_complete_connect(&connect);
+    if (err != Q2P_ERR_SUCCESS)
+        goto fail;
+    cls.quakePort = connect.qport;
+
+    char connect_args[MAX_PACKETLEN_DEFAULT - 16 /* space for command etc */];
+
+    err = q2proto_get_connect_arguments(connect_args, sizeof(connect_args), NULL, &connect);
+    if (err != Q2P_ERR_SUCCESS)
+        goto fail;
+
     Netchan_OutOfBand(NS_CLIENT, &cls.serverAddress,
-                      "connect %i %i %i \"%s\"%s\n", cls.serverProtocol, cls.quakePort,
-                      cls.challenge, userinfo, tail);
+                      "connect %s\n", connect_args);
+    return;
+
+fail:
+    Com_Error(ERR_DISCONNECT, "Could not get connect string (%d)", err);
 }
 
 static void CL_RecentIP_g(genctx_t *ctx)

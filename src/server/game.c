@@ -106,6 +106,9 @@ static void PF_Unicast(edict_t *ent, bool reliable, uint32_t dupe_key)
         goto clear;
     }
 
+    if (msg_write.overflowed)
+        Com_Error(ERR_DROP, "%s: message buffer overflowed", __func__);
+
     clientNum = NUM_FOR_EDICT(ent) - 1;
     if (clientNum < 0 || clientNum >= sv_maxclients->integer) {
         Com_WPrintf("%s to a non-client %d\n", __func__, clientNum);

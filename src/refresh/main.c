@@ -1117,8 +1117,6 @@ bool R_Init(bool total)
 
     GL_InitTables();
 
-    GL_InitDebugDraw();
-
     GL_PostInit();
 
     GL_ShowErrors(__func__);

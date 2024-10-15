@@ -3799,7 +3799,8 @@ static void FS_FindBaseDir(void)
     //static const char *defgame = "baseq2";
 
     // Don't try to detect the base directory if it was already explicitly specified
-    bool detect_base_dir = !Cvar_Exists("basedir", false) && !Cvar_Exists("libdir", false);
+    bool detect_base_dir = !strcmp(sys_basedir->string, sys_basedir->default_string) &&
+                           !strcmp(sys_libdir->string, sys_libdir->default_string);
 
     if (detect_base_dir) {
         // find Steam installation dir first

@@ -1204,13 +1204,17 @@ void SCR_UnregisterStat(const char *name)
     Com_EPrintf("can't unregister missing stat \"%s\"\n", name);
 }
 
-static void SCR_SetActive(const char *name)
+static void SCR_ToggleStat(const char *name)
 {
     stat_reg_t *rover = stat_head;
 
     while (rover) {
         if (!strcmp(rover->name, name)) {
-            stat_active = rover;
+            if (stat_active == rover) {
+                stat_active = NULL;
+            } else {
+                stat_active = rover;
+            }
             return;
         }
 
@@ -1272,7 +1276,18 @@ static void SCR_Stat_c(genctx_t *ctx, int argnum)
 
 static void SCR_Stat_f(void)
 {
-    SCR_SetActive(Cmd_Argv(1));
+    if (Cmd_Argc() == 2) {
+        SCR_ToggleStat(Cmd_Argv(1));
+    } else {
+        Com_Printf("Available stats:\n");
+
+        stat_reg_t *rover = stat_head;
+
+        while (rover) {
+            Com_Printf(" * %s\n", rover->name);
+            rover = rover->next;
+        }
+    }
 }
 
 static const cmdreg_t scr_cmds[] = {

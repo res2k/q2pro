@@ -29,7 +29,7 @@ MISC
 
 char sv_outputbuf[SV_OUTPUTBUF_LENGTH];
 
-void SV_FlushRedirect(int redirected, char *outputbuf, size_t len)
+void SV_FlushRedirect(int redirected, const char *outputbuf, size_t len)
 {
     byte    buffer[MAX_PACKETLEN_DEFAULT];
 
@@ -255,27 +255,25 @@ MULTICAST_PHS    send to clients potentially hearable from org
 */
 void SV_Multicast(const vec3_t origin, multicast_t to, bool reliable)
 {
-    client_t    *client;
-    byte        mask[VIS_MAX_BYTES];
-    mleaf_t     *leaf1 = NULL, *leaf2;
-    int         leafnum q_unused = 0;
-    int         flags = 0;
+    client_t        *client;
+    byte            mask[VIS_MAX_BYTES];
+    const mleaf_t   *leaf1 = NULL;
+    int             flags = 0;
 
-    switch (to) {
-    case MULTICAST_ALL:
-        break;
-    case MULTICAST_PHS:
+    if (to < MULTICAST_ALL || to > MULTICAST_PVS)
+        Com_Error(ERR_DROP, "%s: bad to: %d", __func__, to);
+
+    if (to && !origin)
+        Com_Error(ERR_DROP, "%s: NULL origin", __func__);
+
+    if (!msg_write.cursize) {
+        Com_DPrintf("%s with empty data\n", __func__);
+        return;
+    }
+
+    if (to) {
         leaf1 = CM_PointLeaf(&sv.cm, origin);
-        leafnum = CM_NumLeaf(&sv.cm, leaf1);
-        BSP_ClusterVis(sv.cm.cache, mask, leaf1->cluster, DVIS_PHS);
-        break;
-    case MULTICAST_PVS:
-        leaf1 = CM_PointLeaf(&sv.cm, origin);
-        leafnum = CM_NumLeaf(&sv.cm, leaf1);
-        BSP_ClusterVis(sv.cm.cache, mask, leaf1->cluster, DVIS_PVS);
-        break;
-    default:
-        Com_Error(ERR_DROP, "SV_Multicast: bad to: %i", to);
+        BSP_ClusterVis(sv.cm.cache, mask, leaf1->cluster, MULTICAST_PVS - to);
     }
     if (reliable)
         flags |= MSG_RELIABLE;
@@ -290,8 +288,8 @@ void SV_Multicast(const vec3_t origin, multicast_t to, bool reliable)
             continue;
         }
 
-        if (leaf1) {
-            leaf2 = CM_PointLeaf(&sv.cm, client->edict->s.origin);
+        if (to) {
+            const mleaf_t *leaf2 = CM_PointLeaf(&sv.cm, client->edict->s.origin);
             if (!CM_AreasConnected(&sv.cm, leaf1->area, leaf2->area))
                 continue;
             if (leaf2->cluster == -1)
@@ -304,14 +302,14 @@ void SV_Multicast(const vec3_t origin, multicast_t to, bool reliable)
     }
 
     // add to MVD datagram
-    SV_MvdMulticast(leafnum, to, reliable);
+    SV_MvdMulticast(leaf1, to, flags & MSG_RELIABLE);
 
     // clear the buffer
     SZ_Clear(&msg_write);
 }
 
 #if USE_ZLIB
-static bool can_auto_compress(client_t *client)
+static bool can_auto_compress(const client_t *client)
 {
     if (!client->has_zlib)
         return false;
@@ -323,7 +321,7 @@ static bool can_auto_compress(client_t *client)
     return true;
 }
 
-static int compress_message(client_t *client)
+static int compress_message(const client_t *client)
 {
     int     ret, len;
     byte    *hdr;
@@ -492,30 +490,37 @@ overflowed:
 }
 
 // check if this entity is present in current client frame
-static bool check_entity(client_t *client, int entnum)
+static bool check_entity(const client_t *client, int entnum)
 {
-    client_frame_t *frame;
-    int i, j;
+    const client_frame_t *frame;
+    int left, right;
 
     frame = &client->frames[client->framenum & UPDATE_MASK];
 
-    for (i = 0; i < frame->num_entities; i++) {
-        j = (frame->first_entity + i) % svs.num_entities;
-        if (svs.entities[j].number == entnum) {
+    left = 0;
+    right = frame->num_entities - 1;
+    while (left <= right) {
+        int i, j;
+
+        i = (left + right) / 2;
+        j = (frame->first_entity + i) & (client->num_entities - 1);
+        j = client->entities[j].number;
+        if (j < entnum)
+            left = i + 1;
+        else if (j > entnum)
+            right = i - 1;
+        else
             return true;
-        }
     }
 
     return false;
 }
 
-// sounds reliative to entities are handled specially
-static void emit_snd(client_t *client, message_packet_t *msg)
+// sounds relative to entities are handled specially
+static void emit_snd(const client_t *client, const message_packet_t *msg)
 {
-    int flags, entnum;
-
-    entnum = msg->sendchan >> 3;
-    flags = msg->flags;
+    int entnum = msg->sendchan >> 3;
+    int flags = msg->flags;
 
     // check if position needs to be explicitly sent
     if (!(flags & SND_POS) && !check_entity(client, entnum)) {
@@ -540,9 +545,8 @@ static void emit_snd(client_t *client, message_packet_t *msg)
 
     MSG_WriteShort(msg->sendchan);
 
-    if (flags & SND_POS) {
-        MSG_WritePos(msg->pos, true);
-    }
+    if (flags & SND_POS)
+        MSG_WritePos(msg->pos);
 }
 
 static inline void write_snd(client_t *client, message_packet_t *msg, unsigned maxsize)
@@ -569,10 +573,10 @@ static inline void write_unreliables(client_t *client, unsigned maxsize)
     message_packet_t    *msg, *next;
 
     FOR_EACH_MSG_SAFE(&client->msg_unreliable_list) {
-        if (msg->cursize) {
-            write_msg(client, msg, maxsize);
-        } else {
+        if (msg->cursize == SOUND_PACKET) {
             write_snd(client, msg, maxsize);
+        } else {
+            write_msg(client, msg, maxsize);
         }
     }
 }
@@ -644,10 +648,10 @@ static void repack_unreliables(client_t *client, unsigned maxsize)
 
     // temp entities first
     FOR_EACH_MSG_SAFE(&client->msg_unreliable_list) {
-        if (!msg->cursize || msg->data[0] != svc_temp_entity) {
+        if (msg->cursize == SOUND_PACKET || msg->data[0] != svc_temp_entity) {
             continue;
         }
-        // ignore some low-priority effects, these checks come from r1q2
+        // ignore some low-priority effects, these checks come from R1Q2
         if (msg->data[1] == TE_BLOOD || msg->data[1] == TE_SPLASH ||
             msg->data[1] == TE_GUNSHOT || msg->data[1] == TE_BULLET_SPARKS ||
             msg->data[1] == TE_SHOTGUN) {
@@ -662,7 +666,7 @@ static void repack_unreliables(client_t *client, unsigned maxsize)
 
     // then entity sounds
     FOR_EACH_MSG_SAFE(&client->msg_unreliable_list) {
-        if (!msg->cursize) {
+        if (msg->cursize == SOUND_PACKET) {
             write_snd(client, msg, maxsize);
         }
     }
@@ -673,7 +677,7 @@ static void repack_unreliables(client_t *client, unsigned maxsize)
 
     // then positioned sounds
     FOR_EACH_MSG_SAFE(&client->msg_unreliable_list) {
-        if (msg->cursize && msg->data[0] == svc_sound) {
+        if (msg->cursize != SOUND_PACKET && msg->data[0] == svc_sound) {
             write_msg(client, msg, maxsize);
         }
     }
@@ -684,7 +688,7 @@ static void repack_unreliables(client_t *client, unsigned maxsize)
 
     // then everything else left
     FOR_EACH_MSG_SAFE(&client->msg_unreliable_list) {
-        if (msg->cursize) {
+        if (msg->cursize != SOUND_PACKET) {
             write_msg(client, msg, maxsize);
         }
     }
@@ -712,26 +716,9 @@ static void write_datagram_old(client_t *client)
 
     // send over all the relevant entity_state_t
     // and the player_state_t
-    client->WriteFrame(client);
-    if (msg_write.cursize > maxsize) {
-        unsigned size = msg_write.cursize;
-        int len = 0;
-
-        // try to compress if it has a chance to fit
-        // assume it can be compressed by at least 20%
-        if (size - size / 5 < maxsize)
-            len = compress_message(client);
-
+    if (!client->WriteFrame(client, maxsize)) {
+        SV_DPrintf(0, "Frame %d overflowed for %s\n", client->framenum, client->name);
         SZ_Clear(&msg_write);
-
-        if (len > 0 && len <= maxsize) {
-            SV_DPrintf(0, "Frame %d compressed for %s: %u into %d\n",
-                       client->framenum, client->name, size, len);
-            SZ_Write(&msg_write, get_compressed_data(), len);
-        } else {
-            SV_DPrintf(0, "Frame %d overflowed for %s: %u > %u (comp %d)\n",
-                       client->framenum, client->name, size, maxsize, len);
-        }
     }
 
     // now write unreliable messages
@@ -796,9 +783,7 @@ static void write_datagram_new(client_t *client)
 
     // send over all the relevant entity_state_t
     // and the player_state_t
-    client->WriteFrame(client);
-
-    if (msg_write.overflowed) {
+    if (!client->WriteFrame(client, msg_write.maxsize)) {
         // should never really happen
         Com_WPrintf("Frame overflowed for %s\n", client->name);
         SZ_Clear(&msg_write);
@@ -856,7 +841,7 @@ static void finish_frame(client_t *client)
 }
 
 #if USE_DEBUG && USE_FPS
-static void check_key_sync(client_t *client)
+static void check_key_sync(const client_t *client)
 {
     int div = sv.frametime.div / client->framediv;
     int key1 = !(sv.framenum % sv.frametime.div);
@@ -1031,14 +1016,12 @@ calctime:
 
 void SV_InitClientSend(client_t *newcl)
 {
-    int i;
-
     List_Init(&newcl->msg_free_list);
     List_Init(&newcl->msg_unreliable_list);
     List_Init(&newcl->msg_reliable_list);
 
     newcl->msg_pool = SV_Malloc(sizeof(newcl->msg_pool[0]) * MSG_POOLSIZE);
-    for (i = 0; i < MSG_POOLSIZE; i++) {
+    for (int i = 0; i < MSG_POOLSIZE; i++) {
         List_Append(&newcl->msg_free_list, &newcl->msg_pool[i].entry);
     }
 

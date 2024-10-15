@@ -20,14 +20,20 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "shared/game3_shared.h"
 #include "shared/game3.h"
 #include "game3_proxy.h"
-#include "game3_pmove.h"
 #include "shared/base85.h"
+#include "common/game3_pmove.h"
+#include "common/game3_convert.h"
 
 #include <assert.h>
+#if HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 #include <stdlib.h>
 
 static const cs_remap_t *game_csr;
+
+static game3_edict_t* translate_edict_to_game(edict_t* ent);
+static void game_entity_state_to_server(entity_state_t *server_state, const game3_entity_state_t *game_state);
 
 static void sync_single_edict_server_to_game(int index);
 static void sync_edicts_server_to_game(void);
@@ -52,6 +58,35 @@ static const game_q2pro_restart_filesystem_t game_q2pro_restart_filesystem = {
 
     .RestartFilesystem = wrap_RestartFilesystem,
 };
+
+static qboolean wrap_CustomizeEntityToClient(edict_t *client, edict_t *ent, customize_entity_t *temp)
+{
+    game3_customize_entity_t new_temp;
+    qboolean result = game3_export_ex->CustomizeEntityToClient(translate_edict_to_game(client), translate_edict_to_game(ent), &new_temp);
+    if (result)
+    {
+        game_entity_state_to_server(&temp->s, &new_temp.s);
+    }
+    return result;
+}
+
+static qboolean wrap_EntityVisibleToClient(edict_t *client, edict_t *ent)
+{
+    return game3_export_ex->EntityVisibleToClient(translate_edict_to_game(client), translate_edict_to_game(ent));
+}
+
+const char *game_q2pro_customize_entity_ext = "q2pro:customize_entity";
+
+static const game_q2pro_customize_entity_t game_q2pro_customize_entity = {
+    .api_version = 1,
+
+    .CustomizeEntityToClient = wrap_CustomizeEntityToClient,
+    .EntityVisibleToClient = wrap_EntityVisibleToClient,
+};
+
+// flag indicating if game uses gclient_new_t or gclient_old_t.
+// doesn't enable protocol extensions by itself.
+#define IS_NEW_GAME_API    (game3_export->apiversion == GAME3_API_VERSION_NEW)
 
 #define GAME_EDICT_NUM(n) ((game3_edict_t *)((byte *)game3_export->edicts + game3_export->edict_size*(n)))
 #define NUM_FOR_GAME_EDICT(e) ((int)(((byte *)(e) - (byte *)game3_export->edicts) / game3_export->edict_size))
@@ -111,10 +146,10 @@ static void wrap_dprintf(const char *fmt, ...)
 
 #if USE_SAVEGAMES
     // detect YQ2 game lib by unique first two messages
-    if (!sv.gamedetecthack)
-        sv.gamedetecthack = 1 + !strcmp(fmt, "Game is starting up.\n");
-    else if (sv.gamedetecthack == 2)
-        sv.gamedetecthack = 3 + !strcmp(fmt, "Game is %s built on %s.\n");
+    if (!svs.gamedetecthack)
+        svs.gamedetecthack = 1 + !strcmp(fmt, "Game is starting up.\n");
+    else if (svs.gamedetecthack == 2)
+        svs.gamedetecthack = 3 + !strcmp(fmt, "Game is %s built on %s.\n");
 #endif
 
     game_import.Com_Print(msg);
@@ -189,13 +224,14 @@ static qboolean wrap_inPHS(const vec3_t p1, const vec3_t p2)
     return game_import.inPHS(p1, p2, true);
 }
 
-static void wrap_Pmove_import(game3_pmove_t *pmove)
+static void wrap_Pmove_import(void *pmove)
 {
-    if (sv_client) {
-        game3_Pmove(pmove, &sv_client->pmp);
-    } else {
-        game3_Pmove(pmove, &sv_pmp);
-    }
+    const pmoveParams_t *pmp = sv_client ? &sv_client->pmp : &svs.pmp;
+
+    if (IS_NEW_GAME_API)
+        game3_PmoveNew(pmove, NULL, pmp);
+    else
+        game3_PmoveOld(pmove, NULL, pmp);
 }
 
 static void wrap_sound(game3_edict_t *gent, int channel,
@@ -388,8 +424,12 @@ static void sync_single_edict_server_to_game(int index)
     game_edict->s.event = server_edict->s.event;
 
     assert((game_edict->client && server_edict->client) || (!game_edict->client && !server_edict->client));
-    if(game_edict->client)
-        game_edict->client->ping = server_edict->client->ping;
+    if(game_edict->client) {
+        if (IS_NEW_GAME_API)
+            ((struct game3_gclient_new_s*)game_edict->client)->ping = server_edict->client->ping;
+        else
+            ((struct game3_gclient_old_s*)game_edict->client)->ping = server_edict->client->ping;
+    }
     game_edict->linkcount = server_edict->linkcount;
     game_edict->area.next = game_edict->area.prev = server_edict->linked ? &game_edict->area : NULL; // emulate entity being linked
     game_edict->num_clusters = sent->num_clusters;
@@ -428,22 +468,31 @@ static void sync_edicts_server_to_game(void)
     game3_export->num_edicts = game_export.num_edicts;
 }
 
-static void game_pmove_state_to_server(pmove_state_t* server_pmove_state, const game3_pmove_state_t* game_pmove_state)
+static void game_client_old_to_server(struct gclient_s *server_client, const struct game3_gclient_old_s *game_client)
 {
-    server_pmove_state->pm_type = pmtype_from_game3(game_pmove_state->pm_type);
-    VectorScale(game_pmove_state->origin, 0.125f, server_pmove_state->origin);
-    VectorScale(game_pmove_state->velocity, 0.125f, server_pmove_state->velocity);
-    server_pmove_state->pm_flags = pmflags_from_game3(game_pmove_state->pm_flags);
-    server_pmove_state->pm_time = game_pmove_state->pm_time * 8;
-    server_pmove_state->gravity = game_pmove_state->gravity;
-    server_pmove_state->delta_angles[0] = SHORT2ANGLE(game_pmove_state->delta_angles[0]);
-    server_pmove_state->delta_angles[1] = SHORT2ANGLE(game_pmove_state->delta_angles[1]);
-    server_pmove_state->delta_angles[2] = SHORT2ANGLE(game_pmove_state->delta_angles[2]);
+    ConvertFromGame3_pmove_state_old(&server_client->ps.pmove, &game_client->ps.pmove, game_csr->extended);
+
+    VectorCopy(game_client->ps.viewangles, server_client->ps.viewangles);
+    VectorCopy(game_client->ps.viewoffset, server_client->ps.viewoffset);
+    VectorCopy(game_client->ps.kick_angles, server_client->ps.kick_angles);
+    VectorCopy(game_client->ps.gunangles, server_client->ps.gunangles);
+    VectorCopy(game_client->ps.gunoffset, server_client->ps.gunoffset);
+    server_client->ps.gunindex = game_client->ps.gunindex;
+    server_client->ps.gunframe = game_client->ps.gunframe;
+    Vector4Copy(game_client->ps.blend, server_client->ps.screen_blend);
+    server_client->ps.fov = game_client->ps.fov;
+    server_client->ps.rdflags = game_client->ps.rdflags;
+    memset(&server_client->ps.stats, 0, sizeof(server_client->ps.stats));
+    memcpy(&server_client->ps.stats, &game_client->ps.stats, sizeof(game_client->ps.stats));
+
+    server_client->ping = game_client->ping;
+    // FIXME: Only copy if GMF_CLIENTNUM feature is set
+    server_client->clientNum = game_client->clientNum;
 }
 
-static void game_client_to_server(struct gclient_s *server_client, const struct game3_gclient_s *game_client)
+static void game_client_new_to_server(struct gclient_s *server_client, const struct game3_gclient_new_s *game_client)
 {
-    game_pmove_state_to_server(&server_client->ps.pmove, &game_client->ps.pmove);
+    ConvertFromGame3_pmove_state_new(&server_client->ps.pmove, &game_client->ps.pmove, game_csr->extended);
 
     VectorCopy(game_client->ps.viewangles, server_client->ps.viewangles);
     VectorCopy(game_client->ps.viewoffset, server_client->ps.viewoffset);
@@ -491,7 +540,10 @@ static void sync_single_edict_game_to_server(int index)
         if(!server_edict->client) {
             server_edict->client = Z_Malloc(sizeof(struct gclient_s));
         }
-        game_client_to_server(server_edict->client, game_edict->client);
+        if (IS_NEW_GAME_API)
+            game_client_new_to_server(server_edict->client, game_edict->client);
+        else
+            game_client_old_to_server(server_edict->client, game_edict->client);
     } else if (server_edict->client) {
         Z_Free(server_edict->client);
         server_edict->client = NULL;
@@ -547,6 +599,15 @@ static void wrap_Init(void)
         game_csr = &cs_remap_q2pro_new;
     } else
         game_csr = &cs_remap_old;
+
+    if (game_csr->extended && IS_NEW_GAME_API) {
+        PmoveEnableExt(&svs.pmp);
+        svs.pmp.extended_server_ver = 2;
+    } else if (game_csr->extended) {
+        svs.pmp.extended_server_ver = 1;
+    } else {
+        svs.pmp.extended_server_ver = 0;
+    }
 
     server_edicts = Z_Mallocz(sizeof(edict_t) * game3_export->max_edicts);
     game_export.edicts = server_edicts;
@@ -814,31 +875,12 @@ static void wrap_ClientCommand(edict_t *ent)
     sync_edicts_game_to_server();
 }
 
-static void server_usercmd_to_game(game3_usercmd_t *game_cmd, const usercmd_t *server_cmd)
-{
-    game_cmd->msec = server_cmd->msec;
-    game_cmd->buttons = server_cmd->buttons;
-    game_cmd->angles[0] = ANGLE2SHORT(server_cmd->angles[0]);
-    game_cmd->angles[1] = ANGLE2SHORT(server_cmd->angles[1]);
-    game_cmd->angles[2] = ANGLE2SHORT(server_cmd->angles[2]);
-    game_cmd->forwardmove = server_cmd->forwardmove;
-    game_cmd->sidemove = server_cmd->sidemove;
-    if(server_cmd->buttons & BUTTON_JUMP)
-        game_cmd->upmove = 200;
-    else if(server_cmd->buttons & BUTTON_CROUCH)
-        game_cmd->upmove = -200;
-    else
-        game_cmd->upmove = 0;
-    game_cmd->impulse = 0;
-    game_cmd->lightlevel = 128; // FIXME
-}
-
 static void wrap_ClientThink(edict_t *ent, usercmd_t *cmd)
 {
     // ClientThink() may spawn new entitities, so sync them all
     sync_edicts_server_to_game();
     game3_usercmd_t game_cmd;
-    server_usercmd_to_game(&game_cmd, cmd);
+    ConvertToGame3_usercmd(&game_cmd, cmd);
     game3_export->ClientThink(translate_edict_to_game(ent), &game_cmd);
     sync_edicts_game_to_server();
 }
@@ -869,20 +911,17 @@ static void wrap_ServerCommand(void)
     sync_edicts_game_to_server();
 }
 
-static void wrap_Pmove_export(pmove_t *pmove)
-{
-    // FIXME Correct?
-    if (sv_client) {
-        Pmove(pmove, &sv_client->pmp);
-    } else {
-        Pmove(pmove, &sv_pmp);
-    }
-}
-
 static void *wrap_GetExtension_export(const char *name)
 {
     if (game3_export_ex && strcmp(name, game_q2pro_restart_filesystem_ext) == 0) {
         return (void*)&game_q2pro_restart_filesystem;
+    }
+    if (game3_export_ex
+        && game3_export_ex->apiversion >= GAME3_API_VERSION_EX_ENTITY_VISIBLE
+        && game3_export_ex->CustomizeEntityToClient
+        && game3_export_ex->EntityVisibleToClient
+        && strcmp(name, game_q2pro_customize_entity_ext) == 0) {
+        return (void*)&game_q2pro_customize_entity;
     }
     return NULL;
 }
@@ -991,7 +1030,13 @@ game_export_t *GetGame3Proxy(game_import_t *import, void *game3_entry, void *gam
 
     game3_export = entry(&import3);
     if (game3_ex_entry)
+    {
         game3_export_ex = entry_ex(&game3_import_ex);
+        if (game3_export_ex && game3_export_ex->apiversion < GAME3_API_VERSION_EX_MINIMUM)
+            game3_export_ex = NULL;
+        else
+            Com_DPrintf("Game supports Q2PRO extended API version %d.\n", game3_export_ex->apiversion);
+    }
     else
         game3_export_ex = NULL;
 
@@ -1016,7 +1061,7 @@ game_export_t *GetGame3Proxy(game_import_t *import, void *game3_entry, void *gam
     game_export.RunFrame = wrap_RunFrame;
     game_export.PrepFrame = wrap_PrepFrame;
     game_export.ServerCommand = wrap_ServerCommand;
-    game_export.Pmove = wrap_Pmove_export;
+    game_export.Pmove = NULL; // the engine doesn't actually use the game exported Pmove, so don't bother providing it...
     game_export.GetExtension = wrap_GetExtension_export;
     game_export.Bot_SetWeapon = wrap_Bot_SetWeapon;
     game_export.Bot_TriggerEdict = wrap_Bot_TriggerEdict;

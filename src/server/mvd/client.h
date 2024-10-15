@@ -39,6 +39,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 // game features MVD client supports
 #define MVD_FEATURES    (GMF_CLIENTNUM | GMF_PROPERINUSE | GMF_WANT_ALL_DISCONNECTS)
 
+// dummy flag to mark entity as seen
+#define SVF_MVD_SEEN    BIT(31)
+
 #define LAYOUT_MSEC     3000
 
 typedef enum {
@@ -160,7 +163,7 @@ typedef struct mvd_s {
     vec3_t          spawnOrigin;
     vec3_t          spawnAngles;
     int             pm_type;
-    byte            dcs[CS_BITMAP_BYTES];
+    size_t          dcs[BC_COUNT(MAX_CONFIGSTRINGS)];
     configstring_t  baseconfigstrings[MAX_CONFIGSTRINGS];
     configstring_t  configstrings[MAX_CONFIGSTRINGS];
     const cs_remap_t *csr;

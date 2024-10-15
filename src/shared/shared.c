@@ -26,14 +26,14 @@ void AngleVectors(const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up)
     float        sr, sp, sy, cr, cp, cy;
 
     angle = DEG2RAD(angles[YAW]);
-    sy = sin(angle);
-    cy = cos(angle);
+    sy = sinf(angle);
+    cy = cosf(angle);
     angle = DEG2RAD(angles[PITCH]);
-    sp = sin(angle);
-    cp = cos(angle);
+    sp = sinf(angle);
+    cp = cosf(angle);
     angle = DEG2RAD(angles[ROLL]);
-    sr = sin(angle);
-    cr = cos(angle);
+    sr = sinf(angle);
+    cr = cosf(angle);
 
     if (forward) {
         forward[0] = cp * cy;
@@ -1038,8 +1038,8 @@ uint32_t Q_rand(void)
         mt_index = 0;
 
 #define STEP(j, k) do {                 \
-        x  = mt_state[i] & 0x80000000;  \
-        x |= mt_state[j] & 0x7FFFFFFF;  \
+        x  = mt_state[i] & BIT(31);     \
+        x |= mt_state[j] & MASK(31);    \
         y  = x >> 1;                    \
         y ^= 0x9908B0DF & -(x & 1);     \
         mt_state[i] = mt_state[k] ^ y;  \

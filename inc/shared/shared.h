@@ -26,6 +26,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "config.h"
 #endif
 
+#ifndef USE_PROTOCOL_EXTENSIONS
+#define USE_PROTOCOL_EXTENSIONS (USE_CLIENT || USE_SERVER)
+#endif
+
+#ifndef USE_NEW_GAME_API
+#define USE_NEW_GAME_API (USE_CLIENT || USE_SERVER)
+#endif
+
 #include <math.h>
 #include <ctype.h>
 #include <stdio.h>
@@ -118,6 +126,7 @@ void    Com_Error(error_type_t code, const char *fmt, ...);
 #define Com_EPrintf(...) Com_LPrintf(PRINT_ERROR, __VA_ARGS__)
 #define Com_NPrintf(...) Com_LPrintf(PRINT_NOTICE, __VA_ARGS__)
 
+// an assertion that's ALWAYS enabled. `expr' may have side effects.
 #define Q_assert(expr) \
     do { if (!(expr)) Com_Error(ERR_FATAL, "%s: assertion `%s' failed", __func__, #expr); } while (0)
 
@@ -176,14 +185,23 @@ typedef union {
 
 extern const vec3_t vec3_origin;
 
-typedef struct vrect_s {
-    int             x, y, width, height;
+typedef struct {
+    int x, y, width, height;
 } vrect_t;
 
-#define DEG2RAD(a)      ((a) * (M_PI / 180))
-#define RAD2DEG(a)      ((a) * (180 / M_PI))
+#ifndef M_PIf
+#define M_PIf       3.14159265358979323846f
+#define M_SQRT2f    1.41421356237309504880f
+#define M_SQRT1_2f  0.70710678118654752440f
+#endif
 
-#define ALIGN(x, a)     (((x) + (a) - 1) & ~((a) - 1))
+#define DEG2RAD(a)      ((a) * (M_PIf / 180))
+#define RAD2DEG(a)      ((a) * (180 / M_PIf))
+
+#define Q_ALIGN(x, a)   (((x) + (a) - 1) & ~((a) - 1))
+
+#define MASK(n)         (BIT(n) - 1U)
+#define MASK_ULL(n)     (BIT_ULL(n) - 1ULL)
 
 #define SWAP(type, a, b) \
     do { type SWAP_tmp = a; a = b; b = SWAP_tmp; } while (0)
@@ -342,6 +360,22 @@ static inline uint32_t Q_npot32(uint32_t k)
     return k + 1;
 }
 
+static inline int Q_log2(uint32_t k)
+{
+#if q_has_builtin(__builtin_clz)
+    return 31 - __builtin_clz(k | 1);
+#elif (defined _MSC_VER)
+    unsigned long index;
+    _BitScanReverse(&index, k | 1);
+    return index;
+#else
+    for (int i = 31; i > 0; i--)
+        if (k & BIT(i))
+            return i;
+    return 0;
+#endif
+}
+
 static inline float LerpAngle(float a2, float a1, float frac)
 {
     if (a1 - a2 > 180)
@@ -357,7 +391,13 @@ static inline float anglemod(float a)
     return a;
 }
 
-static inline int Q_align(int value, int align)
+static inline int Q_align_down(int value, int align)
+{
+    int mod = value % align;
+    return value - mod;
+}
+
+static inline int Q_align_up(int value, int align)
 {
     int mod = value % align;
     return mod ? value + align - mod : value;
@@ -451,9 +491,9 @@ static inline uint16_t Q_clip_uint16(int a)
 
 #define Q_rint(x)   ((x) < 0 ? ((int)((x) - 0.5f)) : ((int)((x) + 0.5f)))
 
-#define Q_IsBitSet(data, bit)   (((data)[(bit) >> 3] & (1 << ((bit) & 7))) != 0)
-#define Q_SetBit(data, bit)     ((data)[(bit) >> 3] |= (1 << ((bit) & 7)))
-#define Q_ClearBit(data, bit)   ((data)[(bit) >> 3] &= ~(1 << ((bit) & 7)))
+#define Q_IsBitSet(data, bit)   ((((const byte *)(data))[(bit) >> 3] >> ((bit) & 7)) & 1)
+#define Q_SetBit(data, bit)     (((byte *)(data))[(bit) >> 3] |= (1 << ((bit) & 7)))
+#define Q_ClearBit(data, bit)   (((byte *)(data))[(bit) >> 3] &= ~(1 << ((bit) & 7)))
 
 //=============================================
 
@@ -580,6 +620,8 @@ size_t Q_strnlen(const char *s, size_t maxlen);
 int Q_atoi(const char *s);
 #endif
 
+#define Q_atof(s) strtof(s, NULL)
+
 char *COM_SkipPath(const char *pathname);
 size_t COM_StripExtension(char *out, const char *in, size_t size);
 size_t COM_DefaultExtension(char *path, const char *ext, size_t size);
@@ -638,15 +680,23 @@ char    *vtos(const vec3_t v);
 
 static inline uint16_t ShortSwap(uint16_t s)
 {
+#if q_has_builtin(__builtin_bswap16)
+    return __builtin_bswap16(s);
+#else
     s = (s >> 8) | (s << 8);
     return s;
+#endif
 }
 
 static inline uint32_t LongSwap(uint32_t l)
 {
+#if q_has_builtin(__builtin_bswap32)
+    return __builtin_bswap32(l);
+#else
     l = ((l >> 8) & 0x00ff00ff) | ((l << 8) & 0xff00ff00);
     l = (l >> 16) | (l << 16);
     return l;
+#endif
 }
 
 static inline float FloatSwap(float f)
@@ -678,28 +728,29 @@ static inline int32_t SignExtend(uint32_t v, int bits)
 }
 
 #if USE_LITTLE_ENDIAN
-#define BigShort    ShortSwap
-#define BigLong     LongSwap
-#define BigFloat    FloatSwap
-#define LittleShort(x)    ((uint16_t)(x))
-#define LittleLong(x)     ((uint32_t)(x))
-#define LittleFloat(x)    ((float)(x))
-#define MakeRawLong(b1,b2,b3,b4) (((unsigned)(b4)<<24)|((b3)<<16)|((b2)<<8)|(b1))
+#define BigShort(x)     ShortSwap(x)
+#define BigLong(x)      LongSwap(x)
+#define BigFloat(x)     FloatSwap(x)
+#define LittleShort(x)  ((uint16_t)(x))
+#define LittleLong(x)   ((uint32_t)(x))
+#define LittleFloat(x)  ((float)(x))
+#define MakeRawLong(b1,b2,b3,b4) MakeLittleLong(b1,b2,b3,b4)
 #define MakeRawShort(b1,b2) (((b2)<<8)|(b1))
 #elif USE_BIG_ENDIAN
 #define BigShort(x)     ((uint16_t)(x))
 #define BigLong(x)      ((uint32_t)(x))
 #define BigFloat(x)     ((float)(x))
-#define LittleShort ShortSwap
-#define LittleLong  LongSwap
-#define LittleFloat FloatSwap
-#define MakeRawLong(b1,b2,b3,b4) (((unsigned)(b1)<<24)|((b2)<<16)|((b3)<<8)|(b4))
+#define LittleShort(x)  ShortSwap(x)
+#define LittleLong(x)   LongSwap(x)
+#define LittleFloat(x)  FloatSwap(x)
+#define MakeRawLong(b1,b2,b3,b4) MakeBigLong(b1,b2,b3,b4)
 #define MakeRawShort(b1,b2) (((b1)<<8)|(b2))
 #else
 #error Unknown byte order
 #endif
 
-#define MakeLittleLong(b1,b2,b3,b4) (((unsigned)(b4)<<24)|((b3)<<16)|((b2)<<8)|(b1))
+#define MakeLittleLong(b1,b2,b3,b4) (((uint32_t)(b4)<<24)|((uint32_t)(b3)<<16)|((uint32_t)(b2)<<8)|(uint32_t)(b1))
+#define MakeBigLong(b1,b2,b3,b4) (((uint32_t)(b1)<<24)|((uint32_t)(b2)<<16)|((uint32_t)(b3)<<8)|(uint32_t)(b4))
 
 #define LittleVector(a,b) \
     ((b)[0]=LittleFloat((a)[0]),\
@@ -769,8 +820,10 @@ typedef struct cvar_s {
     int         integer;
 
 // ------ new stuff ------
-#if USE_CLIENT || USE_SERVER
+#if USE_NEW_GAME_API
     char        *default_string;
+#endif
+#if USE_CLIENT || USE_SERVER
     xchanged_t      changed;
     xgenerator_t    generator;
     struct cvar_s   *hashNext;
@@ -836,7 +889,7 @@ typedef uint32_t contents_t;
 #define SURF_FLOWING            BIT(6)      // scroll towards angle
 #define SURF_NODRAW             BIT(7)      // don't bother referencing the texture
 
-#define SURF_ALPHATEST          BIT(25)     // used by kmquake2
+#define SURF_ALPHATEST          BIT(25)     // used by KMQuake2
 
 //KEX
 #define SURF_N64_UV             BIT(28)
@@ -864,7 +917,7 @@ typedef uint32_t surfflags_t;
 #define AREA_TRIGGERS   2
 
 // plane_t structure
-typedef struct cplane_s {
+typedef struct {
     vec3_t  normal;
     float   dist;
     byte    type;           // for fast side tests
@@ -879,7 +932,7 @@ typedef struct cplane_s {
 #define PLANE_NON_AXIAL 6
 
 // csurface_t, but as expected by V3 games
-typedef struct csurface_v3_s {
+typedef struct {
     char        name[16];
     surfflags_t flags;
     int32_t		value;
@@ -977,7 +1030,7 @@ typedef uint8_t button_t;
 
 #if !defined(GAME3_INCLUDE)
 // usercmd_t is sent to the server each client frame
-typedef struct usercmd_s {
+typedef struct {
     byte    msec;
     button_t buttons;
     vec3_t  angles;
@@ -1268,6 +1321,8 @@ typedef enum {
     TE_EXPLOSION2_NL,
 //[Paril-KEX]
 
+    TE_DAMAGE_DEALT = 128,
+
     TE_NUM_ENTITIES
 } temp_event_t;
 
@@ -1349,7 +1404,6 @@ enum {
     STAT_CHASE,
     STAT_SPECTATOR,
 
-    MAX_STATS_OLD = 32,
 #if !defined(GAME3_INCLUDE)
     MAX_STATS = 64, // KEX
 
@@ -1382,6 +1436,9 @@ enum {
 	STAT_ACTIVE_WEAPON,
 #endif // !defined(GAME3_INCLUDE)
 };
+
+#define MAX_STATS_OLD   32
+#define MAX_STATS_NEW   64
 
 // STAT_LAYOUTS flags
 #define LAYOUTS_LAYOUT          BIT(0)
@@ -1594,7 +1651,7 @@ typedef uint8_t entity_event_t;
 // entity_state_t is the information conveyed from the server
 // in an update message about entities that the client will
 // need to render in some way
-typedef struct entity_state_s {
+typedef struct {
     int     number;         // edict index
 
     vec3_t  origin;
@@ -1639,7 +1696,7 @@ typedef struct entity_state_s {
 // but the number of pmove_state_t changes will be reletive to client
 // frame rates
 typedef struct {
-    pmove_state_t   pmove;      // for prediction
+    pmove_state_t   pmove;  // for prediction
 
     // these fields do not need to be communicated bit-precise
 
@@ -1659,9 +1716,9 @@ typedef struct {
     int         gunrate;
 // KEX
 
-    float       screen_blend[4];       // rgba full screen effect
+    vec4_t      screen_blend;       // rgba full screen effect
 // KEX
-    float       damage_blend[4];
+    vec4_t      damage_blend;
 // KEX
 
     float       fov;            // horizontal field of view
@@ -1678,9 +1735,9 @@ typedef struct {
 //==============================================
 
 #define ENTITYNUM_BITS      13
-#define ENTITYNUM_MASK      (BIT(ENTITYNUM_BITS) - 1)
+#define ENTITYNUM_MASK      MASK(ENTITYNUM_BITS)
 
 #define GUNINDEX_BITS       13  // upper 3 bits are skinnum
-#define GUNINDEX_MASK       (BIT(GUNINDEX_BITS) - 1)
+#define GUNINDEX_MASK       MASK(GUNINDEX_BITS)
 
 #endif // !defined(GAME3_INCLUDE)

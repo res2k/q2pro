@@ -66,7 +66,7 @@ static void SV_CreateBaselines(void)
             continue;
         }
 
-        ent->s.number = i;
+        SV_CheckEntityNumber(ent, i);
 
         chunk = &sv_client->baselines[i >> SV_BASELINES_SHIFT];
         if (*chunk == NULL) {
@@ -76,10 +76,20 @@ static void SV_CreateBaselines(void)
         base = *chunk + (i & SV_BASELINES_MASK);
         MSG_PackEntity(base, &ent->s, true);
 
+        // no need to transmit data that will change anyway
+        if (i <= sv_client->maxclients) {
+            VectorClear(base->origin);
+            VectorClear(base->angles);
+            base->frame = 0;
+        }
+
+        // don't ever transmit event
+        base->event = 0;
+
 #if USE_MVD_CLIENT
         if (sv.state != ss_broadcast)
 #endif
-        if (sv_client->esFlags & MSG_ES_LONGSOLID) {
+        if (sv_client->esFlags & MSG_ES_LONGSOLID && !sv_client->csr->extended) {
             base->solid = sv.entities[i].solid32;
         }
     }
@@ -122,7 +132,7 @@ static void write_configstrings(void)
     SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
 }
 
-static void write_baseline(entity_packed_t *base)
+static void write_baseline(const entity_packed_t *base)
 {
     MSG_WriteDeltaEntity(NULL, base, sv_client->esFlags | MSG_ES_FORCE);
 }
@@ -216,7 +226,7 @@ static void write_baseline_stream(void)
     SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
 }
 
-static void stuff_cmds(list_t *list)
+static void stuff_cmds(const list_t *list)
 {
     stuffcmd_t *stuff;
 
@@ -243,14 +253,12 @@ static void stuff_junk(void)
     static const char junkchars[] =
         "!#&'()*+,-./0123456789:<=>?@[\\]^_``````````abcdefghijklmnopqrstuvwxyz|~~~~~~~~~~";
     char junk[8][16];
-    int i, j, k;
+    int i, j;
 
     for (i = 0; i < 8; i++) {
-        for (j = 0; j < 15; j++) {
-            k = Q_rand() % (sizeof(junkchars) - 1);
-            junk[i][j] = junkchars[k];
-        }
-        junk[i][15] = 0;
+        for (j = 0; j < 15; j++)
+            junk[i][j] = junkchars[Q_rand_uniform(sizeof(junkchars) - 1)];
+        junk[i][j] = 0;
     }
 
     Q_strlcpy(sv_client->reconnect_var, junk[2], sizeof(sv_client->reconnect_var));
@@ -288,6 +296,9 @@ static int q2pro_protocol_flags(void)
 
     if (sv_client->csr->extended)
         flags |= Q2PRO_PF_EXTENSIONS;
+
+    if (sv_client->esFlags & MSG_ES_EXTENSIONS_2)
+        flags |= Q2PRO_PF_EXTENSIONS_2;
 
     if (!svs.is_game_rerelease)
         flags |= Q2PRO_PF_GAME3_COMPAT;
@@ -348,7 +359,7 @@ void SV_New_f(void)
     if (sv.state == ss_pic || sv.state == ss_cinematic)
         MSG_WriteShort(-1);
     else
-        MSG_WriteShort(sv_client->slot);
+        MSG_WriteShort(sv_client->infonum);
     MSG_WriteString(sv_client->configstrings[CS_NAME]);
 
     // send protocol specific stuff
@@ -423,6 +434,10 @@ void SV_Begin_f(void)
         Com_DPrintf("Begin not valid -- already spawned\n");
         return;
     }
+    if (sv.state == ss_pic || sv.state == ss_cinematic) {
+        Com_DPrintf("Begin not valid -- map not loaded\n");
+        return;
+    }
 
     if (!sv_client->version_string) {
         SV_DropClient(sv_client, "!failed version probe");
@@ -450,6 +465,13 @@ void SV_Begin_f(void)
     SV_AlignKeyFrames(sv_client);
 
     stuff_cmds(&sv_cmdlist_begin);
+
+    // allocate packet entities if not done yet
+    if (!sv_client->entities) {
+        int max_packet_entities = sv_client->csr->extended ? MAX_PACKET_ENTITIES : MAX_PACKET_ENTITIES_OLD;
+        sv_client->num_entities = max_packet_entities * UPDATE_BACKUP;
+        sv_client->entities = SV_Mallocz(sizeof(sv_client->entities[0]) * sv_client->num_entities);
+    }
 
     // call the game begin function
     ge->ClientBegin(sv_player);
@@ -779,11 +801,11 @@ static bool match_cvar_val(const char *s, const char *v)
     case '*':
         return *v;
     case '=':
-        return atof(v) == atof(s);
+        return Q_atof(v) == Q_atof(s);
     case '<':
-        return atof(v) < atof(s);
+        return Q_atof(v) < Q_atof(s);
     case '>':
-        return atof(v) > atof(s);
+        return Q_atof(v) > Q_atof(s);
     case '~':
         return Q_stristr(v, s);
     case '#':
@@ -924,7 +946,7 @@ static const ucmd_t ucmds[] = {
     { NULL, NULL }
 };
 
-static void handle_filtercmd(filtercmd_t *filter)
+static void handle_filtercmd(const filtercmd_t *filter)
 {
     if (filter->action == FA_IGNORE)
         return;
@@ -1384,12 +1406,14 @@ static void SV_ParseDeltaUserinfo(void)
 }
 
 #if USE_FPS
+// key frames must be aligned for all clients (and game) to ensure there isn't
+// additional frame of latency for clients with framediv > 1.
 void SV_AlignKeyFrames(client_t *client)
 {
     int framediv = sv.frametime.div / client->framediv;
-    int framenum = sv.framenum / client->framediv;
+    int framenum = (sv.framenum + client->framediv - 1) / client->framediv;
     int frameofs = framenum % framediv;
-    int newnum = frameofs + Q_align(client->framenum, framediv);
+    int newnum = frameofs + Q_align_up(client->framenum, framediv);
 
     Com_DDPrintf("[%d] align %d --> %d (num = %d, div = %d, ofs = %d)\n",
                  sv.framenum, client->framenum, newnum, framenum, framediv, frameofs);

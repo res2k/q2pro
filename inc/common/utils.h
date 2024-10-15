@@ -18,6 +18,10 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #pragma once
 
+#if USE_CLIENT
+extern const char com_env_suf[6][3];
+#endif
+
 typedef enum {
     COLOR_BLACK,
     COLOR_RED,
@@ -68,10 +72,24 @@ color_index_t Com_ParseColor(const char *s);
 unsigned Com_ParseExtensionString(const char *s, const char *const extnames[]);
 #endif
 
+extern const char com_hexchars[16];
+
+size_t Com_EscapeString(char *dst, const char *src, size_t size);
+
 char *Com_MakePrintable(const char *s);
 
+#if USE_CLIENT
+uint32_t Com_SlowRand(void);
+#define Com_SlowFrand()  ((int32_t)Com_SlowRand() * 0x1p-32f + 0.5f)
+#define Com_SlowCrand()  ((int32_t)Com_SlowRand() * 0x1p-31f)
+#endif
+
+// Bitmap chunks (for sparse bitmaps)
+#define BC_BITS         (sizeof(size_t) * CHAR_BIT)
+#define BC_COUNT(n)     (((n) + BC_BITS - 1) / BC_BITS)
+
 // Some mods actually exploit CS_STATUSBAR to take space up to CS_AIRACCEL
-static inline size_t CS_SIZE(const cs_remap_t *csr, int cs)
+static inline size_t Com_ConfigstringSize(const cs_remap_t *csr, int cs)
 {
     if (cs >= CS_STATUSBAR && cs < csr->airaccel)
         return CS_MAX_STRING_LENGTH * (csr->airaccel - cs);
@@ -82,7 +100,7 @@ static inline size_t CS_SIZE(const cs_remap_t *csr, int cs)
     return CS_MAX_STRING_LENGTH;
 }
 
-typedef struct frametime_s {
+typedef struct {
     int         time;      // variable server frame time
     int         div;       // BASE_FRAMETIME/frametime
 } frametime_t;

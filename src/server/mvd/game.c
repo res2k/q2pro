@@ -450,8 +450,7 @@ static void MVD_FollowStop(mvd_client_t *client)
     client->ps.viewangles[ROLL] = 0;
 
     for (i = 0; i < 3; i++) {
-        client->ps.pmove.delta_angles[i] = ANGLE2SHORT(
-                                               client->ps.viewangles[i]) - client->lastcmd.angles[i];
+        client->ps.pmove.delta_angles[i] = ANGLE2SHORT(client->ps.viewangles[i]) - client->lastcmd.angles[i];
     }
 
     VectorClear(client->ps.kick_angles);
@@ -682,6 +681,8 @@ static void MVD_UpdateClient(mvd_client_t *client)
             Vector4Set(client->ps.screen_blend, 0.5f, 0.3f, 0.2f, 0.4f);
         else
             Vector4Clear(client->ps.screen_blend);
+
+        Vector4Clear(client->ps.damage_blend);
     } else {
         // copy entire player state
         client->ps = target->ps;
@@ -696,7 +697,7 @@ static void MVD_UpdateClient(mvd_client_t *client)
         if (target != mvd->dummy) {
             if (mvd_stats_hack->integer && mvd->dummy) {
                 // copy stats of the dummy MVD observer
-                for (i = 0; i < MAX_STATS; i++) {
+                for (i = 0; i < MAX_STATS_OLD; i++) {
                     if (mvd_stats_hack->integer & BIT(i)) {
                         client->ps.stats[i] = mvd->dummy->ps.stats[i];
                     }
@@ -773,17 +774,31 @@ void MVD_BroadcastPrintf(mvd_t *mvd, int level, int mask, const char *fmt, ...)
     SZ_Clear(&msg_write);
 }
 
+#define ES_MASK     (MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS | MSG_ES_EXTENSIONS_2)
+#define PS_MASK     (MSG_PS_EXTENSIONS | MSG_PS_EXTENSIONS_2)
+
 static void MVD_SetServerState(client_t *cl, mvd_t *mvd)
 {
+    if (cl->csr != mvd->csr) {
+        Z_Freep(&cl->entities);
+        cl->num_entities = 0;
+    }
+
     cl->gamedir = mvd->gamedir;
     cl->mapname = mvd->mapname;
     cl->configstrings = mvd->configstrings;
     cl->csr = mvd->csr;
-    cl->slot = mvd->clientNum;
+    cl->infonum = mvd->clientNum;
     cl->cm = &mvd->cm;
     cl->ge = &mvd->ge;
     cl->spawncount = mvd->servercount;
     cl->maxclients = mvd->maxclients;
+
+    cl->esFlags &= ~ES_MASK;
+    cl->psFlags &= ~PS_MASK;
+    cl->esFlags |= mvd->esFlags & ES_MASK;
+    cl->psFlags |= mvd->psFlags & PS_MASK;
+
     cl->esFlags |= MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS;
 }
 
@@ -1669,26 +1684,27 @@ MISC GAME FUNCTIONS
 
 void MVD_LinkEdict(mvd_t *mvd, edict_t *ent)
 {
-    int         index;
-    mmodel_t    *cm;
-    bsp_t       *cache = mvd->cm.cache;
+    int             index;
+    const mmodel_t  *mod;
+    const bsp_t     *bsp = mvd->cm.cache;
 
-    if (!cache) {
+    if (!bsp)
         return;
-    }
 
-    if (ent->s.solid == PACKED_BSP) {
-        index = ent->s.modelindex;
-        if (index < 1 || index > cache->nummodels) {
-            Com_WPrintf("%s: entity %d: bad inline model index: %d\n",
-                        __func__, ent->s.number, index);
-            return;
-        }
-        cm = &cache->models[index - 1];
-        VectorCopy(cm->mins, ent->mins);
-        VectorCopy(cm->maxs, ent->maxs);
-        ent->solid = SOLID_BSP;
-    } else if (ent->s.solid) {
+    index = ent->s.modelindex - 1;
+    if (index == MODELINDEX_PLAYER - 1)
+        index = 0;
+    else if (index >= MODELINDEX_PLAYER)
+        index--;
+    if (index > 0 && index < bsp->nummodels) {
+        mod = &bsp->models[index];
+        VectorCopy(mod->mins, ent->mins);
+        VectorCopy(mod->maxs, ent->maxs);
+        if (ent->s.solid == PACKED_BSP)
+            ent->solid = SOLID_BSP;
+        else
+            ent->solid = SOLID_TRIGGER;
+    } else if (ent->s.solid && ent->s.solid != PACKED_BSP) {
         MSG_UnpackSolid32_Ver2(ent->s.solid, ent->mins, ent->maxs);
         ent->solid = SOLID_BBOX;
     } else {
@@ -1754,7 +1770,7 @@ static void MVD_GameInit(void)
 
     for (i = 0; i < sv_maxclients->integer; i++) {
         mvd_clients[i].cl = &svs.client_pool[i];
-        edicts[i + 1].client = (gclient_t *)&mvd_clients[i];
+        edicts[i + 1].client = (struct gclient_s*)&mvd_clients[i];
     }
 
     mvd_ge.edicts = edicts;

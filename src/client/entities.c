@@ -261,7 +261,7 @@ static void set_active_state(void)
 {
     cls.state = ca_active;
 
-    cl.serverdelta = Q_align(cl.frame.number, CL_FRAMEDIV);
+    cl.serverdelta = Q_align_down(cl.frame.number, CL_FRAMEDIV);
     cl.time = cl.servertime = 0; // set time, needed for demos
 #if USE_FPS
     cl.keytime = cl.keyservertime = 0;
@@ -401,6 +401,13 @@ void CL_DeltaFrame(void)
 
     // set server time
     framenum = cl.frame.number - cl.serverdelta;
+
+    if (framenum < 0)
+        Com_Error(ERR_DROP, "%s: server time went backwards", __func__);
+
+    if (framenum > INT_MAX / CL_FRAMETIME)
+        Com_Error(ERR_DROP, "%s: server time overflowed", __func__);
+
     cl.servertime = framenum * CL_FRAMETIME;
 #if USE_FPS
     cl.keyservertime = (framenum / cl.frametime.div) * BASE_FRAMETIME;
@@ -511,15 +518,15 @@ static void CL_AddPacketEntities(void)
     int                 autoanim;
     clientinfo_t        *ci;
     unsigned int        effects, renderfx;
-    bool                has_alpha;
+    bool                has_alpha, has_trail;
 
     // bonus items rotate at a fixed rate
     autorotate = anglemod(cl.time * 0.1f);
 
     // brush models can auto animate their frames
-    autoanim = 2 * cl.time / 1000;
+    autoanim = cl.time / 500;
 
-    autobob = 5 * sin(cl.time / 400.0f);
+    autobob = 5 * sinf(cl.time / 400.0f);
 
     memset(&ent, 0, sizeof(ent));
 
@@ -528,6 +535,8 @@ static void CL_AddPacketEntities(void)
         s1 = &cl.entityStates[i];
 
         cent = &cl_entities[s1->number];
+
+        has_trail = false;
 
         effects = s1->effects;
         renderfx = s1->renderfx;
@@ -635,8 +644,12 @@ static void CL_AddPacketEntities(void)
             ent.oldorigin[2] += autobob;
         }
 
-        if ((effects & EF_GIB) && !cl_gibs->integer)
-            goto skip;
+        if (!cl_gibs->integer) {
+            if (effects & EF_GIB && !(cl.csr.extended && effects & EF_ROCKET))
+                goto skip;
+            if (effects & EF_GREENGIB)
+                goto skip;
+        }
 
         // create a new entity
 
@@ -692,7 +705,7 @@ static void CL_AddPacketEntities(void)
         if (renderfx & RF_BEAM) {
             // the four beam colors are encoded in 32 bits of skinnum (hack)
             ent.alpha = 0.30f;
-            ent.skinnum = (s1->skinnum >> ((Q_rand() % 4) * 8)) & 0xff;
+            ent.skinnum = (s1->skinnum >> ((Com_SlowRand() % 4) * 8)) & 0xff;
             ent.model = 0;
         } else {
             // set skin
@@ -778,7 +791,7 @@ static void CL_AddPacketEntities(void)
                 VectorCopy(ent.origin, start);
             }
 
-            CL_Trace(&trace, start, vec3_origin, vec3_origin, end, NULL, mask);
+            CL_Trace(&trace, start, end, vec3_origin, vec3_origin, NULL, mask);
             LerpVector(start, end, cent->flashlightfrac, end);
             V_AddLight(end, 256, 1, 1, 1);
 
@@ -789,7 +802,7 @@ static void CL_AddPacketEntities(void)
         if (effects & EF_GRENADE_LIGHT)
             V_AddLight(ent.origin, 100, 1, 1, 0);
 
-        if (s1->number == cl.frame.clientNum + 1) {
+        if (s1->number == cl.frame.clientNum + 1 && !cl.thirdPersonView) {
             if (effects & EF_FLAG1)
                 V_AddLight(ent.origin, 225, 1.0f, 0.1f, 0.1f);
             else if (effects & EF_FLAG2)
@@ -798,10 +811,7 @@ static void CL_AddPacketEntities(void)
                 V_AddLight(ent.origin, 225, 1.0f, 1.0f, 0.0f);
             else if (effects & EF_TRACKERTRAIL)
                 V_AddLight(ent.origin, 225, -1.0f, -1.0f, -1.0f);
-            if (!cl.thirdPersonView) {
-                //ent.flags |= RF_VIEWERMODEL;    // only draw from mirrors
-                goto skip;
-            }
+            goto skip;
         }
 
         // if set to invisible, skip
@@ -965,30 +975,39 @@ static void CL_AddPacketEntities(void)
             goto skip;
 
         if (effects & EF_ROCKET) {
-            if (!(cl_disable_particles->integer & NOPART_ROCKET_TRAIL))
-                CL_RocketTrail(cent->lerp_origin, ent.origin, cent);
+            if (cl.csr.extended && effects & EF_GIB) {
+                CL_DiminishingTrail(cent, ent.origin, DT_FIREBALL);
+                has_trail = true;
+            } else if (!(cl_disable_particles->integer & NOPART_ROCKET_TRAIL)) {
+                CL_DiminishingTrail(cent, ent.origin, DT_ROCKET);
+                has_trail = true;
+            }
             if (cl_dlight_hacks->integer & DLHACK_ROCKET_COLOR)
                 V_AddLight(ent.origin, 200, 1, 0.23f, 0);
             else
                 V_AddLight(ent.origin, 200, 1, 1, 0);
         } else if (effects & EF_BLASTER) {
             if (effects & EF_TRACKER) {
-                CL_BlasterTrail2(cent->lerp_origin, ent.origin);
+                CL_BlasterTrail2(cent, ent.origin);
                 V_AddLight(ent.origin, 200, 0, 1, 0);
             } else {
-                CL_BlasterTrail(cent->lerp_origin, ent.origin);
+                CL_BlasterTrail(cent, ent.origin);
                 V_AddLight(ent.origin, 200, 1, 1, 0);
             }
+            has_trail = true;
         } else if (effects & EF_HYPERBLASTER) {
             if (effects & EF_TRACKER)
                 V_AddLight(ent.origin, 200, 0, 1, 0);
             else
                 V_AddLight(ent.origin, 200, 1, 1, 0);
         } else if (effects & EF_GIB) {
-            CL_DiminishingTrail(cent->lerp_origin, ent.origin, cent, effects);
+            CL_DiminishingTrail(cent, ent.origin, DT_GIB);
+            has_trail = true;
         } else if (effects & EF_GRENADE) {
-            if (!(cl_disable_particles->integer & NOPART_GRENADE_TRAIL))
-                CL_DiminishingTrail(cent->lerp_origin, ent.origin, cent, effects);
+            if (!(cl_disable_particles->integer & NOPART_GRENADE_TRAIL)) {
+                CL_DiminishingTrail(cent, ent.origin, DT_GRENADE);
+                has_trail = true;
+            }
         } else if (effects & EF_FLIES) {
             CL_FlyEffect(cent, ent.origin);
         } else if (effects & EF_BFG) {
@@ -1003,44 +1022,67 @@ static void CL_AddPacketEntities(void)
         } else if (effects & EF_TRAP) {
             ent.origin[2] += 32;
             CL_TrapParticles(cent, ent.origin);
-            i = (Q_rand() % 100) + 100;
+            i = (Com_SlowRand() % 100) + 100;
             V_AddLight(ent.origin, i, 1, 0.8f, 0.1f);
         } else if (effects & EF_FLAG1) {
-            CL_FlagTrail(cent->lerp_origin, ent.origin, 242);
+            CL_FlagTrail(cent, ent.origin, 242);
             V_AddLight(ent.origin, 225, 1, 0.1f, 0.1f);
+            has_trail = true;
         } else if (effects & EF_FLAG2) {
-            CL_FlagTrail(cent->lerp_origin, ent.origin, 115);
+            CL_FlagTrail(cent, ent.origin, 115);
             V_AddLight(ent.origin, 225, 0.1f, 0.1f, 1);
+            has_trail = true;
         } else if (effects & EF_TAGTRAIL) {
-            CL_TagTrail(cent->lerp_origin, ent.origin, 220);
+            CL_TagTrail(cent, ent.origin, 220);
             V_AddLight(ent.origin, 225, 1.0f, 1.0f, 0.0f);
+            has_trail = true;
         } else if (effects & EF_TRACKERTRAIL) {
             if (effects & EF_TRACKER) {
-                float intensity = 50 + (500 * (sin(cl.time / 500.0f) + 1.0f));
+                float intensity = 50 + (500 * (sinf(cl.time / 500.0f) + 1.0f));
                 V_AddLight(ent.origin, intensity, -1.0f, -1.0f, -1.0f);
             } else {
                 CL_Tracker_Shell(cent, ent.origin);
                 V_AddLight(ent.origin, 155, -1.0f, -1.0f, -1.0f);
             }
         } else if (effects & EF_TRACKER) {
-            CL_TrackerTrail(cent->lerp_origin, ent.origin, 0);
+            CL_TrackerTrail(cent, ent.origin);
             V_AddLight(ent.origin, 200, -1, -1, -1);
+            has_trail = true;
         } else if (effects & EF_GREENGIB) {
-            CL_DiminishingTrail(cent->lerp_origin, ent.origin, cent, effects);
+            CL_DiminishingTrail(cent, ent.origin, DT_GREENGIB);
+            has_trail = true;
         } else if (effects & EF_IONRIPPER) {
-            CL_IonripperTrail(cent->lerp_origin, ent.origin);
+            CL_IonripperTrail(cent, ent.origin);
             V_AddLight(ent.origin, 100, 1, 0.5f, 0.5f);
+            has_trail = true;
         } else if (effects & EF_BLUEHYPERBLASTER) {
             V_AddLight(ent.origin, 200, 0, 0, 1);
         } else if (effects & EF_PLASMA) {
-            if (effects & EF_ANIM_ALLFAST)
-                CL_BlasterTrail(cent->lerp_origin, ent.origin);
+            if (effects & EF_ANIM_ALLFAST) {
+                CL_BlasterTrail(cent, ent.origin);
+                has_trail = true;
+            }
             V_AddLight(ent.origin, 130, 1, 0.5f, 0.5f);
         }
 
 skip:
-        VectorCopy(ent.origin, cent->lerp_origin);
+        if (!has_trail)
+            VectorCopy(ent.origin, cent->lerp_origin);
     }
+}
+
+static float player_alpha_hack(void)
+{
+    centity_t   *ent;
+
+    ent = &cl_entities[cl.frame.clientNum + 1];
+    if (ent->serverframe != cl.frame.number)
+        return 1;
+
+    if (!ent->current.modelindex || !ent->current.alpha)
+        return 1;
+
+    return ent->current.alpha;
 }
 
 static int shell_effect_hack(void)
@@ -1069,21 +1111,6 @@ static int shell_effect_hack(void)
     return flags;
 }
 
-static float player_alpha_hack(void)
-{
-    centity_t   *ent;
-    int         flags = 0;
-
-    ent = &cl_entities[cl.frame.clientNum + 1];
-    if (ent->serverframe != cl.frame.number)
-        return 1.0f;
-
-    if (!ent->current.modelindex || !ent->current.alpha)
-        return 1.0f;
-
-    return LERP(ent->prev.alpha, ent->current.alpha, cl.lerpfrac);
-}
-
 /*
 ==============
 CL_AddViewWeapon
@@ -1100,8 +1127,15 @@ static void CL_AddViewWeapon(void)
         return;
     }
 
-    if (info_hand->integer == 2 && cl_gun->integer == 1) {
-        return;
+    if (cl_gun->integer == 1) {
+        // don't draw gun if in wide angle view
+        if (cls.demo.playback && cls.demo.compat && cl.frame.ps.fov > 90) {
+            return;
+        }
+        // don't draw gun if center handed
+        if (info_hand->integer == 2) {
+            return;
+        }
     }
 
     // find states to interpolate between
@@ -1139,7 +1173,7 @@ static void CL_AddViewWeapon(void)
         gun.oldframe = gun_frame;   // development tool
     } else {
 // KEX
-        if (cl.csr.extended) {
+        if (cl.is_rerelease_game) {
             if (ops->gunindex != ps->gunindex) { // just changed weapons, don't lerp from old
                 cl.weapon.frame = cl.weapon.last_frame = ps->gunframe;
                 cl.weapon.server_time = cl.servertime;
@@ -1172,10 +1206,8 @@ static void CL_AddViewWeapon(void)
         gun.flags |= RF_TRANSLUCENT;
     } else {
         gun.alpha = player_alpha_hack();
-
-        if (gun.alpha != 1.0f) {
+        if (gun.alpha != 1)
             gun.flags |= RF_TRANSLUCENT;
-        }
     }
 
     V_AddEntity(&gun);
@@ -1271,8 +1303,8 @@ static void CL_SetupThirdPersionView(void)
 
     angle = DEG2RAD(cl_thirdperson_angle->value);
     range = cl_thirdperson_range->value;
-    fscale = cos(angle);
-    rscale = sin(angle);
+    fscale = cosf(angle);
+    rscale = sinf(angle);
     VectorMA(cl.refdef.vieworg, -range * fscale, cl.v_forward, cl.refdef.vieworg);
     VectorMA(cl.refdef.vieworg, -range * rscale, cl.v_right, cl.refdef.vieworg);
 
@@ -1285,7 +1317,7 @@ static void CL_SetupThirdPersionView(void)
     VectorSubtract(focus, cl.refdef.vieworg, focus);
     dist = sqrtf(focus[0] * focus[0] + focus[1] * focus[1]);
 
-    cl.refdef.viewangles[PITCH] = -RAD2DEG(atan2(focus[2], dist));
+    cl.refdef.viewangles[PITCH] = -RAD2DEG(atan2f(focus[2], dist));
     cl.refdef.viewangles[YAW] -= cl_thirdperson_angle->value;
 
     cl.thirdPersonView = true;
@@ -1314,7 +1346,7 @@ first:
 
 static inline float lerp_client_fov(float ofov, float nfov, float lerp)
 {
-    if (cls.demo.playback) {
+    if (cls.demo.playback && !cls.demo.compat) {
         int fov = info_fov->integer;
 
         if (fov < 1)
@@ -1384,6 +1416,7 @@ void CL_CalcViewValues(void)
             cl.refdef.vieworg[i] = ops->pmove.origin[i] +
                 lerp * (ps->pmove.origin[i] - ops->pmove.origin[i]);
         }
+        cl.refdef.vieworg[2] += ops->pmove.viewheight;
     }
 
     // if not running a demo or on a locked frame, add the local angle movement
@@ -1414,8 +1447,8 @@ void CL_CalcViewValues(void)
         Vector4Lerp(ops->screen_blend, ps->screen_blend, blendfrac, cl.refdef.screen_blend);
         Vector4Lerp(ops->damage_blend, ps->damage_blend, damageblendfrac, cl.refdef.damage_blend);
     } else {
-        // don't interpolate blend color
         Vector4Copy(ps->screen_blend, cl.refdef.screen_blend);
+        Vector4Copy(ps->damage_blend, cl.refdef.damage_blend);
     }
     // Mix in screen_blend from cgame pmove
     // FIXME: Should also be interpolated?...
@@ -1494,9 +1527,9 @@ Called to get the sound spatialization origin
 */
 void CL_GetEntitySoundOrigin(unsigned entnum, vec3_t org)
 {
-    centity_t   *ent;
-    mmodel_t    *cm;
-    vec3_t      mid;
+    const centity_t *ent;
+    const mmodel_t  *mod;
+    vec3_t          mid;
 
     if (entnum >= cl.csr.max_edicts)
         Com_Error(ERR_DROP, "%s: bad entity", __func__);
@@ -1514,9 +1547,9 @@ void CL_GetEntitySoundOrigin(unsigned entnum, vec3_t org)
 
     // offset the origin for BSP models
     if (ent->current.solid == PACKED_BSP) {
-        cm = cl.model_clip[ent->current.modelindex];
-        if (cm) {
-            VectorAvg(cm->mins, cm->maxs, mid);
+        mod = cl.model_clip[ent->current.modelindex];
+        if (mod) {
+            VectorAvg(mod->mins, mod->maxs, mid);
             VectorAdd(org, mid, org);
         }
     }

@@ -186,7 +186,7 @@ typedef enum {
 #define SFL_CROSS_TRIGGER_6     BIT(5)
 #define SFL_CROSS_TRIGGER_7     BIT(6)
 #define SFL_CROSS_TRIGGER_8     BIT(7)
-#define SFL_CROSS_TRIGGER_MASK  (BIT(8) - 1)
+#define SFL_CROSS_TRIGGER_MASK  MASK(8)
 
 // noise types for PlayerNoise
 #define PNOISE_SELF             0
@@ -269,6 +269,14 @@ typedef struct precache_s {
     struct precache_s   *next;
     void                (*func)(void);
 } precache_t;
+
+// new game API can be used w/o protocol extensions,
+// so this needs to be dynamic
+#if USE_NEW_GAME_API
+#define PM_TIME_SHIFT   (game.csr.extended ? 0 : 3)
+#else
+#define PM_TIME_SHIFT   3
+#endif
 
 //
 // this structure is left intact through an entire game

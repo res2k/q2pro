@@ -29,23 +29,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define POWERSUIT_SCALE     4.0f
 #define WEAPONSHELL_SCALE   0.5f
 
-#define SHELL_RED_COLOR     0xF2
-#define SHELL_GREEN_COLOR   0xD0
-#define SHELL_BLUE_COLOR    0xF3
-
-#define SHELL_RG_COLOR      0xDC
-//#define SHELL_RB_COLOR        0x86
-#define SHELL_RB_COLOR      0x68
-#define SHELL_BG_COLOR      0x78
-
-//ROGUE
-#define SHELL_DOUBLE_COLOR  0xDF // 223
-#define SHELL_HALF_DAM_COLOR    0x90
-#define SHELL_CYAN_COLOR    0x72
-//ROGUE
-
-#define SHELL_WHITE_COLOR   0xD7
-
 #define RF_SHELL_MASK       (RF_SHELL_RED | RF_SHELL_GREEN | RF_SHELL_BLUE | \
                              RF_SHELL_DOUBLE | RF_SHELL_HALF_DAM | RF_SHELL_LITE_GREEN)
 
@@ -59,13 +42,13 @@ typedef struct entity_s {
     ** most recent data
     */
     vec3_t              origin;     // also used as RF_BEAM's "from"
-    int                 frame;          // also used as RF_BEAM's diameter
+    unsigned            frame;      // also used as RF_BEAM's diameter
 
     /*
     ** previous data for lerping
     */
     vec3_t              oldorigin;  // also used as RF_BEAM's "to"
-    int                 oldframe;
+    unsigned            oldframe;
 
     /*
     ** misc
@@ -83,22 +66,22 @@ typedef struct entity_s {
     float       scale;
 } entity_t;
 
-typedef struct dlight_s {
+typedef struct {
     vec3_t  origin;
     vec3_t  transformed;
     vec3_t  color;
     float   intensity;
 } dlight_t;
 
-typedef struct particle_s {
+typedef struct {
     vec3_t  origin;
     int     color;              // -1 => use rgba
     float   alpha;
     color_t rgba;
 } particle_t;
 
-typedef struct lightstyle_s {
-    float           white;          // highest of RGB
+typedef struct {
+    float   white;              // highest of RGB
 } lightstyle_t;
 
 // rendered fog parameters
@@ -118,7 +101,7 @@ typedef struct {
     } height;
 } fog_params_t;
 
-typedef struct refdef_s {
+typedef struct {
     int         x, y, width, height;// in virtual screen coordinates
     float       fov_x, fov_y;
     vec3_t      vieworg;
@@ -127,6 +110,7 @@ typedef struct refdef_s {
     vec4_t      damage_blend;       // rgba 0-1 damage blend
     float       time;               // time is uesed to auto animate
     int         rdflags;            // RDF_UNDERWATER, etc
+    bool        extended;
 
     byte        *areabits;          // if not NULL, only areas with set bits will be drawn
 
@@ -144,12 +128,21 @@ typedef struct refdef_s {
     fog_params_t    fog;
 } refdef_t;
 
+enum {
+    QGL_PROFILE_NONE,
+    QGL_PROFILE_CORE,
+    QGL_PROFILE_ES,
+};
+
 typedef struct {
-    int     colorbits;
-    int     depthbits;
-    int     stencilbits;
-    int     multisamples;
-    bool    debug;
+    uint8_t     colorbits;
+    uint8_t     depthbits;
+    uint8_t     stencilbits;
+    uint8_t     multisamples;
+    bool        debug;
+    uint8_t     profile;
+    uint8_t     major_ver;
+    uint8_t     minor_ver;
 } r_opengl_config_t;
 
 typedef enum {
@@ -170,17 +163,23 @@ typedef struct {
 } clipRect_t;
 
 typedef enum {
-    IF_NONE         = 0,
-    IF_PERMANENT    = BIT(0),
-    IF_TRANSPARENT  = BIT(1),
-    IF_PALETTED     = BIT(2),
-    IF_UPSCALED     = BIT(3),
-    IF_SCRAP        = BIT(4),
-    IF_TURBULENT    = BIT(5),
-    IF_REPEAT       = BIT(6),
-    IF_NEAREST      = BIT(7),
-    IF_OPAQUE       = BIT(8),
-    IF_SPECIAL      = BIT(9),
+    IF_NONE             = 0,
+    IF_PERMANENT        = BIT(0),   // not freed by R_EndRegistration()
+    IF_TRANSPARENT      = BIT(1),   // known to be transparent
+    IF_PALETTED         = BIT(2),   // loaded from 8-bit paletted format
+    IF_UPSCALED         = BIT(3),   // upscaled
+    IF_SCRAP            = BIT(4),   // put in scrap texture
+    IF_TURBULENT        = BIT(5),   // turbulent surface (don't desaturate, etc)
+    IF_REPEAT           = BIT(6),   // tiling image
+    IF_NEAREST          = BIT(7),   // don't bilerp
+    IF_OPAQUE           = BIT(8),   // known to be opaque
+    IF_DEFAULT_FLARE    = BIT(9),   // default flare hack
+    IF_SPECIAL          = BIT(10),  // 1x1 pixel pure white image
+
+    // not stored in image
+    IF_OPTIONAL         = BIT(16),  // don't warn if not found
+    IF_DIRECT           = BIT(17),  // don't override extension
+    IF_CLASSIC_SKY      = BIT(18),  // split in two halves
 } imageflags_t;
 
 typedef enum {
@@ -228,7 +227,7 @@ void    R_EndRegistration(void);
 #define R_RegisterSkin(name)    R_RegisterImage(name, IT_SKIN, IF_NONE)
 #define R_RegisterSprite(name)  R_RegisterImage(name, IT_SPRITE, IF_NONE)
 
-void    R_RenderFrame(refdef_t *fd);
+void    R_RenderFrame(const refdef_t *fd);
 void    R_LightPoint(const vec3_t origin, vec3_t light);
 
 void    R_ClearColor(void);
@@ -272,23 +271,23 @@ void    R_TileClear(int x, int y, int w, int h, qhandle_t pic);
 void    R_DrawFill8(int x, int y, int w, int h, int c);
 void    R_DrawFill32(int x, int y, int w, int h, uint32_t color);
 
-void    R_AddDebugLine(const vec3_t start, const vec3_t end, color_t color, int time, bool depth_test);
-void    R_AddDebugPoint(const vec3_t point, float size, color_t color, int time, bool depth_test);
-void    R_AddDebugAxis(const vec3_t point, float size, int time, bool depth_test);
-void    R_AddDebugCircle(const vec3_t origin, float radius, color_t color, int time, bool depth_test);
-void    R_AddDebugBounds(const vec3_t absmins, const vec3_t absmaxs, color_t color, int time, bool depth_test);
-void    R_AddDebugSphere(const vec3_t origin, float radius, color_t color, int time, bool depth_test);
+void    R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugPoint(const vec3_t point, float size, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugAxis(const vec3_t origin, const vec3_t angles, float size, uint32_t time, qboolean depth_test);
+void    R_AddDebugCircle(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugBounds(const vec3_t absmins, const vec3_t absmaxs, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugSphere(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test);
 // angles = null to make oriented text
-void    R_AddDebugText(const vec3_t origin, const char *text, float size, const vec3_t angles, color_t color, int time, bool depth_test);
-void    R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, color_t color, int time, bool depth_test);
-void    R_AddDebugRay(const vec3_t start, const vec3_t dir, float length, float size, color_t line_color, color_t arrow_color, int time, bool depth_test);
-void    R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, color_t line_color, color_t arrow_color, int time, bool depth_test);
+void    R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text, float size, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, uint32_t color, uint32_t time, qboolean depth_test);
+void    R_AddDebugRay(const vec3_t start, const vec3_t dir, float length, float size, uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test);
+void    R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test);
 
-void    R_AddDebugCurveArrow(const vec3_t start, const vec3_t ctrl, const vec3_t end, float size, color_t line_color, color_t arrow_color, int time, bool depth_test);
+void    R_AddDebugCurveArrow(const vec3_t start, const vec3_t ctrl, const vec3_t end, float size, uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test);
 
 // video mode and refresh state management entry points
 void    R_BeginFrame(void);
 void    R_EndFrame(void);
 void    R_ModeChanged(int width, int height, int flags);
 
-r_opengl_config_t *R_GetGLConfig(void);
+r_opengl_config_t R_GetGLConfig(void);

@@ -16,16 +16,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 */
 
-#pragma once
+#include "shared/shared.h"
+#include "common/pmove.h"
+#include "shared/game3_shared.h"
+#include "common/game3_pmove.h"
 
-/*
-==============================================================
-
-PLAYER MOVEMENT CODE
-
-Common between server and client so prediction matches
-
-==============================================================
-*/
-
-void game3_Pmove(game3_pmove_t *pmove, pmoveParams_t *params);
+#define PMOVE_NEW 1
+#define PMOVE_TYPE game3_pmove_new_t
+#define PMOVE_FUNC game3_PmoveNew
+#define PMOVE_TIME_SHIFT pmp->time_shift
+#define PMOVE_C2S(x) SignExtend(COORD2SHORT(x), pmp->coord_bits)
+#include "template.c"

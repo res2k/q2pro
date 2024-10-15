@@ -69,14 +69,13 @@ static void V_ClearScene(void)
     r_numparticles = 0;
 }
 
-
 /*
 =====================
 V_AddEntity
 
 =====================
 */
-void V_AddEntity(entity_t *ent)
+void V_AddEntity(const entity_t *ent)
 {
     if (r_numentities >= MAX_ENTITIES)
     {
@@ -96,14 +95,13 @@ void V_AddEntity(entity_t *ent)
     r_entities[r_numentities++] = *ent;
 }
 
-
 /*
 =====================
 V_AddParticle
 
 =====================
 */
-void V_AddParticle(particle_t *p)
+void V_AddParticle(const particle_t *p)
 {
     if (r_numparticles >= MAX_PARTICLES)
         return;
@@ -304,18 +302,20 @@ static int entitycmpfnc(const void *_a, const void *_b)
     const entity_t *a = (const entity_t *)_a;
     const entity_t *b = (const entity_t *)_b;
     
-    bool a_shell = a->flags & (RF_SHELL_MASK);
-    bool b_shell = b->flags & (RF_SHELL_MASK);
-
     // all other models are sorted by model then skin
-    if (a->model == b->model) {
-        if (a_shell == b_shell)
-            return a->skin - b->skin;
-        else
-            return a_shell - b_shell;
-    }
-    else
-        return a->model - b->model;
+    if (a->model > b->model)
+        return 1;
+    if (a->model < b->model)
+        return -1;
+
+    if (a->skin > b->skin)
+        return 1;
+    if (a->skin < b->skin)
+        return -1;
+
+    bool a_shell = a->flags & RF_SHELL_MASK;
+    bool b_shell = b->flags & RF_SHELL_MASK;
+    return a_shell - b_shell;
 }
 
 static void V_SetLightLevel(void)
@@ -355,10 +355,10 @@ float V_CalcFov(float fov_x, float width, float height)
     if (fov_x < 0.75f || fov_x > 179)
         Com_Error(ERR_DROP, "%s: bad fov: %f", __func__, fov_x);
 
-    x = width / tan(fov_x * (M_PI / 360));
+    x = width / tanf(fov_x * (M_PIf / 360));
 
-    a = atan(height / x);
-    a = a * (360 / M_PI);
+    a = atanf(height / x);
+    a = a * (360 / M_PIf);
 
     return a;
 }
@@ -453,17 +453,10 @@ void V_RenderView(void)
             V_TestEntities();
         if (cl_testlights->integer)
             V_TestLights();
-        if (cl_testblend->integer) {
-            cl.refdef.screen_blend[0] = 1;
-            cl.refdef.screen_blend[1] = 0.5f;
-            cl.refdef.screen_blend[2] = 0.25f;
-            cl.refdef.screen_blend[3] = 0.5f;
-
-            cl.refdef.damage_blend[0] = 0.25f;
-            cl.refdef.damage_blend[1] = 0.5f;
-            cl.refdef.damage_blend[2] = 0.7f;
-            cl.refdef.damage_blend[3] = 0.5f;
-        }
+        if (cl_testblend->integer & 1)
+            Vector4Set(cl.refdef.screen_blend, 1, 0.5f, 0.25f, 0.5f);
+        if (cl_testblend->integer & 2)
+            Vector4Set(cl.refdef.damage_blend, 0.25f, 0.5f, 0.7f, 0.5f);
 #endif
 
         // never let it sit exactly on a node line, because a water plane can
@@ -501,8 +494,7 @@ void V_RenderView(void)
             r_numparticles = 0;
         if (!cl_add_lights->integer)
             r_numdlights = 0;
-        if (!cl_add_blend->integer)
-        {
+        if (!cl_add_blend->integer) {
             Vector4Clear(cl.refdef.screen_blend);
             Vector4Clear(cl.refdef.damage_blend);
         }
@@ -515,6 +507,7 @@ void V_RenderView(void)
         cl.refdef.dlights = r_dlights;
         cl.refdef.lightstyles = r_lightstyles;
         cl.refdef.rdflags = cl.frame.ps.rdflags | cl.predicted_rdflags;
+        cl.refdef.extended = cl.csr.extended;
 
         // sort entities for better cache locality
         qsort(cl.refdef.entities, cl.refdef.num_entities, sizeof(cl.refdef.entities[0]), entitycmpfnc);

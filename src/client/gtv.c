@@ -52,7 +52,7 @@ static void build_gamestate(void)
 
     // set protocol flags
     cls.gtv.psFlags = MSG_PS_RERELEASE | MSG_PS_EXTENSIONS;
-    cls.gtv.esFlags = MSG_ES_UMASK | MSG_ES_BEAMORIGIN;
+    cls.gtv.esFlags = MSG_ES_UMASK | MSG_ES_BEAMORIGIN | (cl.esFlags & CL_ES_EXTENDED_MASK_2);
     if (cl.csr.extended)
         cls.gtv.esFlags |= MSG_ES_LONGSOLID | MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS;
 }
@@ -66,16 +66,26 @@ static void emit_gamestate(void)
 
     // send the serverdata
     flags = MVF_SINGLEPOV;
-    if (cl.csr.extended)
+    if (cl.csr.extended) {
         flags |= MVF_EXTLIMITS;
     MSG_WriteByte(mvd_serverdata | (flags << SVCMD_BITS));
     MSG_WriteLong(PROTOCOL_VERSION_MVD);
-    if (cl.is_rerelease_game)
+    if (cl.is_rerelease_game) {
+        MSG_WriteByte(mvd_serverdata | (flags << SVCMD_BITS));
+        MSG_WriteLong(PROTOCOL_VERSION_MVD);
         MSG_WriteShort(PROTOCOL_VERSION_MVD_RERELEASE);
-    else if (cl.csr.extended)
+    } else if (cl.csr.extended) {
+        if (cl.esFlags & MSG_ES_EXTENSIONS_2)
+            flags |= MVF_EXTLIMITS_2;
+        MSG_WriteByte(mvd_serverdata);
+        MSG_WriteLong(PROTOCOL_VERSION_MVD);
         MSG_WriteShort(PROTOCOL_VERSION_MVD_CURRENT);
-    else
+        MSG_WriteShort(flags);
+    } else {
+        MSG_WriteByte(mvd_serverdata | (flags << SVCMD_BITS));
+        MSG_WriteLong(PROTOCOL_VERSION_MVD);
         MSG_WriteShort(PROTOCOL_VERSION_MVD_DEFAULT);
+    }
     MSG_WriteLong(cl.servercount);
     MSG_WriteString(cl.gamedir);
     MSG_WriteShort(-1);
@@ -198,7 +208,7 @@ static void drop_client(const char *reason)
     cls.gtv.state = ca_disconnected;
 }
 
-static void write_stream(void *data, size_t len)
+static void write_stream(const void *data, size_t len)
 {
     if (cls.gtv.state <= ca_disconnected) {
         return;
@@ -220,7 +230,7 @@ static void write_message(gtv_serverop_t op)
     write_stream(msg_write.data, msg_write.cursize);
 }
 
-void CL_GTV_WriteMessage(byte *data, size_t len)
+void CL_GTV_WriteMessage(const byte *data, size_t len)
 {
     if (cls.gtv.state != ca_active)
         return;
@@ -260,7 +270,7 @@ void CL_GTV_Resume(void)
     if (cls.gtv.state != ca_active)
         return;
 
-    SZ_Init(&cls.gtv.message, gtv_message_buffer, sizeof(gtv_message_buffer));
+    SZ_InitWrite(&cls.gtv.message, gtv_message_buffer, sizeof(gtv_message_buffer));
 
     build_gamestate();
     emit_gamestate();

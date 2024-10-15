@@ -34,7 +34,7 @@ void    Sys_FreeLibrary(void *handle);
 void    *Sys_GetProcAddress(void *handle, const char *sym);
 
 unsigned    Sys_Milliseconds(void);
-void    Sys_Sleep(int msec);
+void        Sys_Sleep(int msec);
 
 void    Sys_Init(void);
 void    Sys_AddDefaultConfig(void);
@@ -46,13 +46,15 @@ void    Sys_RunConsole(void);
 void    Sys_ConsoleOutput(const char *text, size_t len);
 void    Sys_SetConsoleTitle(const char *title);
 void    Sys_SetConsoleColor(color_index_t color);
-void    Sys_Printf(const char *fmt, ...) q_printf(1, 2);
+void    Sys_LoadHistory(void);
+void    Sys_SaveHistory(void);
 #else
 #define Sys_RunConsole()                (void)0
 #define Sys_ConsoleOutput(text, len)    (void)0
 #define Sys_SetConsoleTitle(title)      (void)0
 #define Sys_SetConsoleColor(color)      (void)0
-#define Sys_Printf(...)                 (void)0
+#define Sys_LoadHistory()               (void)0
+#define Sys_SaveHistory()               (void)0
 #endif
 
 q_noreturn q_printf(1, 2)
@@ -74,11 +76,11 @@ bool    Sys_GetInstalledGamePath(game_path_t path_type, char *path, size_t path_
 void    Sys_DebugBreak(void);
 
 #if USE_AC_CLIENT
-bool Sys_GetAntiCheatAPI(void);
+bool    Sys_GetAntiCheatAPI(void);
 #endif
 
 #ifndef _WIN32
-bool Sys_SetNonBlock(int fd, bool nb);
+bool    Sys_SetNonBlock(int fd, bool nb);
 #endif
 
 #if USE_MEMORY_TRACES
@@ -88,4 +90,3 @@ void Sys_BackTrace(void **output, size_t count, size_t offset);
 extern cvar_t   *sys_basedir;
 extern cvar_t   *sys_libdir;
 extern cvar_t   *sys_homedir;
-extern cvar_t   *sys_forcegamelib;

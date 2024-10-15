@@ -39,7 +39,7 @@ void vectoangles2(const vec3_t value1, vec3_t angles)
             pitch = 270;
     } else {
         if (value1[0])
-            yaw = RAD2DEG(atan2(value1[1], value1[0]));
+            yaw = RAD2DEG(atan2f(value1[1], value1[0]));
         else if (value1[1] > 0)
             yaw = 90;
         else
@@ -49,7 +49,7 @@ void vectoangles2(const vec3_t value1, vec3_t angles)
             yaw += 360;
 
         forward = sqrtf(value1[0] * value1[0] + value1[1] * value1[1]);
-        pitch = RAD2DEG(atan2(value1[2], forward));
+        pitch = RAD2DEG(atan2f(value1[2], forward));
         if (pitch < 0)
             pitch += 360;
     }
@@ -447,7 +447,7 @@ BoxOnPlaneSide
 Returns 1, 2, or 1 + 2
 ==================
 */
-int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_t *p)
+box_plane_t BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_t *p)
 {
     const vec_t *bounds[2] = { emins, emaxs };
     int     i = p->signbits & 1;
@@ -459,9 +459,9 @@ int BoxOnPlaneSide(const vec3_t emins, const vec3_t emaxs, const cplane_t *p)
     p->normal[1] * bounds[j][1] + \
     p->normal[2] * bounds[k][2]
 
-    vec_t   dist1 = P(i ^ 1, j ^ 1, k ^ 1);
-    vec_t   dist2 = P(i, j, k);
-    int     sides = 0;
+    vec_t       dist1 = P(i ^ 1, j ^ 1, k ^ 1);
+    vec_t       dist2 = P(i, j, k);
+    box_plane_t sides = 0;
 
 #undef P
 
@@ -488,8 +488,8 @@ void SetupRotationMatrix(vec3_t matrix[3], const vec3_t dir, float degrees)
     vec_t   angle, s, c, one_c, xx, yy, zz, xy, yz, zx, xs, ys, zs;
 
     angle = DEG2RAD(degrees);
-    s = sin(angle);
-    c = cos(angle);
+    s = sinf(angle);
+    c = cosf(angle);
     one_c = 1.0F - c;
 
     xx = dir[0] * dir[0];
@@ -513,6 +513,19 @@ void SetupRotationMatrix(vec3_t matrix[3], const vec3_t dir, float degrees)
     matrix[2][0] = (one_c * zx) - ys;
     matrix[2][1] = (one_c * yz) + xs;
     matrix[2][2] = (one_c * zz) + c;
+}
+
+void RotatePointAroundVector(vec3_t out, const vec3_t dir, const vec3_t in, float degrees)
+{
+    vec3_t matrix[3];
+    vec3_t tmp;
+
+    SetupRotationMatrix(matrix, dir, degrees);
+
+    VectorCopy(in, tmp);
+    out[0] = DotProduct(tmp, matrix[0]);
+    out[1] = DotProduct(tmp, matrix[1]);
+    out[2] = DotProduct(tmp, matrix[2]);
 }
 
 #if USE_MD5

@@ -25,6 +25,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/cvar.h"
 #include "common/files.h"
 #include "common/hash_map.h"
+#include "common/intreadwrite.h"
 #include "common/math.h"
 #include "client/video.h"
 #include "client/client.h"
@@ -39,59 +40,33 @@ with this program; if not, write to the Free Software Foundation, Inc.,
  */
 
 #if USE_GLES
-#define QGL_INDEX_TYPE  GLushort
-#define QGL_INDEX_ENUM  GL_UNSIGNED_SHORT
+#define QGL_INDEX_TYPE  GL_UNSIGNED_SHORT
+typedef GLushort glIndex_t;
 #else
-#define QGL_INDEX_TYPE  GLuint
-#define QGL_INDEX_ENUM  GL_UNSIGNED_INT
+#define QGL_INDEX_TYPE  GL_UNSIGNED_INT
+typedef GLuint glIndex_t;
 #endif
 
-#define MAX_TMUS        3
+#define TAB_SIN(x)  gl_static.sintab[(x) & 255]
+#define TAB_COS(x)  gl_static.sintab[((x) + 64) & 255]
 
-#define TAB_SIN(x) gl_static.sintab[(x) & 255]
-#define TAB_COS(x) gl_static.sintab[((x) + 64) & 255]
-
-#define NUM_TEXNUMS     7
-
-typedef struct {
-    const char *name;
-
-    void (*init)(void);
-    void (*shutdown)(void);
-    void (*clear_state)(void);
-    void (*setup_2d)(void);
-    void (*setup_3d)(void);
-
-    void (*load_proj_matrix)(const GLfloat *matrix);
-    void (*load_view_matrix)(const GLfloat *model, const GLfloat *view);
-
-    void (*state_bits)(GLbitfield bits);
-    void (*array_bits)(GLbitfield bits);
-
-    void (*vertex_pointer)(GLint size, GLsizei stride, const GLfloat *pointer);
-    void (*tex_coord_pointer)(GLint size, GLsizei stride, const GLfloat *pointer);
-    void (*light_coord_pointer)(GLint size, GLsizei stride, const GLfloat *pointer);
-    void (*color_byte_pointer)(GLint size, GLsizei stride, const GLubyte *pointer);
-    void (*color_float_pointer)(GLint size, GLsizei stride, const GLfloat *pointer);
-    void (*color)(GLfloat r, GLfloat g, GLfloat b, GLfloat a);
-    void (*normal_pointer)(GLint size, GLsizei stride, const GLfloat *pointer);
-
-    bool (*use_dlights)(void);
-} glbackend_t;
+#define NUM_AUTO_TEXTURES   7
 
 typedef struct {
     GLuint query;
+    float frac;
+    unsigned timestamp;
     bool pending;
     bool visible;
 } glquery_t;
 
 #define PROGRAM_HASH_SIZE   16
 
-#define NUM_UBLOCKS 2
+#define NUM_UNIFORM_BUFFERS 2
 
 enum {
-    UBLOCK_MAIN,
-    UBLOCK_DLIGHTS
+    UNIFORM_BUFFER_MAIN,
+    UNIFORM_BUFFER_DLIGHTS
 };
 
 typedef struct glprogram_s glprogram_t;
@@ -99,21 +74,21 @@ typedef struct glprogram_s glprogram_t;
 typedef struct {
     bool            registering;
     bool            use_shaders;
-    glbackend_t     backend;
     struct {
         bsp_t       *cache;
-        memhunk_t   hunk;
         vec_t       *vertices;
-        GLuint      bufnum;
+        GLuint      buffer;
         vec_t       size;
     } world;
     GLuint          warp_texture;
     GLuint          warp_renderbuffer;
     GLuint          warp_framebuffer;
-    GLuint          u_blocks[NUM_UBLOCKS];
-    glprogram_t     *programs_head;
-    glprogram_t     *programs_hash[PROGRAM_HASH_SIZE];
-    GLuint          texnums[NUM_TEXNUMS];
+    GLuint          uniform_buffers[NUM_UNIFORM_BUFFERS];
+    GLuint          array_object;
+    GLuint          index_buffer;
+    GLuint          vertex_buffer;
+    GLuint          warp_program;
+    GLuint          texnums[NUM_AUTO_TEXTURES];
     GLenum          samples_passed;
     GLbitfield      stencil_buffer_bit;
     float           entity_modulate;
@@ -125,6 +100,8 @@ typedef struct {
     byte            latlngtab[NUMVERTEXNORMALS][2];
     byte            lightstylemap[MAX_LIGHTSTYLES];
     hash_map_t      *queries;
+    hash_map_t      *programs;
+    image_t         *classic_sky;
 } glStatic_t;
 
 typedef struct {
@@ -134,9 +111,11 @@ typedef struct {
     unsigned        visframe;
     unsigned        drawframe;
     unsigned        dlightframe;
-    unsigned        rand_seed;
+    unsigned        timestamp;
+    float           frametime;
     int             viewcluster1;
     int             viewcluster2;
+    int             nodes_visible;
     cplane_t        frustumPlanes[4];
     entity_t        *ent;
     bool            entrotated;
@@ -151,7 +130,7 @@ typedef struct {
     bool            framebuffer_ok;
 } glRefdef_t;
 
-enum {
+typedef enum {
     QGL_CAP_LEGACY                      = BIT(0),
     QGL_CAP_SHADER                      = BIT(1),
     QGL_CAP_TEXTURE_BITS                = BIT(2),
@@ -160,7 +139,12 @@ enum {
     QGL_CAP_TEXTURE_LOD_BIAS            = BIT(5),
     QGL_CAP_TEXTURE_NON_POWER_OF_TWO    = BIT(6),
     QGL_CAP_TEXTURE_ANISOTROPY          = BIT(7),
-};
+    QGL_CAP_UNPACK_SUBIMAGE             = BIT(8),
+    QGL_CAP_ELEMENT_INDEX_UINT          = BIT(9),
+    QGL_CAP_QUERY_RESULT_NO_WAIT        = BIT(10),
+    QGL_CAP_CLIENT_VA                   = BIT(11),
+    QGL_CAP_LINE_SMOOTH                 = BIT(12),
+} glcap_t;
 
 #define QGL_VER(major, minor)   ((major) * 100 + (minor))
 #define QGL_UNPACK_VER(ver)     (ver) / 100, (ver) % 100
@@ -169,10 +153,12 @@ typedef struct {
     int     ver_gl;
     int     ver_es;
     int     ver_sl;
-    int     caps;
+    glcap_t caps;
     int     colorbits;
     int     depthbits;
     int     stencilbits;
+    int     max_texture_size_log2;
+    int     max_texture_size;
 } glConfig_t;
 
 extern glStatic_t gl_static;
@@ -181,10 +167,9 @@ extern glRefdef_t glr;
 
 extern entity_t gl_world;
 
-extern int registration_sequence;
+extern unsigned r_registration_sequence;
 
 typedef struct {
-    int nodesVisible;
     int nodesDrawn;
     int leavesDrawn;
     int facesMarked;
@@ -202,6 +187,8 @@ typedef struct {
     int rotatedBoxesCulled;
     int batchesDrawn2D;
     int uniformUploads;
+    int vertexArrayBinds;
+    int occlusionQueries;
 } statCounters_t;
 
 extern statCounters_t c;
@@ -209,24 +196,29 @@ extern statCounters_t c;
 // regular variables
 extern cvar_t *gl_partscale;
 extern cvar_t *gl_partstyle;
+extern cvar_t *gl_beamstyle;
 extern cvar_t *gl_celshading;
 extern cvar_t *gl_dotshading;
 extern cvar_t *gl_shadows;
 extern cvar_t *gl_modulate;
 extern cvar_t *gl_modulate_world;
 extern cvar_t *gl_coloredlightmaps;
+extern cvar_t *gl_lightmap_bits;
 extern cvar_t *gl_brightness;
 extern cvar_t *gl_dynamic;
 extern cvar_t *gl_dlight_falloff;
 extern cvar_t *gl_modulate_entities;
 extern cvar_t *gl_glowmap_intensity;
+extern cvar_t *gl_flarespeed;
 extern cvar_t *gl_fontshadow;
 extern cvar_t *gl_shaders;
 #if USE_MD5
 extern cvar_t *gl_md5_load;
 extern cvar_t *gl_md5_use;
+extern cvar_t *gl_md5_distance;
 #endif
 extern cvar_t *gl_fog;
+extern cvar_t *gl_damageblend_frac;
 
 // development variables
 extern cvar_t *gl_znear;
@@ -234,9 +226,11 @@ extern cvar_t *gl_drawsky;
 extern cvar_t *gl_showtris;
 #if USE_DEBUG
 extern cvar_t *gl_nobind;
+extern cvar_t *gl_novbo;
 extern cvar_t *gl_test;
 #endif
 extern cvar_t *gl_cull_nodes;
+extern cvar_t *gl_cull_models;
 extern cvar_t *gl_clear;
 extern cvar_t *gl_novis;
 extern cvar_t *gl_lockpvs;
@@ -245,8 +239,9 @@ extern cvar_t *gl_fullbright;
 extern cvar_t *gl_vertexlight;
 extern cvar_t *gl_lightgrid;
 extern cvar_t *gl_showerrors;
-extern cvar_t *gl_damageblend_frac;
 extern cvar_t *gl_per_pixel_lighting; // use_shaders only
+
+extern int32_t gl_shaders_modified;
 
 typedef enum {
     CULL_OUT,
@@ -258,7 +253,7 @@ glCullResult_t GL_CullBox(const vec3_t bounds[2]);
 glCullResult_t GL_CullSphere(const vec3_t origin, float radius);
 glCullResult_t GL_CullLocalBox(const vec3_t origin, const vec3_t bounds[2]);
 
-bool GL_AllocBlock(int width, int height, int *inuse,
+bool GL_AllocBlock(int width, int height, uint16_t *inuse,
                    int w, int h, int *s, int *t);
 
 void GL_MultMatrix(GLfloat *restrict out, const GLfloat *restrict a, const GLfloat *restrict b);
@@ -269,6 +264,23 @@ void GL_RotateForEntity(void);
 void GL_ClearErrors(void);
 bool GL_ShowErrors(const char *func);
 
+void GL_InitQueries(void);
+void GL_DeleteQueries(void);
+
+static inline void GL_AdvanceValue(float *restrict val, float target, float speed)
+{
+    if (speed <= 0) {
+        *val = target;
+    } else if (*val < target) {
+        *val += speed * glr.frametime;
+        if (*val > target)
+            *val = target;
+    } else if (*val > target) {
+        *val -= speed * glr.frametime;
+        if (*val < target)
+            *val = target;
+    }
+}
 
 /*
  * gl_model.c
@@ -280,8 +292,8 @@ typedef struct {
 } maliastc_t;
 
 typedef struct {
-    short   pos[3];
-    byte    norm[2]; // lat, lng
+    int16_t     pos[3];
+    uint8_t     norm[2]; // lat, lng
 } maliasvert_t;
 
 typedef struct {
@@ -298,7 +310,7 @@ typedef struct {
     int             numtris;
     int             numindices;
     int             numskins;
-    QGL_INDEX_TYPE  *indices;
+    glIndex_t       *indices;
     maliasvert_t    *verts;
     maliastc_t      *tcoords;
 #if USE_MD5
@@ -321,10 +333,8 @@ typedef struct {
 #define MD5_MAX_JOINTS      256
 #define MD5_MAX_JOINTNAME   32
 #define MD5_MAX_MESHES      32
-#define MD5_MAX_WEIGHTS     4096
+#define MD5_MAX_WEIGHTS     8192
 #define MD5_MAX_FRAMES      1024
-
-typedef char md5_jointname_t[MD5_MAX_JOINTNAME];
 
 /* Joint */
 typedef struct {
@@ -359,7 +369,7 @@ typedef struct {
 
     md5_vertex_t *vertices;
     maliastc_t *tcoords;
-    QGL_INDEX_TYPE *indices;
+    glIndex_t *indices;
     md5_weight_t *weights;
 } md5_mesh_t;
 
@@ -373,7 +383,6 @@ typedef struct {
     md5_mesh_t *meshes;
     md5_joint_t *base_skeleton;
     md5_joint_t *skeleton_frames; // [num_joints][num_frames]
-    md5_jointname_t *jointnames;
     image_t **skins;
 } md5_model_t;
 
@@ -388,7 +397,7 @@ typedef struct {
     } type;
 
     char name[MAX_QPATH];
-    int registration_sequence;
+    unsigned registration_sequence;
     memhunk_t hunk;
 
     int nummeshes;
@@ -403,6 +412,8 @@ typedef struct {
         maliasframe_t *frames;
         mspriteframe_t *spriteframes;
     };
+
+    GLuint buffer;
 } model_t;
 
 // world: xyz[3] | color[1]  | st[2]    | lmst[2]   | normal[3] | unused[1]
@@ -424,12 +435,12 @@ qhandle_t R_RegisterModel(const char *name);
 #define LIGHT_STYLE(i) \
     &glr.fd.lightstyles[gl_static.lightstylemap[(i)]]
 
-#define LM_MAX_LIGHTMAPS    32
-#define LM_BLOCK_WIDTH      (1 << 10)
+#define LM_MAX_LIGHTMAPS    128
+#define LM_MAX_BLOCK_WIDTH  (1 << 10)
 
 typedef struct lightmap_s {
-    int         mins[2];
-    int         maxs[2];
+    uint16_t    mins[2];
+    uint16_t    maxs[2];
     byte        *buffer;
 } lightmap_t;
 
@@ -437,11 +448,10 @@ typedef struct {
     bool        dirty;
     int         comp, block_size, block_shift;
     float       add, modulate, scale;
-    int         nummaps, maxmaps;
-    int         inuse[LM_BLOCK_WIDTH];
+    int         nummaps, maxmaps, block_bytes;
+    uint16_t    inuse[LM_MAX_BLOCK_WIDTH];
     GLuint      texnums[LM_MAX_LIGHTMAPS];
     lightmap_t  lightmaps[LM_MAX_LIGHTMAPS];
-    byte        buffer[0x4000000];
 } lightmap_builder_t;
 
 extern lightmap_builder_t lm;
@@ -479,32 +489,68 @@ typedef enum glStateBits_e {
     GLS_SKY_FOG             = BIT(14),
     GLS_CLASSIC_SKY         = BIT(15),
     GLS_DYNAMIC_LIGHTS      = BIT(16),
+    GLS_DEFAULT_FLARE       = BIT(17),
 
-    GLS_SHADER_START_BIT    = 6,
-
-    GLS_SHADE_SMOOTH        = BIT(17),
-    GLS_SCROLL_X            = BIT(18),
-    GLS_SCROLL_Y            = BIT(19),
-    GLS_SCROLL_FLIP         = BIT(20),
-    GLS_SCROLL_SLOW         = BIT(21),
+    GLS_SHADE_SMOOTH        = BIT(18),
+    GLS_SCROLL_X            = BIT(19),
+    GLS_SCROLL_Y            = BIT(20),
+    GLS_SCROLL_FLIP         = BIT(21),
+    GLS_SCROLL_SLOW         = BIT(22),
 
     GLS_BLEND_MASK  = GLS_BLEND_BLEND | GLS_BLEND_ADD | GLS_BLEND_MODULATE,
     GLS_COMMON_MASK = GLS_DEPTHMASK_FALSE | GLS_DEPTHTEST_DISABLE | GLS_CULL_DISABLE | GLS_BLEND_MASK,
     GLS_SHADER_MASK = GLS_ALPHATEST_ENABLE | GLS_TEXTURE_REPLACE | GLS_SCROLL_ENABLE |
         GLS_LIGHTMAP_ENABLE | GLS_WARP_ENABLE | GLS_INTENSITY_ENABLE | GLS_GLOWMAP_ENABLE |
-        GLS_FOG_ENABLE | GLS_SKY_FOG | GLS_CLASSIC_SKY | GLS_DYNAMIC_LIGHTS,
+        GLS_FOG_ENABLE | GLS_SKY_FOG | GLS_CLASSIC_SKY | GLS_DYNAMIC_LIGHTS | GLS_DEFAULT_FLARE,
     GLS_SCROLL_MASK = GLS_SCROLL_ENABLE | GLS_SCROLL_X | GLS_SCROLL_Y | GLS_SCROLL_FLIP | GLS_SCROLL_SLOW,
     GLS_UBLOCK_MASK = GLS_SCROLL_MASK | GLS_FOG_ENABLE | GLS_SKY_FOG | GLS_CLASSIC_SKY,
 } glStateBits_t;
 
 typedef enum {
+    VERT_ATTR_POS,
+    VERT_ATTR_TC,
+    VERT_ATTR_LMTC,
+    VERT_ATTR_COLOR,
+    VERT_ATTR_NORMAL,
+
+    VERT_ATTR_COUNT
+} glVertexAttr_t;
+
+typedef enum {
     GLA_NONE        = 0,
-    GLA_VERTEX      = BIT(0),
-    GLA_TC          = BIT(1),
-    GLA_LMTC        = BIT(2),
-    GLA_COLOR       = BIT(3),
-    GLA_NORMAL      = BIT(4),
+    GLA_VERTEX      = BIT(VERT_ATTR_POS),
+    GLA_TC          = BIT(VERT_ATTR_TC),
+    GLA_LMTC        = BIT(VERT_ATTR_LMTC),
+    GLA_COLOR       = BIT(VERT_ATTR_COLOR),
+    GLA_NORMAL      = BIT(VERT_ATTR_NORMAL),
 } glArrayBits_t;
+
+typedef enum {
+    VA_NONE,
+
+    VA_SPRITE,
+    VA_EFFECT,
+    VA_NULLMODEL,
+    VA_OCCLUDE,
+    VA_WATERWARP,
+    VA_MESH_SHADE,
+    VA_MESH_FLAT,  // also used for per-pixel lighting
+    VA_2D,
+    VA_3D,
+
+    VA_TOTAL,
+
+    VA_DEBUG = VA_OCCLUDE // VA_OCCLUDE happens to have the layout needed to debug lines
+} glVertexArray_t;
+
+typedef enum {
+    TMU_TEXTURE,
+    TMU_LIGHTMAP,
+    TMU_GLOWMAP,
+    MAX_TMUS,
+
+    TMU_ALPHAMAP = TMU_LIGHTMAP // classic sky alphamap
+} glTmu_t;
 
 typedef struct {
     vec3_t    position;
@@ -513,42 +559,44 @@ typedef struct {
 } glDlight_t;
 
 typedef struct {
-    GLuint          client_tmu;
-    GLuint          server_tmu;
-    GLuint          texnums[MAX_TMUS];
-    GLbitfield      state_bits;
-    GLbitfield      array_bits;
-    const GLfloat   *currentviewmatrix;
-    const GLfloat   *currentmodelmatrix;
-    struct {
-        GLfloat     model[16];
-        GLfloat     view[16];
-        GLfloat     proj[16];
+    GLfloat     model[16];
+    GLfloat     view[16];
+    GLfloat     proj[16];
+    GLfloat     time;
+    GLfloat     modulate;
+    GLfloat     add;
+    GLfloat     intensity;
+    GLfloat     intensity2;
+    GLfloat     fog_sky_factor;
+    GLfloat     w_amp[2];
+    GLfloat     w_phase[2];
+    GLfloat     scroll[2];
+    GLfloat     height_fog_falloff;
+    GLfloat     height_fog_density;
+    GLint       num_dlights;
+    GLfloat     pad;
+    GLfloat     vieworg[4];
+    GLfloat     global_fog[4];
+    GLfloat     height_fog_start[4];
+    GLfloat     height_fog_end[4];
+} glUniformBlock_t;
 
-        GLfloat     time;
-        GLfloat     modulate;
-        GLfloat     add;
-        GLfloat     intensity;
+typedef struct {
+    glDlight_t     lights[MAX_DLIGHTS];
+} glUniformDlights_t;
 
-        GLfloat     w_amp[2];
-        GLfloat     w_phase[2];
-        GLfloat     scroll[2];
-        GLfloat     fog_sky_factor;
-        GLfloat     intensity2;
-        
-        GLfloat     view_org[4];
-        GLfloat     global_fog[4];
-        GLfloat     height_fog_start[4];
-        GLfloat     height_fog_end[4];
-        GLfloat     height_fog_falloff;
-        GLfloat     height_fog_density;
-        GLint       num_dlights;
-        GLfloat     pad;
-    } u_block;
-
-    struct {
-        glDlight_t     lights[MAX_DLIGHTS];
-    } u_dlights;
+typedef struct {
+    glTmu_t             client_tmu;
+    glTmu_t             server_tmu;
+    GLuint              texnums[MAX_TMUS];
+    glStateBits_t       state_bits;
+    glArrayBits_t       array_bits;
+    GLuint              currentbuffer[2];
+    glVertexArray_t     currentva;
+    const GLfloat      *currentviewmatrix;
+    const GLfloat      *currentmodelmatrix;
+    glUniformBlock_t    u_block;
+    glUniformDlights_t  u_dlights;
 } glState_t;
 
 typedef struct glprogram_s {
@@ -561,7 +609,39 @@ typedef struct glprogram_s {
 
 extern glState_t gls;
 
-static inline void GL_ActiveTexture(GLuint tmu)
+typedef struct {
+    uint8_t size;
+    bool type;
+    uint8_t stride;
+    uint8_t offset;
+} glVaDesc_t;
+
+typedef struct {
+    const char *name;
+
+    void (*init)(void);
+    void (*shutdown)(void);
+    void (*clear_state)(void);
+    void (*setup_2d)(void);
+    void (*setup_3d)(void);
+
+    void (*load_proj_matrix)(const GLfloat *matrix);
+    void (*load_view_matrix)(const GLfloat *model, const GLfloat *view);
+
+    void (*state_bits)(glStateBits_t bits);
+    void (*array_bits)(glArrayBits_t bits);
+
+    void (*array_pointers)(const glVaDesc_t *desc, const GLfloat *ptr);
+    void (*tex_coord_pointer)(const GLfloat *ptr);
+
+    void (*color)(GLfloat r, GLfloat g, GLfloat b, GLfloat a);
+
+    bool (*use_dlights)(void);
+} glbackend_t;
+
+extern const glbackend_t *gl_backend;
+
+static inline void GL_ActiveTexture(glTmu_t tmu)
 {
     if (gls.server_tmu != tmu) {
         qglActiveTexture(GL_TEXTURE0 + tmu);
@@ -569,7 +649,7 @@ static inline void GL_ActiveTexture(GLuint tmu)
     }
 }
 
-static inline void GL_ClientActiveTexture(GLuint tmu)
+static inline void GL_ClientActiveTexture(glTmu_t tmu)
 {
     if (gls.client_tmu != tmu) {
         qglClientActiveTexture(GL_TEXTURE0 + tmu);
@@ -577,39 +657,25 @@ static inline void GL_ClientActiveTexture(GLuint tmu)
     }
 }
 
-static inline void GL_StateBits(GLbitfield bits)
+static inline void GL_StateBits(glStateBits_t bits)
 {
     if (gls.state_bits != bits) {
-        gl_static.backend.state_bits(bits);
+        gl_backend->state_bits(bits);
         gls.state_bits = bits;
     }
 }
 
-static inline void GL_ArrayBits(GLbitfield bits)
+static inline void GL_ArrayBits(glArrayBits_t bits)
 {
     if (gls.array_bits != bits) {
-        gl_static.backend.array_bits(bits);
+        gl_backend->array_bits(bits);
         gls.array_bits = bits;
-    }
-}
-
-static inline void GL_LockArrays(GLsizei count)
-{
-    if (qglLockArraysEXT) {
-        qglLockArraysEXT(0, count);
-    }
-}
-
-static inline void GL_UnlockArrays(void)
-{
-    if (qglUnlockArraysEXT) {
-        qglUnlockArraysEXT();
     }
 }
 
 static inline void GL_ForceMatrix(const GLfloat *model, const GLfloat *view)
 {
-    gl_static.backend.load_view_matrix(model, view);
+    gl_backend->load_view_matrix(model, view);
     gls.currentmodelmatrix = model;
     gls.currentviewmatrix = view;
 }
@@ -619,6 +685,17 @@ static inline void GL_LoadMatrix(const GLfloat *model, const GLfloat *view)
     if (gls.currentmodelmatrix != model ||
         gls.currentviewmatrix != view) {
         GL_ForceMatrix(model, view);
+    }
+}
+
+static inline void GL_BindBuffer(GLenum target, GLuint buffer)
+{
+    const int i = target == GL_ELEMENT_ARRAY_BUFFER;
+    Q_assert(i || target == GL_ARRAY_BUFFER);
+
+    if (gls.currentbuffer[i] != buffer) {
+        qglBindBuffer(target, buffer);
+        gls.currentbuffer[i] = buffer;
     }
 }
 
@@ -638,19 +715,24 @@ static inline void GL_DepthRange(GLfloat n, GLfloat f)
         qglDepthRange(n, f);
 }
 
-#define GL_VertexPointer        gl_static.backend.vertex_pointer
-#define GL_TexCoordPointer      gl_static.backend.tex_coord_pointer
-#define GL_LightCoordPointer    gl_static.backend.light_coord_pointer
-#define GL_ColorBytePointer     gl_static.backend.color_byte_pointer
-#define GL_ColorFloatPointer    gl_static.backend.color_float_pointer
-#define GL_Color                gl_static.backend.color
-#define GL_NormalPointer        gl_static.backend.normal_pointer
+#define GL_Color(r, g, b, a) gl_backend->color(r, g, b, a)
 
-void GL_ForceTexture(GLuint tmu, GLuint texnum);
-void GL_BindTexture(GLuint tmu, GLuint texnum);
-void GL_CommonStateBits(GLbitfield bits);
-void GL_ScrollSpeed(vec2_t scroll, GLbitfield bits);
-void GL_DrawOutlines(GLsizei count, const QGL_INDEX_TYPE *indices);
+#define GL_DrawTriangles(num_indices, indices) \
+    qglDrawElements(GL_TRIANGLES, num_indices, QGL_INDEX_TYPE, indices)
+
+typedef enum {
+    SHOWTRIS_NONE   = 0,
+    SHOWTRIS_WORLD  = BIT(0),
+    SHOWTRIS_MESH   = BIT(1),
+    SHOWTRIS_PIC    = BIT(2),
+    SHOWTRIS_FX     = BIT(3),
+} showtris_t;
+
+void GL_ForceTexture(glTmu_t tmu, GLuint texnum);
+void GL_BindTexture(glTmu_t tmu, GLuint texnum);
+void GL_CommonStateBits(glStateBits_t bits);
+void GL_ScrollPos(vec2_t scroll, glStateBits_t bits);
+void GL_DrawOutlines(GLsizei count, const glIndex_t *indices, bool indexed);
 void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat znear, GLfloat zfar);
 void GL_Frustum(GLfloat fov_x, GLfloat fov_y, GLfloat reflect_x);
 void GL_Setup2D(void);
@@ -658,9 +740,6 @@ void GL_Setup3D(bool waterwarp);
 void GL_ClearState(void);
 void GL_InitState(void);
 void GL_ShutdownState(void);
-
-extern const glbackend_t backend_legacy;
-extern const glbackend_t backend_shader;
 
 /*
  * gl_draw.c
@@ -708,22 +787,22 @@ bool GL_InitWarpTexture(void);
 
 extern cvar_t *gl_intensity;
 
+extern image_t shell_texture;
 
 /*
  * gl_tess.c
  *
  */
-#define TESS_MAX_VERTICES   4096
+#define TESS_MAX_VERTICES   6144
 #define TESS_MAX_INDICES    (3 * TESS_MAX_VERTICES)
 
 typedef struct {
     GLfloat         vertices[VERTEX_SIZE * TESS_MAX_VERTICES];
-    QGL_INDEX_TYPE  indices[TESS_MAX_INDICES];
-    GLubyte         colors[4 * TESS_MAX_VERTICES];
+    glIndex_t       indices[TESS_MAX_INDICES];
     GLuint          texnum[MAX_TMUS];
     int             numverts;
     int             numindices;
-    int             flags;
+    glStateBits_t   flags;
 } tesselator_t;
 
 extern tesselator_t tess;
@@ -731,8 +810,15 @@ extern tesselator_t tess;
 void GL_Flush2D(void);
 void GL_DrawParticles(void);
 void GL_DrawBeams(void);
+void GL_DrawFlares(void);
 
-void GL_BindArrays(void);
+void GL_BindArrays(glVertexArray_t va);
+void GL_LockArrays(GLsizei count);
+void GL_UnlockArrays(void);
+void GL_DrawIndexed(showtris_t showtris);
+void GL_InitArrays(void);
+void GL_ShutdownArrays(void);
+
 void GL_Flush3D(void);
 
 void GL_AddAlphaFace(mface_t *face, entity_t *ent);
@@ -742,7 +828,6 @@ void GL_DrawSolidFaces(void);
 void GL_ClearSolidFaces(void);
 
 // gl_debug.c
-void GL_ClearDebugLines(void);
 void GL_DrawDebugLines(void);
 void GL_InitDebugDraw(void);
 void GL_ShutdownDebugDraw(void);
@@ -760,7 +845,7 @@ void GL_LightPoint(const vec3_t origin, vec3_t color);
  * gl_sky.c
  *
  */
-void R_AddSkySurface(mface_t *surf);
+void R_AddSkySurface(const mface_t *surf);
 void R_ClearSkyBox(void);
 void R_DrawSkyBox(void);
 void R_SetSky(const char *name, float rotate, bool autorotate, const vec3_t axis);
@@ -779,3 +864,11 @@ void GL_DrawAliasModel(const model_t *model);
 void HQ2x_Render(uint32_t *output, const uint32_t *input, int width, int height);
 void HQ4x_Render(uint32_t *output, const uint32_t *input, int width, int height);
 void HQ2x_Init(void);
+
+/*
+ * debug.c
+ *
+ */
+void GL_InitDebugDraw(void);
+void GL_ShutdownDebugDraw(void);
+void GL_DrawDebugLines(void);

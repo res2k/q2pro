@@ -19,6 +19,9 @@ common_src = [
   'src/common/field.c',
   'src/common/fifo.c',
   'src/common/files.c',
+  'src/common/game3_convert.c',
+  'src/common/game3_pmove/new.c',
+  'src/common/game3_pmove/old.c',
   'src/common/natsort.c',
   'src/common/hash_map.c',
   'src/common/loc.c',
@@ -121,7 +124,6 @@ client_src = [
   'src/server/commands.c',
   'src/server/entities.c',
   'src/server/game.c',
-  'src/server/game3_proxy/game3_pmove.c',
   'src/server/game3_proxy/game3_proxy.c',
   'src/server/init.c',
   'src/server/main.c',
@@ -187,7 +189,6 @@ server_src = [
   'src/server/commands.c',
   'src/server/entities.c',
   'src/server/game.c',
-  'src/server/game3_proxy/game3_pmove.c',
   'src/server/game3_proxy/game3_proxy.c',
   'src/server/init.c',
   'src/server/main.c',
@@ -252,7 +253,6 @@ game_src = [
   'src/shared/base85.c',
   'src/shared/m_flash.c',
   'src/shared/shared.c',
-  'src/common/pmove.c',
 ]
 
 cc = meson.get_compiler('c')
@@ -318,6 +318,7 @@ if cc.get_argument_syntax() == 'gcc'
     '-fsigned-char',
     '-fms-extensions',
     '-fno-math-errno',
+    '-fno-trapping-math',
     '-Wpointer-arith',
     '-Wformat-security',
     '-Werror=vla',
@@ -351,6 +352,8 @@ add_project_link_arguments(common_link_args, language: 'c')
 
 config = configuration_data()
 
+texture_formats = []
+
 fallback_opt = ['default_library=static']
 
 zlib = dependency('zlib',
@@ -367,6 +370,9 @@ png = dependency('libpng',
   required:        get_option('libpng'),
   default_options: fallback_opt,
 )
+if png.found()
+  texture_formats += 'png'
+endif
 
 config.set10('USE_ZLIB', zlib.found())
 config.set10('USE_PNG', png.found())
@@ -408,11 +414,17 @@ if jpeg.found()
   endif
   if has_rgba
     client_deps += jpeg
+    texture_formats += 'jpg'
     config.set10('USE_JPG', true)
   endif
 endif
 
+if get_option('tga')
+  texture_formats += 'tga'
+endif
+
 openal = dependency('openal',
+  version:         '>= 1.18.0',
   required:        get_option('openal'),
   default_options: fallback_opt,
 )
@@ -516,6 +528,10 @@ if get_option('tests')
   config.set10('USE_TESTS', true)
 endif
 
+if get_option('debug')
+  refresh_src += 'src/refresh/debug.c'
+endif
+
 if get_option('game-abi-hack').require(x86 and cc.get_id() == 'gcc' and cc.has_argument('-mstackrealign')).allowed()
   config.set10('USE_GAME_ABI_HACK', true)
   engine_args += '-mstackrealign'
@@ -580,12 +596,14 @@ if not win32
   config.set_quoted('LIBDIR',     libdir)
   config.set_quoted('HOMEDIR',    homedir)
 endif
+config.set_quoted('R_TEXTURE_FORMATS', ' '.join(texture_formats))
 config.set_quoted('VID_GEOMETRY', get_option('vid-geometry'))
 config.set_quoted('VID_MODELIST', get_option('vid-modelist'))
 
 config.set10('USE_AUTOREPLY',     get_option('auto-reply'))
 config.set10('USE_DEBUG',         get_option('debug'))
 config.set10('USE_FPS',           get_option('variable-fps'))
+config.set10('USE_GLES',          get_option('opengl-es1'))
 config.set10('USE_ICMP',          get_option('icmp-errors').require(win32 or cc.has_header('linux/errqueue.h')).allowed())
 config.set10('USE_MD3',           get_option('md3'))
 config.set10('USE_MD5',           get_option('md5'))
@@ -594,9 +612,26 @@ config.set10('USE_PACKETDUP',     get_option('packetdup-hack'))
 config.set10('USE_TGA',           get_option('tga'))
 config.set10('USE_' + host_machine.endian().to_upper() + '_ENDIAN', true)
 
+if host_machine.system() == 'darwin'
+  config.set_quoted('DEFGLPROFILE', 'gl3.2')
+elif get_option('opengl-es1')
+  config.set_quoted('DEFGLPROFILE', 'es1')
+else
+  config.set_quoted('DEFGLPROFILE', '')
+endif
+
+# protocol extensions are always on
+config.set10('USE_PROTOCOL_EXTENSIONS', true)
+
 if not win32
   have_backtrace = cc.has_header('execinfo.h') and cc.has_function('backtrace')
   config.set10('HAVE_BACKTRACE',  have_backtrace)
+endif
+config.set10('HAVE_MALLOC_H', cc.has_header('malloc.h'))
+# new game API flag is *always on* for engine,
+# and can be enabled here for game as well
+if get_option('game-new-api')
+  config.set10('USE_NEW_GAME_API', true)
 endif
 
 configure_file(output: 'config.h', configuration: config)
@@ -613,6 +648,7 @@ summary({
   'client-ui'          : config.get('USE_UI', 0) != 0,
   'debug'              : config.get('USE_DEBUG', 0) != 0,
   'game-abi-hack'      : config.get('USE_GAME_ABI_HACK', 0) != 0,
+  'game-new-api'       : config.get('USE_NEW_GAME_API', 0) != 0,
   'icmp-errors'        : config.get('USE_ICMP', 0) != 0,
   'libcurl'            : config.get('USE_CURL', 0) != 0,
   'libjpeg'            : config.get('USE_JPG', 0) != 0,

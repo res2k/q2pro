@@ -20,8 +20,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "client/input.h"
 #include "server/nav.h"
 
-pmoveParams_t   sv_pmp;
-
 master_t    sv_masters[MAX_MASTERS];   // address of group servers
 
 LIST_DECL(sv_banlist);
@@ -79,6 +77,8 @@ cvar_t  *sv_calcpings_method;
 cvar_t  *sv_changemapcmd;
 cvar_t  *sv_max_download_size;
 cvar_t  *sv_max_packet_entities;
+cvar_t  *sv_trunc_packet_entities;
+cvar_t  *sv_prioritize_entities;
 
 cvar_t  *sv_strafejump_hack;
 cvar_t  *sv_waterjump_hack;
@@ -87,7 +87,7 @@ cvar_t  *sv_packetdup_hack;
 #endif
 cvar_t  *sv_allow_map;
 cvar_t  *sv_cinematics;
-#if !USE_CLIENT
+#if USE_SERVER
 cvar_t  *sv_recycle;
 #endif
 cvar_t  *sv_enhanced_setplayer;
@@ -161,6 +161,10 @@ void SV_CleanClient(client_t *client)
     for (i = 0; i < SV_BASELINES_CHUNKS; i++) {
         Z_Freep(&client->baselines[i]);
     }
+
+    // free packet entities
+    Z_Freep(&client->entities);
+    client->num_entities = 0;
 }
 
 static void print_drop_reason(client_t *client, const char *reason, clstate_t oldstate)
@@ -372,7 +376,7 @@ void SV_RateInit(ratelimit_t *r, const char *s)
     r->cost = rate2credits(rate);
 }
 
-addrmatch_t *SV_MatchAddress(list_t *list, netadr_t *addr)
+addrmatch_t *SV_MatchAddress(const list_t *list, const netadr_t *addr)
 {
     addrmatch_t *match;
 
@@ -446,7 +450,7 @@ static size_t SV_StatusString(char *status)
             }
             len = Q_snprintf(entry, sizeof(entry),
                              "%i %i \"%s\"\n",
-                             cl->edict->client->ps.stats[STAT_FRAGS],
+                             SV_GetClient_Stat(cl, STAT_FRAGS),
                              cl->ping, cl->name);
             if (len >= sizeof(entry)) {
                 continue;
@@ -575,7 +579,7 @@ static void SVC_GetChallenge(void)
     unsigned    oldestTime;
 
     oldest = 0;
-    oldestTime = 0xffffffff;
+    oldestTime = UINT_MAX;
 
     // see if we already have a challenge for this ip
     for (i = 0; i < MAX_CHALLENGES; i++) {
@@ -590,7 +594,7 @@ static void SVC_GetChallenge(void)
         }
     }
 
-    challenge = Q_rand() & 0x7fffffff;
+    challenge = Q_rand() & INT_MAX;
     if (i == MAX_CHALLENGES) {
         // overwrite the oldest
         svs.challenges[oldest].challenge = challenge;
@@ -634,7 +638,7 @@ typedef struct {
 
 // small hack to permit one-line return statement :)
 #define reject(...) reject_printf(__VA_ARGS__), false
-#define reject2(...) reject_printf(__VA_ARGS__), NULL
+#define reject_ptr(...) reject_printf(__VA_ARGS__), NULL
 
 static bool parse_basic_params(conn_params_t *p)
 {
@@ -769,12 +773,12 @@ static bool parse_enhanced_params(conn_params_t *p)
     p->has_zlib = !*s || atoi(s);
 
     // set minor protocol version
-    p->version = PROTOCOL_VERSION_Q2PRO_EXTENDED_LIMITS;
+    p->version = PROTOCOL_VERSION_Q2PRO_EXTENDED_LIMITS_2;
 
     return true;
 }
 
-static char *userinfo_ip_string(void)
+static const char *userinfo_ip_string(void)
 {
     // fake up reserved IPv4 address to prevent IPv6 unaware mods from exploding
     if (net_from.type == NA_IP6 && !(g_features->integer & GMF_IPV6_ADDRESS_AWARE)) {
@@ -919,26 +923,26 @@ static client_t *find_client_slot(conn_params_t *params)
 
     // clients that know the password are never redirected
     if (sv_reserved_slots->integer != params->reserved)
-        return reject2("Server and reserved slots are full.\n");
+        return reject_ptr("Server and reserved slots are full.\n");
 
     // optionally redirect them to a different address
     if (*s)
         return redirect(s);
 
-    return reject2("Server is full.\n");
+    return reject_ptr("Server is full.\n");
 }
 
 static void init_pmove_and_es_flags(client_t *newcl)
 {
     // copy default pmove parameters
-    newcl->pmp = sv_pmp;
+    newcl->pmp = svs.pmp;
     newcl->pmp.airaccelerate = sv_airaccelerate->integer;
 
     // common extensions
     newcl->pmp.speedmult = 2;
     newcl->pmp.strafehack = sv_strafejump_hack->integer >= 1;
 
-    // q2pro extensions
+    // Q2PRO extensions
     if (sv_qwmod->integer) {
         PmoveEnableQW(&newcl->pmp);
     }
@@ -949,6 +953,7 @@ static void init_pmove_and_es_flags(client_t *newcl)
     newcl->esFlags |= MSG_ES_SHORTANGLES;
     newcl->esFlags |= MSG_ES_EXTENSIONS;
     newcl->esFlags |= MSG_ES_RERELEASE;
+    newcl->psFlags = MSG_PS_RERELEASE | MSG_PS_EXTENSIONS;
     newcl->pmp.waterhack = sv_waterjump_hack->integer >= 1;
 }
 
@@ -1029,7 +1034,7 @@ static void SVC_DirectConnect(void)
     // accept the new client
     // this is the only place a client_t is ever initialized
     memset(newcl, 0, sizeof(*newcl));
-    newcl->number = newcl->slot = number;
+    newcl->number = newcl->infonum = number;
     newcl->challenge = params.challenge; // save challenge for checksumming
     newcl->protocol = params.protocol;
     newcl->version = params.version;
@@ -1275,14 +1280,14 @@ int SV_CountClients(void)
     return count;
 }
 
-static int ping_nop(client_t *cl)
+static int ping_nop(const client_t *cl)
 {
     return 0;
 }
 
-static int ping_min(client_t *cl)
+static int ping_min(const client_t *cl)
 {
-    client_frame_t *frame;
+    const client_frame_t *frame;
     int i, j, count = INT_MAX;
 
     for (i = 0; i < UPDATE_BACKUP; i++) {
@@ -1299,9 +1304,9 @@ static int ping_min(client_t *cl)
     return count == INT_MAX ? 0 : count;
 }
 
-static int ping_avg(client_t *cl)
+static int ping_avg(const client_t *cl)
 {
-    client_frame_t *frame;
+    const client_frame_t *frame;
     int i, j, total = 0, count = 0;
 
     for (i = 0; i < UPDATE_BACKUP; i++) {
@@ -1328,7 +1333,7 @@ Updates the cl->ping and cl->fps variables
 static void SV_CalcPings(void)
 {
     client_t    *cl;
-    int         (*calc)(client_t *);
+    int         (*calc)(const client_t *);
     int         res;
 
     switch (sv_calcpings_method->integer) {
@@ -1365,7 +1370,7 @@ static void SV_CalcPings(void)
         }
 
         // let the game dll know about the ping
-        cl->edict->client->ping = cl->ping;
+        SV_SetClient_Ping(cl, cl->ping);
     }
 }
 
@@ -1523,7 +1528,7 @@ static void update_client_mtu(client_t *client, int ee_info)
 SV_ErrorEvent
 =================
 */
-void SV_ErrorEvent(netadr_t *from, int ee_errno, int ee_info)
+void SV_ErrorEvent(const netadr_t *from, int ee_errno, int ee_info)
 {
     client_t    *client;
     netchan_t   *netchan;
@@ -1575,6 +1580,11 @@ static void SV_CheckTimeouts(void)
     unsigned    delta;
 
     FOR_EACH_CLIENT(client) {
+        if (Netchan_SeqTooBig(&client->netchan)) {
+            SV_DropClient(client, "outgoing sequence too big");
+            continue;
+        }
+
         // never timeout local clients
         if (NET_IsLocalAddress(&client->netchan.remote_address)) {
             continue;
@@ -2118,14 +2128,16 @@ void SV_Init(void)
     sv_pad_packets = Cvar_Get("sv_pad_packets", "0", 0);
 #endif
     sv_lan_force_rate = Cvar_Get("sv_lan_force_rate", "0", CVAR_LATCH);
-    sv_min_rate = Cvar_Get("sv_min_rate", "1500", CVAR_LATCH);
-    sv_max_rate = Cvar_Get("sv_max_rate", "15000", CVAR_LATCH);
+    sv_min_rate = Cvar_Get("sv_min_rate", "15000", CVAR_LATCH);
+    sv_max_rate = Cvar_Get("sv_max_rate", "60000", CVAR_LATCH);
     sv_max_rate->changed = sv_min_rate->changed = sv_rate_changed;
     sv_max_rate->changed(sv_max_rate);
     sv_calcpings_method = Cvar_Get("sv_calcpings_method", "2", 0);
     sv_changemapcmd = Cvar_Get("sv_changemapcmd", "", 0);
     sv_max_download_size = Cvar_Get("sv_max_download_size", "8388608", 0);
     sv_max_packet_entities = Cvar_Get("sv_max_packet_entities", "0", 0);
+    sv_trunc_packet_entities = Cvar_Get("sv_trunc_packet_entities", "1", 0);
+    sv_prioritize_entities = Cvar_Get("sv_prioritize_entities", "0", 0);
 
     sv_strafejump_hack = Cvar_Get("sv_strafejump_hack", "1", CVAR_LATCH);
     sv_waterjump_hack = Cvar_Get("sv_waterjump_hack", "1", CVAR_LATCH);
@@ -2134,10 +2146,10 @@ void SV_Init(void)
     sv_packetdup_hack = Cvar_Get("sv_packetdup_hack", "0", 0);
 #endif
 
-    sv_allow_map = Cvar_Get("sv_allow_map", "0", 0);
+    sv_allow_map = Cvar_Get("sv_allow_map", COM_DEDICATED ? "0" : "1", 0);
     sv_cinematics = Cvar_Get("sv_cinematics", "1", 0);
 
-#if !USE_CLIENT
+#if USE_SERVER
     sv_recycle = Cvar_Get("sv_recycle", "0", 0);
 #endif
 
@@ -2180,7 +2192,8 @@ void SV_Init(void)
 #endif
 
     // set up default pmove parameters
-    PmoveInit(&sv_pmp);
+    PmoveInit(&svs.pmp);
+    svs.pmp.extended_server_ver = 1;
 
     Nav_Init();
 
@@ -2264,6 +2277,8 @@ void SV_Shutdown(const char *finalmsg, error_type_t type)
     if (!sv_registered)
         return;
 
+    R_ClearDebugLines();    // for local system
+
 #if USE_MVD_CLIENT
     if (ge != &mvd_ge && !(type & MVD_SPAWN_INTERNAL)) {
         // shutdown MVD client now if not already running the built-in MVD game module
@@ -2288,7 +2303,6 @@ void SV_Shutdown(const char *finalmsg, error_type_t type)
 
     // free server static data
     Z_Free(svs.client_pool);
-    Z_Free(svs.entities);
 #if USE_ZLIB
     deflateEnd(&svs.z);
     Z_Free(svs.z_buffer);

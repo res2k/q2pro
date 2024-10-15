@@ -18,8 +18,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "shared/shared.h"
 #include "shared/game3_shared.h"
+#include "common/game3_pmove.h"
 #include "common/pmove.h"
-#include "game3_pmove.h"
 
 #define STEPSIZE    18
 
@@ -45,7 +45,7 @@ typedef struct {
 static game3_pmove_t *pm;
 static pml_t        pml;
 
-static pmoveParams_t    *pmp;
+static const pmoveParams_t    *pmp;
 
 // movement parameters
 static const float  pm_stopspeed = 100;
@@ -1026,7 +1026,7 @@ Pmove
 Can be called by either the server or the client
 ================
 */
-void game3_Pmove(game3_pmove_t *pmove, pmoveParams_t *params)
+void game3_Pmove(game3_pmove_t *pmove, cplane_t* groundplane, const pmoveParams_t *params)
 {
     pm = pmove;
     pmp = params;
@@ -1055,7 +1055,7 @@ void game3_Pmove(game3_pmove_t *pmove, pmoveParams_t *params)
         pml.frametime = pmp->speedmult * pm->cmd.msec * 0.001f;
         PM_FlyMove();
         PM_SnapPosition();
-        return;
+        goto finish;
     }
 
     pml.frametime = pm->cmd.msec * 0.001f;
@@ -1067,7 +1067,7 @@ void game3_Pmove(game3_pmove_t *pmove, pmoveParams_t *params)
     }
 
     if (pm->s.pm_type == G3PM_FREEZE)
-        return;     // no movement at all
+        goto finish;     // no movement at all
 
     // set mins, maxs, and viewheight
     PM_CheckDuck();
@@ -1134,4 +1134,8 @@ void game3_Pmove(game3_pmove_t *pmove, pmoveParams_t *params)
     PM_CategorizePosition();
 
     PM_SnapPosition();
+
+finish:
+    if (groundplane)
+        *groundplane = pml.groundplane;
 }

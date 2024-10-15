@@ -30,6 +30,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 const game_export_t     *ge;
 const game_q2pro_restart_filesystem_t *g_restart_fs;
+const game_q2pro_customize_entity_t   *g_customize_entity;
 
 static void PF_configstring(int index, const char *val);
 
@@ -303,8 +304,6 @@ Also sets mins and maxs for inline bmodels
 */
 static void PF_setmodel(edict_t *ent, const char *name)
 {
-    mmodel_t    *mod;
-
     if (!ent || !name)
         Com_Error(ERR_DROP, "PF_setmodel: NULL");
 
@@ -312,7 +311,7 @@ static void PF_setmodel(edict_t *ent, const char *name)
 
 // if it is an inline model, get the size information for it
     if (name[0] == '*') {
-        mod = CM_InlineModel(&sv.cm, name);
+        const mmodel_t *mod = CM_InlineModel(&sv.cm, name);
         VectorCopy(mod->mins, ent->mins);
         VectorCopy(mod->maxs, ent->maxs);
         PF_LinkEdict(ent);
@@ -354,7 +353,7 @@ static void PF_configstring(int index, const char *val)
     }
 
     // print a warning and truncate everything else
-    maxlen = CS_SIZE(&svs.csr, index);
+    maxlen = Com_ConfigstringSize(&svs.csr, index);
     if (len >= maxlen) {
         Com_WPrintf(
             "%s: index %d overflowed: %zu > %zu\n",
@@ -412,9 +411,14 @@ typedef enum {
     VIS_NOAREAS = 2     // can be OR'ed with one of above
 } vis_t;
 
+static void PF_WritePos(const vec3_t pos)
+{
+    MSG_WritePos(pos);
+}
+
 static qboolean PF_inVIS(const vec3_t p1, const vec3_t p2, vis_t vis)
 {
-    mleaf_t *leaf1, *leaf2;
+    const mleaf_t *leaf1, *leaf2;
     byte mask[VIS_MAX_BYTES];
 
     leaf1 = CM_PointLeaf(&sv.cm, p1);
@@ -425,7 +429,9 @@ static qboolean PF_inVIS(const vec3_t p1, const vec3_t p2, vis_t vis)
         return false;
     if (!Q_IsBitSet(mask, leaf2->cluster))
         return false;
-    if (!(vis & VIS_NOAREAS) && !CM_AreasConnected(&sv.cm, leaf1->area, leaf2->area))
+    if (vis & VIS_NOAREAS)
+        return true;
+    if (!CM_AreasConnected(&sv.cm, leaf1->area, leaf2->area))
         return false;       // a door blocks it
     return true;
 }
@@ -489,7 +495,7 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
     vec3_t      origin_v;
     client_t    *client;
     byte        mask[VIS_MAX_BYTES];
-    mleaf_t     *leaf1, *leaf2;
+    const mleaf_t       *leaf1, *leaf2;
     message_packet_t    *msg;
     bool        force_pos;
 
@@ -505,8 +511,11 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
         Com_Error(ERR_DROP, "%s: soundindex = %d", __func__, soundindex);
 
     vol = volume * 255;
-    att = min(attenuation * 64, 255);   // need to clip due to check above
+    att = attenuation * 64;
     ofs = timeofs * 1000;
+
+    // need to clip due to faulty range check above
+    att = min(att, 255);
 
     ent = NUM_FOR_EDICT(edict);
 
@@ -554,7 +563,7 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
         MSG_WriteByte(ofs);
 
     MSG_WriteShort(sendchan);
-    MSG_WritePos(origin, true);
+    PF_WritePos(origin);
 
     // if the sound doesn't attenuate, send it to everyone
     // (global radio chatter, voiceovers, etc)
@@ -563,11 +572,10 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
 
     // multicast if force sending origin
     if (force_pos) {
-        if (channel & CHAN_NO_PHS_ADD) {
-            SV_Multicast(NULL, MULTICAST_ALL, channel & CHAN_RELIABLE);
-        } else {
-            SV_Multicast(origin, MULTICAST_PHS, channel & CHAN_RELIABLE);
-        }
+        multicast_t to = MULTICAST_PHS;
+        if (channel & CHAN_NO_PHS_ADD)
+            to = MULTICAST_ALL;
+        SV_Multicast(origin, to, channel & CHAN_RELIABLE);
         return;
     }
 
@@ -610,7 +618,7 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
 
         msg = LIST_FIRST(message_packet_t, &client->msg_free_list, entry);
 
-        msg->cursize = 0;
+        msg->cursize = SOUND_PACKET;
         msg->flags = flags;
         msg->index = soundindex;
         msg->volume = vol;
@@ -621,7 +629,7 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
 
         List_Remove(&msg->entry);
         List_Append(&client->msg_unreliable_list, &msg->entry);
-        client->msg_unreliable_bytes += MAX_SOUND_PACKET;
+        client->msg_unreliable_bytes += msg_write.cursize;
     }
 
     // clear multicast buffer
@@ -664,13 +672,11 @@ static void PF_LocalSound(edict_t *target, const vec3_t origin,
     PF_Unicast(target, !!(channel & CHAN_RELIABLE), dupe_key);
 }
 
-void PF_Pmove(pmove_t *pm)
+void PF_Pmove(void *pm)
 {
-    if (sv_client) {
-        Pmove(pm, &sv_client->pmp);
-    } else {
-        Pmove(pm, &sv_pmp);
-    }
+    const pmoveParams_t *pmp = sv_client ? &sv_client->pmp : &svs.pmp;
+
+    Pmove(pm, pmp);
 }
 
 static void PF_WriteEntity(const edict_t *entity)
@@ -807,45 +813,45 @@ static void PF_Loc_Print(edict_t* ent, int level, const char* base, const char**
 
 static void PF_Draw_Line(const vec3_t start, const vec3_t end, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugLine(start, end, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugLine(start, end, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Point(const vec3_t point, const float size, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugPoint(point, size, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugPoint(point, size, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Circle(const vec3_t origin, const float radius, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugCircle(origin, radius, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugCircle(origin, radius, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Bounds(const vec3_t mins, const vec3_t maxs, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugBounds(mins, maxs, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugBounds(mins, maxs, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Sphere(const vec3_t origin, const float radius, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugSphere(origin, radius, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugSphere(origin, radius, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_OrientedWorldText(const vec3_t origin, const char * text, const rgba_t* color, const float size, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugText(origin, text, size, NULL, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugText(origin, NULL, text, size, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_StaticWorldText(const vec3_t origin, const vec3_t angles, const char * text, const rgba_t* color, const float size, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugText(origin, text, size, angles, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugText(origin, angles, text, size, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Cylinder(const vec3_t origin, const float halfHeight, const float radius, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugCylinder(origin, halfHeight, radius, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugCylinder(origin, halfHeight, radius, MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Ray(const vec3_t origin, const vec3_t direction, const float length, const float size, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugRay(origin, direction, length, size, (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) },
-                  (const color_t) { .u32 = MakeColor(color->r, color->g, color->b, color->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugRay(origin, direction, length, size, MakeColor(color->r, color->g, color->b, color->a),
+                  MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Arrow(const vec3_t start, const vec3_t end, const float size, const rgba_t* lineColor, const rgba_t* arrowColor, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugArrow(start, end, size, (const color_t) { .u32 = MakeColor(lineColor->r, lineColor->g, lineColor->b, lineColor->a) },
-                    (const color_t) { .u32 = MakeColor(arrowColor->r, arrowColor->g, arrowColor->b, arrowColor->a) }, lifeTime * 1000, depthTest);
+    R_AddDebugArrow(start, end, size, MakeColor(lineColor->r, lineColor->g, lineColor->b, lineColor->a),
+                    MakeColor(arrowColor->r, arrowColor->g, arrowColor->b, arrowColor->a), lifeTime * 1000, depthTest);
 }
 #else
 static void PF_Draw_Line(const vec3_t start, const vec3_t end, const rgba_t* color, const float lifeTime, const bool depthTest) {}
@@ -877,8 +883,8 @@ static uint32_t PF_ServerFrame(void)
 static void PF_SendToClipboard(const char* text)
 {
 #if USE_CLIENT
-    if(vid.set_clipboard_data)
-        vid.set_clipboard_data(text);
+    if(vid->set_clipboard_data)
+        vid->set_clipboard_data(text);
 #endif
 }
 
@@ -886,11 +892,6 @@ static size_t PF_Info_ValueForKey (const char *s, const char *key, char *buffer,
 {
     char *infostr = Info_ValueForKey(s, key);
     return Q_strlcpy(buffer, infostr, buffer_len);
-}
-
-static void PF_MSG_WritePos (const vec3_t p)
-{
-    MSG_WritePos(p, true);
 }
 
 //==============================================
@@ -930,7 +931,7 @@ static const game_import_t game_import = {
     .WriteLong = MSG_WriteLong,
     .WriteFloat = PF_WriteFloat,
     .WriteString = MSG_WriteString,
-    .WritePosition = PF_MSG_WritePos,
+    .WritePosition = PF_WritePos,
     .WriteDir = MSG_WriteDir,
     .WriteAngle = MSG_WriteAngle,
     .WriteEntity = PF_WriteEntity,
@@ -997,12 +998,35 @@ static const filesystem_api_v1_t filesystem_api_v1 = {
     .ErrorString = Q_ErrorString,
 };
 
+#if USE_REF && USE_DEBUG
+static const debug_draw_api_v1_t debug_draw_api_v1 = {
+    .ClearDebugLines = R_ClearDebugLines,
+    .AddDebugLine = R_AddDebugLine,
+    .AddDebugPoint = R_AddDebugPoint,
+    .AddDebugAxis = R_AddDebugAxis,
+    .AddDebugBounds = R_AddDebugBounds,
+    .AddDebugSphere = R_AddDebugSphere,
+    .AddDebugCircle = R_AddDebugCircle,
+    .AddDebugCylinder = R_AddDebugCylinder,
+    .AddDebugArrow = R_AddDebugArrow,
+    .AddDebugCurveArrow = R_AddDebugCurveArrow,
+    .AddDebugText = R_AddDebugText,
+};
+#endif
+
 static void *PF_GetExtension(const char *name)
 {
     if (!name)
         return NULL;
-    if (!strcmp(name, "FILESYSTEM_API_V1"))
+
+    if (!strcmp(name, FILESYSTEM_API_V1))
         return (void *)&filesystem_api_v1;
+
+#if USE_REF && USE_DEBUG
+    if (!strcmp(name, DEBUG_DRAW_API_V1) && !dedicated->integer)
+        return (void *)&debug_draw_api_v1;
+#endif
+
     return NULL;
 }
 
@@ -1068,8 +1092,8 @@ void SV_InitGameProgs(void)
 
     if (ge->apiversion != GAME_API_VERSION) {
         svs.is_game_rerelease = false;
-        if (ge->apiversion == 3) {
-            Com_DPrintf("Detected version 3 game library, using proxy game\n");
+        if (ge->apiversion == GAME3_API_VERSION_OLD || ge->apiversion == GAME3_API_VERSION_NEW) {
+            Com_DPrintf("Detected version %d game library, using proxy game\n", ge->apiversion);
             ge = GetGame3Proxy(&import, entry, entry_ex);
         } else {
             Com_Error(ERR_DROP, "Game library is version %d, expected %d",
@@ -1091,6 +1115,7 @@ void SV_InitGameProgs(void)
     ge->Init();
 
     g_restart_fs = (game_q2pro_restart_filesystem_t *)ge->GetExtension(game_q2pro_restart_filesystem_ext);
+    g_customize_entity = (game_q2pro_customize_entity_t *)ge->GetExtension(game_q2pro_customize_entity_ext);
 
     if (!svs.is_game_rerelease && (g_features->integer & GMF_PROTOCOL_EXTENSIONS) == 0)
         svs.csr = cs_remap_old;

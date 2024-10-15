@@ -45,7 +45,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/zone.h"
 
 #include "client/client.h"
-#include "client/keys.h"
 #include "server/server.h"
 #include "system/system.h"
 #include "system/hunk.h"
@@ -118,12 +117,23 @@ cvar_t  *allow_download_others;
 
 cvar_t  *rcon_password;
 
+cvar_t  *sys_forcegamelib;
+
+#if USE_SAVEGAMES
+cvar_t  *sys_allow_unsafe_savegames;
+#endif
+
+#if USE_SYSCON
+cvar_t  *sys_history;
+#endif
+
 const char  com_version_string[] =
     APPLICATION " " VERSION " " __DATE__ " " BUILDSTRING " " CPUSTRING;
 
 unsigned    com_framenum;
 unsigned    com_eventTime;
 unsigned    com_localTime;
+unsigned    com_localTime2;
 bool        com_initialized;
 time_t      com_startTime;
 
@@ -346,6 +356,21 @@ static void console_write(print_type_t type, const char *text)
     Sys_ConsoleOutput(buf, len);
 }
 
+#if USE_SYSCON
+void Sys_Printf(const char *fmt, ...)
+{
+    va_list     argptr;
+    char        msg[MAXPRINTMSG];
+    size_t      len;
+
+    va_start(argptr, fmt);
+    len = Q_vscnprintf(msg, sizeof(msg), fmt, argptr);
+    va_end(argptr);
+
+    Sys_ConsoleOutput(msg, len);
+}
+#endif
+
 #ifndef _WIN32
 /*
 =============
@@ -556,6 +581,7 @@ void Com_Error(error_type_t code, const char *fmt, ...)
     SV_Shutdown(va("Server fatal crashed: %s\n", com_errorMsg), ERR_FATAL);
     CL_Shutdown();
     NET_Shutdown();
+    Sys_SaveHistory();
     logfile_close();
     FS_Shutdown();
 
@@ -600,6 +626,7 @@ void Com_Quit(const char *reason, error_type_t type)
     SV_Shutdown(buffer, type);
     CL_Shutdown();
     NET_Shutdown();
+    Sys_SaveHistory();
     logfile_close();
     FS_Shutdown();
     Com_ShutdownAsyncWork();
@@ -613,7 +640,7 @@ static void Com_Quit_f(void)
     Com_Quit(Cmd_Args(), ERR_DISCONNECT);
 }
 
-#if !USE_CLIENT
+#if USE_SERVER
 static void Com_Recycle_f(void)
 {
     Com_Quit(Cmd_Args(), ERR_RECONNECT);
@@ -650,7 +677,7 @@ size_t Com_UptimeLong_m(char *buffer, size_t size)
 
 static size_t Com_Random_m(char *buffer, size_t size)
 {
-    return Q_scnprintf(buffer, size, "%d", Q_rand() % 10);
+    return Q_snprintf(buffer, size, "%d", Q_rand_uniform(10));
 }
 
 static size_t Com_MapList_m(char *buffer, size_t size)
@@ -860,7 +887,7 @@ void Qcommon_Init(int argc, char **argv)
     Cbuf_Init();
     Cmd_Init();
     Cvar_Init();
-    Key_Init();
+    CL_PreInit();
     Prompt_Init();
     Con_Init();
 
@@ -917,6 +944,16 @@ void Qcommon_Init(int argc, char **argv)
 
     rcon_password = Cvar_Get("rcon_password", "", CVAR_PRIVATE);
 
+    sys_forcegamelib = Cvar_Get("sys_forcegamelib", "", CVAR_NOSET);
+
+#if USE_SAVEGAMES
+    sys_allow_unsafe_savegames = Cvar_Get("sys_allow_unsafe_savegames", "0", CVAR_NOSET);
+#endif
+
+#if USE_SYSCON
+    sys_history = Cvar_Get("sys_history", STRINGIFY(HISTORY_SIZE), 0);
+#endif
+
     Cmd_AddCommand("z_stats", Z_Stats_f);
 
     //Cmd_AddCommand("setenv", Com_Setenv_f);
@@ -961,7 +998,7 @@ void Qcommon_Init(int argc, char **argv)
     Cmd_AddCommand("lasterror", Com_LastError_f);
 
     Cmd_AddCommand("quit", Com_Quit_f);
-#if !USE_CLIENT
+#if USE_SERVER
     Cmd_AddCommand("recycle", Com_Recycle_f);
 #endif
 
@@ -972,6 +1009,7 @@ void Qcommon_Init(int argc, char **argv)
     SV_Init();
     CL_Init();
     TST_Init();
+    Sys_LoadHistory();
 
     Sys_RunConsole();
 
@@ -1025,7 +1063,7 @@ void Qcommon_Frame(void)
     static float frac;
 
     if (setjmp(com_abortframe)) {
-        return;            // an ERR_DROP was thrown
+        return; // an ERR_DROP was thrown
     }
 
     Com_CompleteAsyncWork();
@@ -1064,8 +1102,7 @@ void Qcommon_Frame(void)
 
     if (msec > 250) {
         Com_DPrintf("Hitch warning: %u msec frame time\n", msec);
-        msec = 100; // time was unreasonable,
-        // host OS was hibernated or something
+        msec = 100; // time was unreasonable
     }
 
 #if USE_CLIENT
@@ -1085,6 +1122,7 @@ void Qcommon_Frame(void)
 
     // run local time
     com_localTime += msec;
+    com_localTime2 += msec & (sv_paused->integer - 1);
     com_framenum++;
 
 #if USE_CLIENT

@@ -19,57 +19,53 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "gl.h"
 #include "arbfp.h"
 
-static void legacy_state_bits(GLbitfield bits)
+static void legacy_state_bits(glStateBits_t bits)
 {
-    GLbitfield diff = bits ^ gls.state_bits;
+    glStateBits_t diff = bits ^ gls.state_bits;
 
-    if (diff & GLS_COMMON_MASK) {
+    if (diff & GLS_COMMON_MASK)
         GL_CommonStateBits(bits);
-    }
 
     if (diff & GLS_ALPHATEST_ENABLE) {
-        if (bits & GLS_ALPHATEST_ENABLE) {
+        if (bits & GLS_ALPHATEST_ENABLE)
             qglEnable(GL_ALPHA_TEST);
-        } else {
+        else
             qglDisable(GL_ALPHA_TEST);
-        }
     }
 
     if (diff & GLS_TEXTURE_REPLACE) {
-        GL_ActiveTexture(0);
-        if (bits & GLS_TEXTURE_REPLACE) {
+        GL_ActiveTexture(TMU_TEXTURE);
+        if (bits & GLS_TEXTURE_REPLACE)
             qglTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_REPLACE);
-        } else {
+        else
             qglTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-        }
     }
 
     if (diff & GLS_SCROLL_MASK) {
-        GL_ActiveTexture(0);
+        GL_ActiveTexture(TMU_TEXTURE);
         qglMatrixMode(GL_TEXTURE);
         qglLoadIdentity();
 
         if (bits & GLS_SCROLL_ENABLE) {
             vec2_t scroll;
-            GL_ScrollSpeed(scroll, bits);
-            qglTranslatef(scroll[0] * glr.fd.time, scroll[1] * glr.fd.time, 0);
+            GL_ScrollPos(scroll, bits);
+            qglTranslatef(scroll[0], scroll[1], 0);
         }
     }
 
     if (diff & GLS_LIGHTMAP_ENABLE) {
-        GL_ActiveTexture(1);
-        if (bits & GLS_LIGHTMAP_ENABLE) {
+        GL_ActiveTexture(TMU_LIGHTMAP);
+        if (bits & GLS_LIGHTMAP_ENABLE)
             qglEnable(GL_TEXTURE_2D);
-        } else {
+        else
             qglDisable(GL_TEXTURE_2D);
-        }
     }
 
-    if ((diff & GLS_WARP_ENABLE) && gl_static.programs_head) {
+    if ((diff & GLS_WARP_ENABLE) && gl_static.warp_program) {
         if (bits & GLS_WARP_ENABLE) {
             vec4_t param = { glr.fd.time, glr.fd.time };
             qglEnable(GL_FRAGMENT_PROGRAM_ARB);
-            qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, gl_static.programs_head->id);
+            qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, gl_static.warp_program);
             qglProgramLocalParameter4fvARB(GL_FRAGMENT_PROGRAM_ARB, 0, param);
         } else {
             qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, 0);
@@ -78,11 +74,10 @@ static void legacy_state_bits(GLbitfield bits)
     }
 
     if (diff & GLS_SHADE_SMOOTH) {
-        if (bits & GLS_SHADE_SMOOTH) {
+        if (bits & GLS_SHADE_SMOOTH)
             qglShadeModel(GL_SMOOTH);
-        } else {
+        else
             qglShadeModel(GL_FLAT);
-        }
     }
 
     if (diff & GLS_FOG_ENABLE) {
@@ -101,80 +96,75 @@ static void legacy_state_bits(GLbitfield bits)
     }
 }
 
-static void legacy_array_bits(GLbitfield bits)
+static void legacy_array_bits(glArrayBits_t bits)
 {
-    GLbitfield diff = bits ^ gls.array_bits;
+    glArrayBits_t diff = bits ^ gls.array_bits;
 
     if (diff & GLA_VERTEX) {
-        if (bits & GLA_VERTEX) {
+        if (bits & GLA_VERTEX)
             qglEnableClientState(GL_VERTEX_ARRAY);
-        } else {
+        else
             qglDisableClientState(GL_VERTEX_ARRAY);
-        }
     }
 
     if (diff & GLA_TC) {
-        GL_ClientActiveTexture(0);
-        if (bits & GLA_TC) {
+        GL_ClientActiveTexture(TMU_TEXTURE);
+        if (bits & GLA_TC)
             qglEnableClientState(GL_TEXTURE_COORD_ARRAY);
-        } else {
+        else
             qglDisableClientState(GL_TEXTURE_COORD_ARRAY);
-        }
     }
 
     if (diff & GLA_LMTC) {
-        GL_ClientActiveTexture(1);
-        if (bits & GLA_LMTC) {
+        GL_ClientActiveTexture(TMU_LIGHTMAP);
+        if (bits & GLA_LMTC)
             qglEnableClientState(GL_TEXTURE_COORD_ARRAY);
-        } else {
+        else
             qglDisableClientState(GL_TEXTURE_COORD_ARRAY);
-        }
     }
 
     if (diff & GLA_COLOR) {
-        if (bits & GLA_COLOR) {
+        if (bits & GLA_COLOR)
             qglEnableClientState(GL_COLOR_ARRAY);
-        } else {
+        else
             qglDisableClientState(GL_COLOR_ARRAY);
-        }
     }
 }
 
-static void legacy_vertex_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
+static void legacy_array_pointers(const glVaDesc_t *desc, const GLfloat *ptr)
 {
-    qglVertexPointer(size, GL_FLOAT, sizeof(GLfloat) * stride, pointer);
+    uintptr_t base = (uintptr_t)ptr;
+
+    qglVertexPointer(desc->size, GL_FLOAT, desc->stride, (void *)(base + desc->offset));
+    desc++;
+
+    if (desc->size) {
+        GL_ClientActiveTexture(TMU_TEXTURE);
+        qglTexCoordPointer(desc->size, GL_FLOAT, desc->stride, (void *)(base + desc->offset));
+    }
+    desc++;
+
+    if (desc->size && lm.nummaps) {
+        GL_ClientActiveTexture(TMU_LIGHTMAP);
+        qglTexCoordPointer(desc->size, GL_FLOAT, desc->stride, (void *)(base + desc->offset));
+    }
+    desc++;
+
+    if (desc->size) {
+        const GLenum type = desc->type ? GL_UNSIGNED_BYTE : GL_FLOAT;
+        qglColorPointer(desc->size, type, desc->stride, (void *)(base + desc->offset));
+    }
 }
 
-static void legacy_tex_coord_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
+static void legacy_tex_coord_pointer(const GLfloat *ptr)
 {
-    GL_ClientActiveTexture(0);
-    qglTexCoordPointer(size, GL_FLOAT, sizeof(GLfloat) * stride, pointer);
-}
-
-static void legacy_light_coord_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
-{
-    GL_ClientActiveTexture(1);
-    qglTexCoordPointer(size, GL_FLOAT, sizeof(GLfloat) * stride, pointer);
-}
-
-static void legacy_color_byte_pointer(GLint size, GLsizei stride, const GLubyte *pointer)
-{
-    qglColorPointer(size, GL_UNSIGNED_BYTE, sizeof(GLfloat) * stride, pointer);
-}
-
-static void legacy_color_float_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
-{
-    qglColorPointer(size, GL_FLOAT, sizeof(GLfloat) * stride, pointer);
+    GL_ClientActiveTexture(TMU_TEXTURE);
+    qglTexCoordPointer(2, GL_FLOAT, 0, ptr);
 }
 
 static void legacy_color(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 {
     qglColor4f(r, g, b, a);
-}
-
-static void legacy_normal_pointer(GLint size, GLsizei stride, const GLfloat *pointer)
-{
-    // no-op
 }
 
 static void legacy_load_view_matrix(const GLfloat *model, const GLfloat *view)
@@ -187,7 +177,7 @@ static void legacy_load_view_matrix(const GLfloat *model, const GLfloat *view)
         qglLoadIdentity();
 
     if (model)
-        glMultMatrixf(model);
+        qglMultMatrixf(model);
 }
 
 static void legacy_load_proj_matrix(const GLfloat *matrix)
@@ -196,12 +186,8 @@ static void legacy_load_proj_matrix(const GLfloat *matrix)
     qglLoadMatrixf(matrix);
 }
 
-static void legacy_clear_state(void)
+static void legacy_disable_state(void)
 {
-    qglDisable(GL_ALPHA_TEST);
-    qglAlphaFunc(GL_GREATER, 0.666f);
-    qglShadeModel(GL_FLAT);
-
     if (qglActiveTexture && qglClientActiveTexture) {
         qglActiveTexture(GL_TEXTURE1);
         qglBindTexture(GL_TEXTURE_2D, 0);
@@ -220,25 +206,33 @@ static void legacy_clear_state(void)
         qglDisableClientState(GL_TEXTURE_COORD_ARRAY);
     }
 
-    qglMatrixMode(GL_TEXTURE);
-    qglLoadIdentity();
-
     qglDisableClientState(GL_VERTEX_ARRAY);
     qglDisableClientState(GL_COLOR_ARRAY);
 
-    if (gl_static.programs_head) {
+    if (gl_static.warp_program) {
         qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, 0);
         qglDisable(GL_FRAGMENT_PROGRAM_ARB);
     }
+}
+
+static void legacy_clear_state(void)
+{
+    qglDisable(GL_ALPHA_TEST);
+    qglAlphaFunc(GL_GREATER, 0.666f);
+    qglShadeModel(GL_FLAT);
+
+    legacy_disable_state();
+
+    qglMatrixMode(GL_TEXTURE);
+    qglLoadIdentity();
 }
 
 static void legacy_init(void)
 {
     GLuint prog = 0;
 
-    if (!qglGenProgramsARB) {
+    if (!qglGenProgramsARB)
         return;
-    }
 
     GL_ClearErrors();
 
@@ -254,16 +248,16 @@ static void legacy_init(void)
     }
 
     qglBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, 0);
-    gl_static.programs_head = Z_TagMallocz(sizeof(glprogram_t), TAG_RENDERER);
-    gl_static.programs_head->id = prog;
+    gl_static.warp_program = prog;
 }
 
 static void legacy_shutdown(void)
 {
-    if (gl_static.programs_head) {
-        qglDeleteProgramsARB(1, &gl_static.programs_head->id);
-        Z_Free(gl_static.programs_head);
-        gl_static.programs_head = NULL;
+    legacy_disable_state();
+
+    if (gl_static.warp_program) {
+        qglDeleteProgramsARB(1, &gl_static.warp_program);
+        gl_static.warp_program = 0;
     }
 }
 
@@ -285,12 +279,9 @@ const glbackend_t backend_legacy = {
     .state_bits = legacy_state_bits,
     .array_bits = legacy_array_bits,
 
-    .vertex_pointer = legacy_vertex_pointer,
+    .array_pointers = legacy_array_pointers,
     .tex_coord_pointer = legacy_tex_coord_pointer,
-    .light_coord_pointer = legacy_light_coord_pointer,
-    .color_byte_pointer = legacy_color_byte_pointer,
-    .color_float_pointer = legacy_color_float_pointer,
+
     .color = legacy_color,
-    .normal_pointer = legacy_normal_pointer,
     .use_dlights = legacy_use_dlights
 };

@@ -32,20 +32,117 @@ Encode a client frame onto the network channel
 
 /*
 =============
+SV_TruncPacketEntities
+
+Truncates remainder of entity_packed_t list, patching current frame to make
+delta compression happy.
+=============
+*/
+static bool SV_TruncPacketEntities(client_t *client, const client_frame_t *from,
+                                   client_frame_t *to, int oldindex, int newindex)
+{
+    entity_packed_t *newent;
+    const entity_packed_t *oldent;
+    int i, oldnum, newnum, entities_mask, from_num_entities, to_num_entities;
+    bool ret = true;
+
+    if (!sv_trunc_packet_entities->integer || client->netchan.type)
+        return false;
+
+    SV_DPrintf(0, "Truncating frame %d at %u bytes for %s\n",
+               client->framenum, msg_write.cursize, client->name);
+
+    if (!from)
+        from_num_entities = 0;
+    else
+        from_num_entities = from->num_entities;
+    to_num_entities = to->num_entities;
+
+    entities_mask = client->num_entities - 1;
+    oldent = newent = NULL;
+    while (newindex < to->num_entities || oldindex < from_num_entities) {
+        if (newindex >= to->num_entities) {
+            newnum = MAX_EDICTS;
+        } else {
+            i = (to->first_entity + newindex) & entities_mask;
+            newent = &client->entities[i];
+            newnum = newent->number;
+        }
+
+        if (oldindex >= from_num_entities) {
+            oldnum = MAX_EDICTS;
+        } else {
+            i = (from->first_entity + oldindex) & entities_mask;
+            oldent = &client->entities[i];
+            oldnum = oldent->number;
+        }
+
+        if (newnum == oldnum) {
+            // skip delta update
+            *newent = *oldent;
+            oldindex++;
+            newindex++;
+            continue;
+        }
+
+        if (newnum < oldnum) {
+            // remove new entity from frame
+            to->num_entities--;
+            for (i = newindex; i < to->num_entities; i++) {
+                client->entities[(to->first_entity + i    ) & entities_mask] =
+                client->entities[(to->first_entity + i + 1) & entities_mask];
+            }
+            continue;
+        }
+
+        if (newnum > oldnum) {
+            // drop the frame if entity list got too big.
+            // should not normally happen.
+            if (to->num_entities >= MAX_PACKET_ENTITIES) {
+                ret = false;
+                break;
+            }
+
+            // insert old entity into frame
+            for (i = to->num_entities - 1; i >= newindex; i--) {
+                client->entities[(to->first_entity + i + 1) & entities_mask] =
+                client->entities[(to->first_entity + i    ) & entities_mask];
+            }
+
+            client->entities[(to->first_entity + newindex) & entities_mask] = *oldent;
+            to->num_entities++;
+
+            // should never go backwards
+            to_num_entities = max(to_num_entities, to->num_entities);
+
+            oldindex++;
+            newindex++;
+            continue;
+        }
+    }
+
+    client->next_entity = to->first_entity + to_num_entities;
+    return ret;
+}
+
+/*
+=============
 SV_EmitPacketEntities
 
 Writes a delta update of an entity_packed_t list to the message.
 =============
 */
-static void SV_EmitPacketEntities(client_t         *client,
-                                  client_frame_t   *from,
-                                  client_frame_t   *to,
-                                  int              clientEntityNum)
+static bool SV_EmitPacketEntities(client_t *client, const client_frame_t *from,
+                                  client_frame_t *to, int clientEntityNum, unsigned maxsize)
 {
     entity_packed_t *newent;
     const entity_packed_t *oldent;
     int i, oldnum, newnum, oldindex, newindex, from_num_entities;
     msgEsFlags_t flags;
+    bool ret = true;
+
+    if (msg_write.cursize + 2 > maxsize)
+        return false;
 
     if (!from)
         from_num_entities = 0;
@@ -56,24 +153,24 @@ static void SV_EmitPacketEntities(client_t         *client,
     oldindex = 0;
     oldent = newent = NULL;
     while (newindex < to->num_entities || oldindex < from_num_entities) {
-        if (msg_write.cursize + MAX_PACKETENTITY_BYTES > msg_write.maxsize) {
-            Com_WPrintf("%s: frame got too large, aborting.\n", __func__);
+        if (msg_write.cursize + MAX_PACKETENTITY_BYTES > maxsize) {
+            ret = SV_TruncPacketEntities(client, from, to, oldindex, newindex);
             break;
         }
 
         if (newindex >= to->num_entities) {
             newnum = MAX_EDICTS;
         } else {
-            i = (to->first_entity + newindex) % svs.num_entities;
-            newent = &svs.entities[i];
+            i = (to->first_entity + newindex) & (client->num_entities - 1);
+            newent = &client->entities[i];
             newnum = newent->number;
         }
 
         if (oldindex >= from_num_entities) {
             oldnum = MAX_EDICTS;
         } else {
-            i = (from->first_entity + oldindex) % svs.num_entities;
-            oldent = &svs.entities[i];
+            i = (from->first_entity + oldindex) & (client->num_entities - 1);
+            oldent = &client->entities[i];
             oldnum = oldent->number;
         }
 
@@ -126,6 +223,7 @@ static void SV_EmitPacketEntities(client_t         *client,
     }
 
     MSG_WriteShort(0);      // end of packetentities
+    return ret;
 }
 
 static client_frame_t *get_last_frame(client_t *client)
@@ -154,7 +252,7 @@ static client_frame_t *get_last_frame(client_t *client)
         return NULL;
     }
 
-    if (svs.next_entity - frame->first_entity > svs.num_entities) {
+    if (client->next_entity - frame->first_entity > client->num_entities) {
         // but entities are too old
         Com_DPrintf("%s: delta request from out-of-date entities.\n", client->name);
         return NULL;
@@ -168,7 +266,7 @@ static client_frame_t *get_last_frame(client_t *client)
 SV_WriteFrameToClient_Default
 ==================
 */
-void SV_WriteFrameToClient_Default(client_t *client)
+bool SV_WriteFrameToClient_Default(client_t *client, unsigned maxsize)
 {
     client_frame_t  *frame, *oldframe;
     player_packed_t *oldstate;
@@ -204,7 +302,7 @@ void SV_WriteFrameToClient_Default(client_t *client)
 
     // delta encode the entities
     MSG_WriteByte(svc_packetentities);
-    SV_EmitPacketEntities(client, oldframe, frame, 0);
+    return SV_EmitPacketEntities(client, oldframe, frame, 0, maxsize);
 }
 
 /*
@@ -212,7 +310,7 @@ void SV_WriteFrameToClient_Default(client_t *client)
 SV_WriteFrameToClient_Enhanced
 ==================
 */
-void SV_WriteFrameToClient_Enhanced(client_t *client)
+bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
 {
     client_frame_t  *frame, *oldframe;
     player_packed_t *oldstate;
@@ -249,7 +347,7 @@ void SV_WriteFrameToClient_Enhanced(client_t *client)
     MSG_WriteData(frame->areabits, frame->areabytes);
 
     // ignore some parts of playerstate if not recording demo
-    psFlags = 0;
+    psFlags = client->psFlags;
     if (!client->settings[CLS_RECORDING]) {
         if (client->settings[CLS_NOGUN]) {
             psFlags |= MSG_PS_IGNORE_GUNFRAMES;
@@ -298,7 +396,7 @@ void SV_WriteFrameToClient_Enhanced(client_t *client)
     client->frameflags = 0;
 
     // delta encode the entities
-    SV_EmitPacketEntities(client, oldframe, frame, clientEntityNum);
+    return SV_EmitPacketEntities(client, oldframe, frame, clientEntityNum, maxsize);
 }
 
 /*
@@ -311,7 +409,7 @@ Build a client frame structure
 
 #if USE_FPS
 static void
-fix_old_origin(client_t *client, entity_packed_t *state, edict_t *ent, int e)
+fix_old_origin(const client_t *client, entity_packed_t *state, const edict_t *ent, int e)
 {
     server_entity_t *sent = &sv.entities[e];
     int i, j, k;
@@ -354,7 +452,7 @@ fix_old_origin(client_t *client, entity_packed_t *state, edict_t *ent, int e)
 }
 #endif
 
-static bool SV_EntityVisible(client_t *client, server_entity_t *svent, byte *mask)
+static bool SV_EntityVisible(const client_t *client, const server_entity_t *svent, const byte *mask)
 {
     if (svent->num_clusters == -1)
         // too many leafs for individual check, go by headnode
@@ -368,7 +466,7 @@ static bool SV_EntityVisible(client_t *client, server_entity_t *svent, byte *mas
     return false;
 }
 
-static bool SV_EntityAttenuatedAway(vec3_t org, edict_t *ent)
+static bool SV_EntityAttenuatedAway(const vec3_t org, const edict_t *ent)
 {
     float dist = Distance(org, ent->s.origin);
     float dist_mult = SOUND_LOOPATTENUATE;
@@ -377,6 +475,49 @@ static bool SV_EntityAttenuatedAway(vec3_t org, edict_t *ent)
         dist_mult = ent->s.loop_attenuation * SOUND_LOOPATTENUATE_MULT;
 
     return (dist - SOUND_FULLVOLUME) * dist_mult > 1.0f;
+}
+
+#define IS_MONSTER(ent) \
+    ((ent->svflags & (SVF_MONSTER | SVF_DEADMONSTER)) == SVF_MONSTER || (ent->s.renderfx & RF_FRAMELERP))
+
+#define IS_HI_PRIO(ent) \
+    (ent->s.number <= sv_client->maxclients || IS_MONSTER(ent) || ent->solid == SOLID_BSP)
+
+#define IS_GIB(ent) \
+    (sv_client->csr->extended ? (ent->s.renderfx & RF_LOW_PRIORITY) : (ent->s.effects & (EF_GIB | EF_GREENGIB)))
+
+#define IS_LO_PRIO(ent) \
+    (IS_GIB(ent) || (!ent->s.modelindex && !ent->s.effects))
+
+static vec3_t clientorg;
+
+static int entpriocmp(const void *p1, const void *p2)
+{
+    const edict_t *a = *(const edict_t **)p1;
+    const edict_t *b = *(const edict_t **)p2;
+
+    bool hi_a = IS_HI_PRIO(a);
+    bool hi_b = IS_HI_PRIO(b);
+    if (hi_a != hi_b)
+        return hi_b - hi_a;
+
+    bool lo_a = IS_LO_PRIO(a);
+    bool lo_b = IS_LO_PRIO(b);
+    if (lo_a != lo_b)
+        return lo_a - lo_b;
+
+    float dist_a = DistanceSquared(a->s.origin, clientorg);
+    float dist_b = DistanceSquared(b->s.origin, clientorg);
+    if (dist_a > dist_b)
+        return 1;
+    return -1;
+}
+
+static int entnumcmp(const void *p1, const void *p2)
+{
+    const edict_t *a = *(const edict_t **)p1;
+    const edict_t *b = *(const edict_t **)p2;
+    return a->s.number - b->s.number;
 }
 
 /*
@@ -389,23 +530,29 @@ copies off the playerstat and areabits.
 */
 void SV_BuildClientFrame(client_t *client)
 {
-    int         e;
+    int         i, e;
     vec3_t      org;
     edict_t     *ent;
     server_entity_t *svent;
     edict_t     *clent;
     client_frame_t  *frame;
     entity_packed_t *state;
-    player_state_t  *ps;
+    const mleaf_t   *leaf;
     int         clientarea, clientcluster;
-    mleaf_t     *leaf;
     byte        clientphs[VIS_MAX_BYTES];
     byte        clientpvs[VIS_MAX_BYTES];
     int         max_packet_entities;
+    edict_t     *edicts[MAX_EDICTS];
+    int         num_edicts;
+    qboolean (*visible)(edict_t *, edict_t *) = NULL;
+    qboolean (*customize)(edict_t *, edict_t *, customize_entity_t *) = NULL;
+    customize_entity_t temp;
 
     clent = client->edict;
     if (!clent->client)
         return;        // not in game yet
+
+    Q_assert(client->entities);
 
     // this is the frame we are creating
     frame = &client->frames[client->framenum & UPDATE_MASK];
@@ -416,11 +563,10 @@ void SV_BuildClientFrame(client_t *client)
     client->frames_sent++;
 
     // find the client's PVS
-    ps = &clent->client->ps;
-    VectorAdd(ps->viewoffset, ps->pmove.origin, org);
+    SV_GetClient_ViewOrg(client, org);
     // Rerelease game doesn't include viewheight in viewoffset, vanilla does
     if (svs.is_game_rerelease)
-        org[2] += ps->pmove.viewheight;
+        org[2] += clent->client->ps.pmove.viewheight;
 
     leaf = CM_PointLeaf(client->cm, org);
     clientarea = leaf->area;
@@ -434,11 +580,11 @@ void SV_BuildClientFrame(client_t *client)
     }
 
     // grab the current player_state_t
-    MSG_PackPlayer(&frame->ps, ps, MSG_PS_RERELEASE);
+    MSG_PackPlayer(&frame->ps, &clent->client->ps, MSG_PS_RERELEASE);
 
     // grab the current clientNum
     if (g_features->integer & GMF_CLIENTNUM) {
-        frame->clientNum = clent->client->clientNum;
+        frame->clientNum = SV_GetClient_ClientNum(client);
         if (!VALIDATE_CLIENTNUM(client->csr, frame->clientNum)) {
             Com_WPrintf("%s: bad clientNum %d for client %d\n",
                         __func__, frame->clientNum, client->number);
@@ -453,36 +599,45 @@ void SV_BuildClientFrame(client_t *client)
         sv_max_packet_entities->integer > 0 ? sv_max_packet_entities->integer :
         MAX_PACKET_ENTITIES;
 
+    if (g_customize_entity) {
+        visible = g_customize_entity->EntityVisibleToClient;
+        customize = g_customize_entity->CustomizeEntityToClient;
+    }
+
     CM_FatPVS(client->cm, clientpvs, org);
     BSP_ClusterVis(client->cm->cache, clientphs, clientcluster, DVIS_PHS);
 
     // build up the list of visible entities
     frame->num_entities = 0;
-    frame->first_entity = svs.next_entity;
+    frame->first_entity = client->next_entity;
 
+    num_edicts = 0;
     for (e = 1; e < client->ge->num_edicts; e++) {
         ent = EDICT_NUM2(client->ge, e);
         svent = &sv.entities[e];
 
         // ignore entities not in use
-        if (!ent->inuse && (g_features->integer & GMF_PROPERINUSE)) {
+        if (!ent->inuse && (g_features->integer & GMF_PROPERINUSE))
             continue;
-        }
 
         // ignore ents without visible models
         if (ent->svflags & SVF_NOCLIENT)
             continue;
 
         // ignore ents without visible models unless they have an effect
-        if (!HAS_EFFECTS(ent)) {
+        if (!HAS_EFFECTS(ent))
             continue;
+
+        // ignore gibs if client says so
+        if (client->settings[CLS_NOGIBS]) {
+            if (ent->s.effects & EF_GIB && !(client->csr->extended && ent->s.effects & EF_ROCKET))
+                continue;
+            if (ent->s.effects & EF_GREENGIB)
+                continue;
         }
 
-        if ((ent->s.effects & EF_GIB) && client->settings[CLS_NOGIBS]) {
-            continue;
-        }
-
-        if (ent->s.renderfx & RF_FLARE && client->settings[CLS_NOFLARES])
+        // ignore flares if client says so
+        if (client->csr->extended && ent->s.renderfx & RF_FLARE && client->settings[CLS_NOFLARES])
             continue;
 
         // ignore if not touching a PV leaf
@@ -518,15 +673,44 @@ void SV_BuildClientFrame(client_t *client)
             }
         }
 
-        if (ent->s.number != e) {
-            Com_WPrintf("%s: fixing ent->s.number: %d to %d\n",
-                        __func__, ent->s.number, e);
-            ent->s.number = e;
-        }
+        SV_CheckEntityNumber(ent, e);
+
+        // optionally skip it
+        if (visible && !visible(clent, ent))
+            continue;
+
+        edicts[num_edicts++] = ent;
+
+        if (num_edicts == max_packet_entities && !sv_prioritize_entities->integer)
+            break;
+    }
+
+    // prioritize entities on overflow
+    if (num_edicts > max_packet_entities) {
+        VectorCopy(org, clientorg);
+        sv_client = client;
+        sv_player = client->edict;
+        qsort(edicts, num_edicts, sizeof(edicts[0]), entpriocmp);
+        sv_client = NULL;
+        sv_player = NULL;
+        num_edicts = max_packet_entities;
+        qsort(edicts, num_edicts, sizeof(edicts[0]), entnumcmp);
+    }
+
+    for (i = 0; i < num_edicts; i++) {
+        ent = edicts[i];
+        e = ent->s.number;
 
         // add it to the circular client_entities array
-        state = &svs.entities[svs.next_entity % svs.num_entities];
-        MSG_PackEntity(state, &ent->s, true);
+        state = &client->entities[client->next_entity & (client->num_entities - 1)];
+
+        // optionally customize it
+        if (customize && customize(clent, ent, &temp)) {
+            Q_assert(temp.s.number == e);
+            MSG_PackEntity(state, &temp.s, true);
+        } else {
+            MSG_PackEntity(state, &ent->s, true);
+        }
 
 #if USE_FPS
         // fix old entity origins for clients not running at
@@ -550,14 +734,11 @@ void SV_BuildClientFrame(client_t *client)
         if ((!USE_MVD_CLIENT || sv.state != ss_broadcast) && (ent->owner == clent)) {
             // don't mark players missiles as solid
             state->solid = 0;
-        } else if (client->esFlags & MSG_ES_LONGSOLID) {
+        } else if (client->esFlags & MSG_ES_LONGSOLID && !client->csr->extended) {
             state->solid = sv.entities[e].solid32;
         }
 
-        svs.next_entity++;
-
-        if (++frame->num_entities == max_packet_entities) {
-            break;
-        }
+        frame->num_entities++;
+        client->next_entity++;
     }
 }

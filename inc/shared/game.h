@@ -34,16 +34,16 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #define SVF_NOCLIENT            BIT(0)      // don't send entity to clients, even if it has effects
 #define SVF_DEADMONSTER         BIT(1)      // treat as CONTENTS_DEADMONSTER for collision
-#define SVF_MONSTER             BIT(2)      // treat as CONTENTS_MONSTER for collision
+#define SVF_MONSTER             BIT(2)      // only used by server as entity priority hint
 
-#define SVF_PLAYER              BIT(3)
+#define SVF_PLAYER              BIT(3)      // treat as CONTENTS_PLAYER for collision
 #define SVF_BOT                 BIT(4)
 #define SVF_NOBOTS              BIT(5)
 #define SVF_RESPAWNING          BIT(6)
-#define SVF_PROJECTILE          BIT(7)
+#define SVF_PROJECTILE          BIT(7)      // treat as CONTENTS_PROJECTILE for collision
 #define SVF_INSTANCED           BIT(8)
 #define SVF_DOOR                BIT(9)
-#define SVF_NOCULL              BIT(10)
+#define SVF_NOCULL              BIT(10)     // always send entity to clients (no PVS checks)
 #define SVF_HULL                BIT(11)
 
 typedef uint32_t svflags_t;
@@ -85,8 +85,8 @@ typedef struct gclient_s gclient_t;
 #ifndef GAME_INCLUDE
 
 struct gclient_s {
-    player_state_t  ps;     // communicated by server to clients
-    int             ping;
+    player_state_t      ps;     // communicated by server to clients
+    int                 ping;
 
     // set to (client POV entity number) - 1 by game,
     // only valid if g_features has GMF_CLIENTNUM bit
@@ -549,6 +549,17 @@ typedef struct {
 
     void (*RestartFilesystem)(void); // called when fs_restart is issued
 } game_q2pro_restart_filesystem_t;
+
+typedef struct {
+    entity_state_t s;
+} customize_entity_t;
+
+typedef struct {
+    int api_version;
+
+    qboolean    (*CustomizeEntityToClient)(edict_t *client, edict_t *ent, customize_entity_t *temp); // if true is returned, `temp' must be initialized
+    qboolean    (*EntityVisibleToClient)(edict_t *client, edict_t *ent);
+} game_q2pro_customize_entity_t;
 
 //===============================================================
 

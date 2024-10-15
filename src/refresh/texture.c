@@ -30,8 +30,6 @@ static int upload_width;
 static int upload_height;
 static bool upload_alpha;
 
-static int max_texture_size;
-
 static cvar_t *gl_noscrap;
 static cvar_t *gl_round_down;
 static cvar_t *gl_picmip;
@@ -49,6 +47,7 @@ static cvar_t *gl_invert;
 static cvar_t *gl_partshape;
 
 cvar_t *gl_intensity;
+image_t shell_texture;
 
 static int GL_UpscaleLevel(int width, int height, imagetype_t type, imageflags_t flags);
 static void GL_Upload32(byte *data, int width, int height, int baselevel, imagetype_t type, imageflags_t flags);
@@ -73,15 +72,34 @@ static const glmode_t filterModes[] = {
 
 static const int numFilterModes = q_countof(filterModes);
 
+static void update_image_params(unsigned mask)
+{
+    int             i;
+    const image_t   *image;
+
+    for (i = 0, image = r_images; i < r_numImages; i++, image++) {
+        if (!image->name[0])
+            continue;
+        if (!(mask & BIT(image->type)))
+            continue;
+
+        GL_ForceTexture(TMU_TEXTURE, image->texnum);
+        GL_SetFilterAndRepeat(image->type, image->flags);
+
+        if (image->texnum2) {
+            GL_ForceTexture(TMU_TEXTURE, image->texnum2);
+            GL_SetFilterAndRepeat(image->type, image->flags);
+        }
+    }
+}
+
 static void gl_texturemode_changed(cvar_t *self)
 {
-    int     i;
-    image_t *image;
+    int i;
 
-    for (i = 0; i < numFilterModes; i++) {
+    for (i = 0; i < numFilterModes; i++)
         if (!Q_stricmp(filterModes[i].name, self->string))
             break;
-    }
 
     if (i == numFilterModes) {
         Com_WPrintf("Bad texture mode: %s\n", self->string);
@@ -94,17 +112,7 @@ static void gl_texturemode_changed(cvar_t *self)
     }
 
     // change all the existing mipmap texture objects
-    for (i = 0, image = r_images; i < r_numImages; i++, image++) {
-        if (image->type == IT_WALL || image->type == IT_SKIN || image->type == IT_SKY || image->type == IT_CLASSIC_SKY) {
-            GL_ForceTexture(0, image->texnum);
-            GL_SetFilterAndRepeat(image->type, image->flags);
-
-            if (image->glow_texnum) {
-                GL_ForceTexture(0, image->glow_texnum);
-                GL_SetFilterAndRepeat(image->type, image->flags);
-            }
-        }
-    }
+    update_image_params(BIT(IT_WALL) | BIT(IT_SKIN) | BIT(IT_SKY) | BIT(IT_CLASSIC_SKY));
 }
 
 static void gl_texturemode_g(genctx_t *ctx)
@@ -118,8 +126,6 @@ static void gl_texturemode_g(genctx_t *ctx)
 
 static void gl_anisotropy_changed(cvar_t *self)
 {
-    int     i;
-    image_t *image;
     GLfloat value = 1;
 
     if (!(gl_config.caps & QGL_CAP_TEXTURE_ANISOTROPY))
@@ -129,47 +135,21 @@ static void gl_anisotropy_changed(cvar_t *self)
     gl_filter_anisotropy = Cvar_ClampValue(self, 1, value);
 
     // change all the existing mipmap texture objects
-    for (i = 0, image = r_images; i < r_numImages; i++, image++) {
-        if (image->type == IT_WALL || image->type == IT_SKIN) {
-            GL_ForceTexture(0, image->texnum);
-            GL_SetFilterAndRepeat(image->type, image->flags);
-
-            if (image->glow_texnum) {
-                GL_ForceTexture(0, image->glow_texnum);
-                GL_SetFilterAndRepeat(image->type, image->flags);
-            }
-        }
-    }
+    update_image_params(BIT(IT_WALL) | BIT(IT_SKIN));
 }
 
 static void gl_bilerp_chars_changed(cvar_t *self)
 {
-    int     i;
-    image_t *image;
-
     // change all the existing charset texture objects
-    for (i = 0, image = r_images; i < r_numImages; i++, image++) {
-        if (image->type == IT_FONT) {
-            GL_ForceTexture(0, image->texnum);
-            GL_SetFilterAndRepeat(image->type, image->flags);
-        }
-    }
+    update_image_params(BIT(IT_FONT));
 }
 
 static void gl_bilerp_pics_changed(cvar_t *self)
 {
-    int     i;
-    image_t *image;
-
     // change all the existing pic texture objects
-    for (i = 0, image = r_images; i < r_numImages; i++, image++) {
-        if (image->type == IT_PIC) {
-            GL_ForceTexture(0, image->texnum);
-            GL_SetFilterAndRepeat(image->type, image->flags);
-        }
-    }
-
-    GL_InitRawTexture();
+    update_image_params(BIT(IT_PIC));
+    if (r_numImages)
+        GL_InitRawTexture();
 }
 
 static void gl_texturebits_changed(cvar_t *self)
@@ -203,7 +183,7 @@ IMAGE PROCESSING
 static void IMG_ResampleTexture(const byte *in, int inwidth, int inheight,
                                 byte *out, int outwidth, int outheight)
 {
-    int i, j;
+    int         i, j;
     const byte  *inrow1, *inrow2;
     unsigned    frac, fracstep;
     unsigned    p1[MAX_TEXTURE_SIZE], p2[MAX_TEXTURE_SIZE];
@@ -243,7 +223,7 @@ static void IMG_ResampleTexture(const byte *in, int inwidth, int inheight,
     }
 }
 
-static void IMG_MipMap(byte *out, byte *in, int width, int height)
+static void IMG_MipMap(byte *out, const byte *in, int width, int height)
 {
     int     i, j;
 
@@ -273,7 +253,7 @@ static void IMG_MipMap(byte *out, byte *in, int width, int height)
 #define SCRAP_BLOCK_WIDTH       256
 #define SCRAP_BLOCK_HEIGHT      256
 
-static int scrap_inuse[SCRAP_BLOCK_WIDTH];
+static uint16_t scrap_inuse[SCRAP_BLOCK_WIDTH];
 static byte scrap_data[SCRAP_BLOCK_WIDTH * SCRAP_BLOCK_HEIGHT * 4];
 static bool scrap_dirty;
 
@@ -283,17 +263,8 @@ static bool scrap_dirty;
 static void Scrap_Init(void)
 {
     // make scrap texture initially transparent
+    memset(scrap_inuse, 0, sizeof(scrap_inuse));
     memset(scrap_data, 0, sizeof(scrap_data));
-}
-
-static void Scrap_Shutdown(void)
-{
-    int i;
-
-    for (i = 0; i < SCRAP_BLOCK_WIDTH; i++) {
-        scrap_inuse[i] = 0;
-    }
-
     scrap_dirty = false;
 }
 
@@ -302,11 +273,10 @@ void Scrap_Upload(void)
     byte *data;
     int maxlevel;
 
-    if (!scrap_dirty) {
+    if (!scrap_dirty)
         return;
-    }
 
-    GL_ForceTexture(0, TEXNUM_SCRAP);
+    GL_ForceTexture(TMU_TEXTURE, TEXNUM_SCRAP);
 
     // make a copy so that effects like gamma scaling don't accumulate
     data = FS_AllocTempMem(sizeof(scrap_data));
@@ -332,6 +302,7 @@ static byte gammatable[256];
 static byte intensitytable[256];
 static byte gammaintensitytable[256];
 static float colorscale;
+static bool lightscale;
 
 /*
 ================
@@ -388,6 +359,8 @@ static void GL_LightScaleTexture(byte *in, int inwidth, int inheight, imagetype_
 
     if (r_config.flags & QVF_GAMMARAMP)
         return;
+    if (!lightscale)
+        return;
 
     p = in;
     c = inwidth * inheight;
@@ -429,18 +402,14 @@ static void GL_ColorInvertTexture(byte *in, int inwidth, int inheight, imagetype
     }
 }
 
-static bool GL_TextureHasAlpha(byte *data, int width, int height)
+static bool GL_TextureHasAlpha(const byte *data, int width, int height)
 {
-    int         i, c;
-    byte        *scan;
+    int     i, c;
 
     c = width * height;
-    scan = data + 3;
-    for (i = 0; i < c; i++, scan += 4) {
-        if (*scan != 255) {
+    for (i = 0, data += 3; i < c; i++, data += 4)
+        if (*data != 255)
             return true;
-        }
-    }
 
     return false;
 }
@@ -489,7 +458,8 @@ static void GL_Upload32(byte *data, int width, int height, int baselevel, imaget
     }
 
     // don't ever bother with >256 textures
-    while (scaled_width > max_texture_size || scaled_height > max_texture_size) {
+    while (scaled_width > gl_config.max_texture_size ||
+           scaled_height > gl_config.max_texture_size) {
         scaled_width >>= 1;
         scaled_height >>= 1;
     }
@@ -533,9 +503,8 @@ static void GL_Upload32(byte *data, int width, int height, int baselevel, imaget
         upload_alpha = GL_TextureHasAlpha(scaled, scaled_width, scaled_height);
     }
 
-    if (upload_alpha) {
+    if (upload_alpha)
         comp = gl_tex_alpha_format;
-    }
 
     qglTexImage2D(GL_TEXTURE_2D, baselevel, comp, scaled_width,
                   scaled_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, scaled);
@@ -563,9 +532,8 @@ static void GL_Upload32(byte *data, int width, int height, int baselevel, imaget
         }
     }
 
-    if (scaled != data) {
+    if (scaled != data)
         FS_FreeTempMem(scaled);
-    }
 }
 
 static int GL_UpscaleLevel(int width, int height, imagetype_t type, imageflags_t flags)
@@ -584,7 +552,7 @@ static int GL_UpscaleLevel(int width, int height, imagetype_t type, imageflags_t
 
     maxlevel = Cvar_ClampInteger(gl_upscale_pcx, 0, 2);
     while (maxlevel) {
-        int maxsize = max_texture_size >> maxlevel;
+        int maxsize = gl_config.max_texture_size >> maxlevel;
 
         // don't bother upscaling larger than max texture size
         if (width <= maxsize && height <= maxsize)
@@ -623,7 +591,7 @@ static void GL_Upscale32(byte *data, int width, int height, int maxlevel, imaget
     if (upload_width != width || upload_height != height) {
         float du    = upload_width / (float)width;
         float dv    = upload_height / (float)height;
-        float bias  = -log(max(du, dv)) / M_LN2;
+        float bias  = -log2f(max(du, dv));
 
         if (gl_config.caps & QGL_CAP_TEXTURE_LOD_BIAS)
             qglTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, bias);
@@ -731,7 +699,7 @@ void IMG_Load(image_t *image, byte *pic)
         scrap_dirty = true;
     } else {
         qglGenTextures(1, &image->texnum);
-        GL_ForceTexture(0, image->texnum);
+        GL_ForceTexture(TMU_TEXTURE, image->texnum);
 
         maxlevel = GL_UpscaleLevel(width, height, image->type, image->flags);
         if (maxlevel) {
@@ -743,9 +711,8 @@ void IMG_Load(image_t *image, byte *pic)
 
         GL_SetFilterAndRepeat(image->type, image->flags);
 
-        if (upload_alpha) {
+        if (upload_alpha)
             image->flags |= IF_TRANSPARENT;
-        }
         image->upload_width = upload_width << maxlevel;     // after power of 2 and scales
         image->upload_height = upload_height << maxlevel;
         image->sl = 0;
@@ -758,50 +725,75 @@ void IMG_Load(image_t *image, byte *pic)
 void IMG_Unload(image_t *image)
 {
     if (image->texnum && !(image->flags & IF_SCRAP)) {
-        if (gls.texnums[0] == image->texnum)
-            gls.texnums[0] = 0;
-        if (gls.texnums[2] == image->glow_texnum)
-            gls.texnums[2] = 0;
-        qglDeleteTextures(2, (GLuint[2]){ image->texnum, image->glow_texnum });
-        image->texnum = image->glow_texnum = 0;
+        GLuint tex[2] = { image->texnum, image->texnum2 };
+
+        // invalidate bindings
+        for (int i = 0; i < MAX_TMUS; i++)
+            if (gls.texnums[i] == tex[0] || gls.texnums[i] == tex[1])
+                gls.texnums[i] = 0;
+
+        qglDeleteTextures(tex[1] ? 2 : 1, tex);
+        image->texnum = image->texnum2 = 0;
     }
 }
 
 // for screenshots
-void IMG_ReadPixels(screenshot_t *s)
+int IMG_ReadPixels(screenshot_t *s)
 {
     int format = gl_config.ver_es ? GL_RGBA : GL_RGB;
-    int align = 4;
+    int align = 4, bpp = format == GL_RGBA ? 4 : 3;
+
+    if (r_config.width < 1 || r_config.height < 1)
+        return Q_ERR(EINVAL);
 
     qglGetIntegerv(GL_PACK_ALIGNMENT, &align);
 
-    s->bpp = format == GL_RGBA ? 4 : 3;
-    s->rowbytes = ALIGN(r_config.width * s->bpp, align);
-    s->pixels = Z_Malloc(s->rowbytes * r_config.height);
+    if (r_config.width > (INT_MAX - align + 1) / bpp)
+        return Q_ERR(EOVERFLOW);
+
+    int rowbytes = Q_ALIGN(r_config.width * bpp, align);
+
+    if (r_config.height > INT_MAX / rowbytes)
+        return Q_ERR(EOVERFLOW);
+
+    int buf_size = rowbytes * r_config.height;
+
+    s->bpp = bpp;
+    s->rowbytes = rowbytes;
+    s->pixels = Z_Malloc(buf_size);
     s->width = r_config.width;
     s->height = r_config.height;
 
-    qglReadPixels(0, 0, r_config.width, r_config.height,
-                  format, GL_UNSIGNED_BYTE, s->pixels);
+    GL_ClearErrors();
+
+    if (qglReadnPixels)
+        qglReadnPixels(0, 0, r_config.width, r_config.height,
+                       format, GL_UNSIGNED_BYTE, buf_size, s->pixels);
+    else
+        qglReadPixels(0, 0, r_config.width, r_config.height,
+                      format, GL_UNSIGNED_BYTE, s->pixels);
+
+    if (GL_ShowErrors("Failed to read pixels"))
+        return Q_ERR_FAILURE;
+
+    return Q_ERR_SUCCESS;
 }
 
 static void GL_BuildIntensityTable(void)
 {
     int i, j;
-    float f;
+    float f = Cvar_ClampValue(gl_intensity, 1, 5);
 
-    f = Cvar_ClampValue(gl_intensity, 1, 5);
-    if (gl_static.use_shaders)
-        f = 1;
-    for (i = 0; i < 256; i++) {
-        j = i * f;
-        if (j > 255) {
-            j = 255;
-        }
-        intensitytable[i] = j;
+    if (gl_static.use_shaders || f == 1.0f) {
+        for (i = 0; i < 256; i++)
+            intensitytable[i] = i;
+        j = 255;
+    } else {
+        for (i = 0; i < 256; i++)
+            intensitytable[i] = min(i * f, 255);
+        j = 255.0f / f;
     }
 
-    j = 255.0f / f;
     gl_static.inverse_intensity_33 = MakeColor(j, j, j, 85);
     gl_static.inverse_intensity_66 = MakeColor(j, j, j, 170);
     gl_static.inverse_intensity_100 = MakeColor(j, j, j, 255);
@@ -820,10 +812,7 @@ static void GL_BuildGammaTables(void)
     } else {
         for (i = 0; i < 256; i++) {
             inf = 255 * pow((i + 0.5) / 255.5, g) + 0.5;
-            if (inf > 255) {
-                inf = 255;
-            }
-            gammatable[i] = inf;
+            gammatable[i] = min(inf, 255);
             gammaintensitytable[i] = intensitytable[gammatable[i]];
         }
     }
@@ -832,8 +821,8 @@ static void GL_BuildGammaTables(void)
 static void gl_gamma_changed(cvar_t *self)
 {
     GL_BuildGammaTables();
-    if (vid.update_gamma)
-        vid.update_gamma(gammatable);
+    if (vid && vid->update_gamma)
+        vid->update_gamma(gammatable);
 }
 
 static void GL_InitDefaultTexture(void)
@@ -855,12 +844,13 @@ static void GL_InitDefaultTexture(void)
         }
     }
 
-    GL_ForceTexture(0, TEXNUM_DEFAULT);
+    GL_ForceTexture(TMU_TEXTURE, TEXNUM_DEFAULT);
     GL_Upload32(pixels, 32, 32, 0, IT_WALL, IF_TURBULENT);
     GL_SetFilterAndRepeat(IT_WALL, IF_TURBULENT);
 
     // fill in notexture image
     ntx = R_NOTEXTURE;
+    strcpy(ntx->name, "NOTEXTURE");
     ntx->width = ntx->upload_width = 32;
     ntx->height = ntx->upload_height = 32;
     ntx->type = IT_WALL;
@@ -911,7 +901,7 @@ static void GL_InitParticleTexture(void)
         }
     }
 
-    GL_ForceTexture(0, TEXNUM_PARTICLE);
+    GL_ForceTexture(TMU_TEXTURE, TEXNUM_PARTICLE);
     GL_Upload32(pixels, 16, 16, 0, IT_SPRITE, flags);
     GL_SetFilterAndRepeat(IT_SPRITE, flags);
 }
@@ -921,12 +911,12 @@ static void GL_InitWhiteImage(void)
     uint32_t pixel;
 
     pixel = U32_WHITE;
-    GL_ForceTexture(0, TEXNUM_WHITE);
+    GL_ForceTexture(TMU_TEXTURE, TEXNUM_WHITE);
     GL_Upload32((byte *)&pixel, 1, 1, 0, IT_SPRITE, IF_REPEAT | IF_NEAREST);
     GL_SetFilterAndRepeat(IT_SPRITE, IF_REPEAT | IF_NEAREST);
 
     pixel = U32_BLACK;
-    GL_ForceTexture(0, TEXNUM_BLACK);
+    GL_ForceTexture(TMU_TEXTURE, TEXNUM_BLACK);
     GL_Upload32((byte *)&pixel, 1, 1, 0, IT_SPRITE, IF_REPEAT | IF_NEAREST);
     GL_SetFilterAndRepeat(IT_SPRITE, IF_REPEAT | IF_NEAREST);
 }
@@ -951,20 +941,22 @@ static void GL_InitBeamTexture(void)
         }
     }
 
-    GL_ForceTexture(0, TEXNUM_BEAM);
+    GL_ForceTexture(TMU_TEXTURE, TEXNUM_BEAM);
     GL_Upload32(pixels, 16, 16, 0, IT_SPRITE, IF_NONE);
     GL_SetFilterAndRepeat(IT_SPRITE, IF_NONE);
 }
 
 static void GL_InitRawTexture(void)
 {
-    GL_ForceTexture(0, TEXNUM_RAW);
+    GL_ForceTexture(TMU_TEXTURE, TEXNUM_RAW);
     GL_SetFilterAndRepeat(IT_PIC, IF_NONE);
 }
 
 bool GL_InitWarpTexture(void)
 {
-    GL_ForceTexture(0, gl_static.warp_texture);
+    GL_ClearErrors();
+
+    GL_ForceTexture(TMU_TEXTURE, gl_static.warp_texture);
     qglTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, glr.fd.width, glr.fd.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
     qglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     qglTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -975,13 +967,15 @@ bool GL_InitWarpTexture(void)
     qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl_static.warp_texture, 0);
 
     qglBindRenderbuffer(GL_RENDERBUFFER, gl_static.warp_renderbuffer);
-    qglRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_STENCIL, glr.fd.width, glr.fd.height);
+    qglRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, glr.fd.width, glr.fd.height);
     qglBindRenderbuffer(GL_RENDERBUFFER, 0);
 
     qglFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gl_static.warp_renderbuffer);
 
     GLenum status = qglCheckFramebufferStatus(GL_FRAMEBUFFER);
     qglBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    GL_ShowErrors(__func__);
 
     if (status != GL_FRAMEBUFFER_COMPLETE) {
         if (gl_showerrors->integer)
@@ -1020,14 +1014,11 @@ GL_InitImages
 */
 void GL_InitImages(void)
 {
-    GLint integer = 0;
-
     gl_bilerp_chars = Cvar_Get("gl_bilerp_chars", "0", 0);
     gl_bilerp_chars->changed = gl_bilerp_chars_changed;
     gl_bilerp_pics = Cvar_Get("gl_bilerp_pics", "0", 0);
     gl_bilerp_pics->changed = gl_bilerp_pics_changed;
-    gl_texturemode = Cvar_Get("gl_texturemode",
-                              "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE);
+    gl_texturemode = Cvar_Get("gl_texturemode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE);
     gl_texturemode->changed = gl_texturemode_changed;
     gl_texturemode->generator = gl_texturemode_g;
     gl_texturebits = Cvar_Get("gl_texturebits", "0", CVAR_FILES);
@@ -1058,43 +1049,31 @@ void GL_InitImages(void)
     else
         gl_intensity->flags |= CVAR_FILES;
 
-    qglGetIntegerv(GL_MAX_TEXTURE_SIZE, &integer);
-
-    if (integer & (integer - 1)) {
-        integer = Q_npot32(integer) >> 1;
-    }
-
-    max_texture_size = min(integer, MAX_TEXTURE_SIZE);
-
-    // need to load this first for IMG_Init
+    gl_texturemode_changed(gl_texturemode);
     gl_texturebits_changed(gl_texturebits);
+    gl_anisotropy_changed(gl_anisotropy);
 
     IMG_Init();
 
     IMG_GetPalette();
 
-    if (gl_upscale_pcx->integer) {
+    if (gl_upscale_pcx->integer)
         HQ2x_Init();
-    }
 
     GL_BuildIntensityTable();
 
-    if (r_config.flags & QVF_GAMMARAMP) {
+    if (r_config.flags & QVF_GAMMARAMP)
         gl_gamma_changed(gl_gamma);
-    } else {
+    else
         GL_BuildGammaTables();
-    }
 
     // FIXME: the name 'saturation' is misleading in this context
     colorscale = Cvar_ClampValue(gl_saturation, 0, 1);
+    lightscale = !(gl_gamma->value == 1.0f && (gl_static.use_shaders || gl_intensity->value == 1.0f));
 
-    gl_texturemode_changed(gl_texturemode);
-    gl_anisotropy_changed(gl_anisotropy);
-    gl_bilerp_chars_changed(gl_bilerp_chars);
-    gl_bilerp_pics_changed(gl_bilerp_pics);
-
-    qglGenTextures(NUM_TEXNUMS, gl_static.texnums);
+    qglGenTextures(NUM_AUTO_TEXTURES, gl_static.texnums);
     qglGenTextures(LM_MAX_LIGHTMAPS, lm.texnums);
+    shell_texture.texnum = TEXNUM_WHITE;
 
     if (gl_static.use_shaders) {
         qglGenTextures(1, &gl_static.warp_texture);
@@ -1133,8 +1112,12 @@ void GL_ShutdownImages(void)
     gl_partshape->changed = NULL;
 
     // delete auto textures
-    qglDeleteTextures(NUM_TEXNUMS, gl_static.texnums);
+    qglDeleteTextures(NUM_AUTO_TEXTURES, gl_static.texnums);
     qglDeleteTextures(LM_MAX_LIGHTMAPS, lm.texnums);
+
+    memset(gl_static.texnums, 0, sizeof(gl_static.texnums));
+    memset(lm.texnums, 0, sizeof(lm.texnums));
+    memset(&shell_texture, 0, sizeof(shell_texture));
 
     GL_DeleteWarpTexture();
 
@@ -1142,8 +1125,8 @@ void GL_ShutdownImages(void)
     r_charset = 0;
 #endif
 
+    scrap_dirty = false;
+
     IMG_FreeAll();
     IMG_Shutdown();
-
-    Scrap_Shutdown();
 }

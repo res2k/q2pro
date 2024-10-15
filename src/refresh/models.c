@@ -26,7 +26,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #define MOD_Malloc(size)    Hunk_TryAlloc(&model->hunk, size)
 
-#define OOM_CHECK(x)    if (!(x)) { ret = Q_ERR(ENOMEM); goto fail; }
+#define OOM_CHECK(x)    do { if (!(x)) { ret = Q_ERR(ENOMEM); goto fail; } } while (0)
 #define ENSURE(x, e)    if (!(x)) return e
 
 // this used to be MAX_MODELS * 2, but not anymore. MAX_MODELS is 8192 now and
@@ -41,16 +41,13 @@ static model_t *MOD_Alloc(void)
     model_t *model;
     int i;
 
-    for (i = 0, model = r_models; i < r_numModels; i++, model++) {
-        if (!model->type) {
+    for (i = 0, model = r_models; i < r_numModels; i++, model++)
+        if (!model->type)
             break;
-        }
-    }
 
     if (i == r_numModels) {
-        if (r_numModels == MAX_RMODELS) {
+        if (r_numModels == MAX_RMODELS)
             return NULL;
-        }
         r_numModels++;
     }
 
@@ -63,12 +60,10 @@ static model_t *MOD_Find(const char *name)
     int i;
 
     for (i = 0, model = r_models; i < r_numModels; i++, model++) {
-        if (!model->type) {
+        if (!model->type)
             continue;
-        }
-        if (!FS_pathcmp(model->name, name)) {
+        if (!FS_pathcmp(model->name, name))
             return model;
-        }
     }
 
     return NULL;
@@ -85,9 +80,9 @@ static void MOD_List_f(void)
     bytes = count = 0;
 
     for (i = 0, model = r_models; i < r_numModels; i++, model++) {
-        if (!model->type) {
+        if (!model->type)
             continue;
-        }
+
         size_t model_size = model->hunk.mapped;
         int flag = ' ';
 #if USE_MD5
@@ -105,16 +100,34 @@ static void MOD_List_f(void)
     Com_Printf("Total resident: %zu\n", bytes);
 }
 
+static void MOD_Free(model_t *model)
+{
+    Hunk_Free(&model->hunk);
+#if USE_MD5
+    Hunk_Free(&model->skeleton_hunk);
+#endif
+
+    if (model->buffer) {
+        // invalidate bindings
+        for (int i = 0; i < 2; i++)
+            if (gls.currentbuffer[i] == model->buffer)
+                gls.currentbuffer[i] = 0;
+        qglDeleteBuffers(1, &model->buffer);
+    }
+
+    memset(model, 0, sizeof(*model));
+}
+
 void MOD_FreeUnused(void)
 {
     model_t *model;
     int i;
 
     for (i = 0, model = r_models; i < r_numModels; i++, model++) {
-        if (!model->type) {
+        if (!model->type)
             continue;
-        }
-        if (model->registration_sequence == registration_sequence) {
+
+        if (model->registration_sequence == r_registration_sequence) {
             // make sure it is paged in
             Com_PageInMemory(model->hunk.base, model->hunk.cursize);
 #if USE_MD5
@@ -123,11 +136,7 @@ void MOD_FreeUnused(void)
 #endif
         } else {
             // don't need this model
-            Hunk_Free(&model->hunk);
-#if USE_MD5
-            Hunk_Free(&model->skeleton_hunk);
-#endif
-            memset(model, 0, sizeof(*model));
+            MOD_Free(model);
         }
     }
 }
@@ -137,17 +146,9 @@ void MOD_FreeAll(void)
     model_t *model;
     int i;
 
-    for (i = 0, model = r_models; i < r_numModels; i++, model++) {
-        if (!model->type) {
-            continue;
-        }
-
-        Hunk_Free(&model->hunk);
-#if USE_MD5
-        Hunk_Free(&model->skeleton_hunk);
-#endif
-        memset(model, 0, sizeof(*model));
-    }
+    for (i = 0, model = r_models; i < r_numModels; i++, model++)
+        if (model->type)
+            MOD_Free(model);
 
     r_numModels = 0;
 }
@@ -185,11 +186,11 @@ static int MOD_LoadSP2(model_t *model, const void *rawdata, size_t length)
         return Q_ERR_SUCCESS;
     }
     if (header.numframes > SP2_MAX_FRAMES) {
-        Com_SetLastError("too many frames");
+        Com_SetLastError("Too many frames");
         return Q_ERR_INVALID_FORMAT;
     }
     if (sizeof(dsp2header_t) + sizeof(dsp2frame_t) * header.numframes > length) {
-        Com_SetLastError("frames out of bounds");
+        Com_SetLastError("Frames out of bounds");
         return Q_ERR_INVALID_FORMAT;
     }
 
@@ -227,28 +228,28 @@ static int MOD_LoadSP2(model_t *model, const void *rawdata, size_t length)
 
 static const char *MOD_ValidateMD2(const dmd2header_t *header, size_t length)
 {
-    ENSURE(header->num_tris <= TESS_MAX_INDICES / 3, "too many tris");
-    ENSURE(header->num_st <= INT_MAX / sizeof(dmd2stvert_t), "too many st");
-    ENSURE(header->num_xyz <= MD2_MAX_VERTS, "too many xyz");
-    ENSURE(header->num_frames <= MD2_MAX_FRAMES, "too many frames");
-    ENSURE(header->num_skins <= MD2_MAX_SKINS, "too many skins");
+    ENSURE(header->num_tris <= TESS_MAX_INDICES / 3, "Too many tris");
+    ENSURE(header->num_st <= INT_MAX / sizeof(dmd2stvert_t), "Too many st");
+    ENSURE(header->num_xyz <= MD2_MAX_VERTS, "Too many xyz");
+    ENSURE(header->num_frames <= MD2_MAX_FRAMES, "Too many frames");
+    ENSURE(header->num_skins <= MD2_MAX_SKINS, "Too many skins");
 
     Q_assert(header->num_xyz);
-    ENSURE(header->framesize >= sizeof(dmd2frame_t) + (header->num_xyz - 1) * sizeof(dmd2trivertx_t), "too small frame size");
-    ENSURE(header->framesize <= MD2_MAX_FRAMESIZE, "too big frame size");
+    ENSURE(header->framesize >= sizeof(dmd2frame_t) + (header->num_xyz - 1) * sizeof(dmd2trivertx_t), "Too small frame size");
+    ENSURE(header->framesize <= MD2_MAX_FRAMESIZE, "Too big frame size");
 
-    ENSURE((uint64_t)header->ofs_tris + header->num_tris * sizeof(dmd2triangle_t) <= length, "bad tris offset");
-    ENSURE((uint64_t)header->ofs_st + header->num_st * sizeof(dmd2stvert_t) <= length, "bad st offset");
-    ENSURE((uint64_t)header->ofs_frames + header->num_frames * header->framesize <= length, "bad frames offset");
-    ENSURE((uint64_t)header->ofs_skins + MD2_MAX_SKINNAME * header->num_skins <= length, "bad skins offset");
+    ENSURE((uint64_t)header->ofs_tris + header->num_tris * sizeof(dmd2triangle_t) <= length, "Bad tris offset");
+    ENSURE((uint64_t)header->ofs_st + header->num_st * sizeof(dmd2stvert_t) <= length, "Bad st offset");
+    ENSURE((uint64_t)header->ofs_frames + header->num_frames * header->framesize <= length, "Bad frames offset");
+    ENSURE((uint64_t)header->ofs_skins + MD2_MAX_SKINNAME * header->num_skins <= length, "Bad skins offset");
 
-    ENSURE(!(header->ofs_tris % q_alignof(dmd2triangle_t)), "odd tris offset");
-    ENSURE(!(header->ofs_st % q_alignof(dmd2stvert_t)), "odd st offset");
-    ENSURE(!(header->ofs_frames % q_alignof(dmd2frame_t)), "odd frames offset");
-    ENSURE(!(header->framesize % q_alignof(dmd2frame_t)), "odd frame size");
+    ENSURE(!(header->ofs_tris % q_alignof(dmd2triangle_t)), "Odd tris offset");
+    ENSURE(!(header->ofs_st % q_alignof(dmd2stvert_t)), "Odd st offset");
+    ENSURE(!(header->ofs_frames % q_alignof(dmd2frame_t)), "Odd frames offset");
+    ENSURE(!(header->framesize % q_alignof(dmd2frame_t)), "Odd frame size");
 
-    ENSURE(header->skinwidth >= 1 && header->skinwidth <= MAX_TEXTURE_SIZE, "bad skin width");
-    ENSURE(header->skinheight >= 1 && header->skinheight <= MAX_TEXTURE_SIZE, "bad skin height");
+    ENSURE(header->skinwidth >= 1 && header->skinwidth <= MAX_TEXTURE_SIZE, "Bad skin width");
+    ENSURE(header->skinheight >= 1 && header->skinheight <= MAX_TEXTURE_SIZE, "Bad skin height");
     return NULL;
 }
 
@@ -274,9 +275,8 @@ static int MOD_LoadMD2(model_t *model, const void *rawdata, size_t length)
     vec3_t          mins, maxs;
     const char      *err;
 
-    if (length < sizeof(header)) {
+    if (length < sizeof(header))
         return Q_ERR_FILE_TOO_SMALL;
-    }
 
     // byte swap the header
     LittleBlock(&header, rawdata, sizeof(header));
@@ -309,9 +309,8 @@ static int MOD_LoadMD2(model_t *model, const void *rawdata, size_t length)
             uint16_t idx_st = LittleShort(src_tri->index_st[j]);
 
             // some broken models have 0xFFFF indices
-            if (idx_xyz >= header.num_xyz || idx_st >= header.num_st) {
+            if (idx_xyz >= header.num_xyz || idx_st >= header.num_st)
                 break;
-            }
 
             vertIndices[numindices + j] = idx_xyz;
             tcIndices[numindices + j] = idx_st;
@@ -324,21 +323,19 @@ static int MOD_LoadMD2(model_t *model, const void *rawdata, size_t length)
     }
 
     if (numindices < 3) {
-        Com_SetLastError("too few valid indices");
+        Com_SetLastError("Too few valid indices");
         return Q_ERR_INVALID_FORMAT;
     }
 
-    for (i = 0; i < numindices; i++) {
+    for (i = 0; i < numindices; i++)
         remap[i] = 0xFFFF;
-    }
 
     // remap all triangle indices
     numverts = 0;
     src_tc = (dmd2stvert_t *)((byte *)rawdata + header.ofs_st);
     for (i = 0; i < numindices; i++) {
-        if (remap[i] != 0xFFFF) {
+        if (remap[i] != 0xFFFF)
             continue; // already remapped
-        }
 
         for (j = i + 1; j < numindices; j++) {
             if (vertIndices[i] == vertIndices[j] &&
@@ -356,7 +353,7 @@ static int MOD_LoadMD2(model_t *model, const void *rawdata, size_t length)
     }
 
     if (numverts > TESS_MAX_VERTICES) {
-        Com_SetLastError("too many verts");
+        Com_SetLastError("Too many verts");
         return Q_ERR_INVALID_FORMAT;
     }
 
@@ -380,14 +377,12 @@ static int MOD_LoadMD2(model_t *model, const void *rawdata, size_t length)
     OOM_CHECK(mesh->skinnames = MOD_Malloc(header.num_skins * sizeof(mesh->skinnames[0])));
 #endif
 
-    if (mesh->numtris != header.num_tris) {
+    if (mesh->numtris != header.num_tris)
         Com_DPrintf("%s has %d bad triangles\n", model->name, header.num_tris - mesh->numtris);
-    }
 
     // store final triangle indices
-    for (i = 0; i < numindices; i++) {
+    for (i = 0; i < numindices; i++)
         mesh->indices[i] = finalIndices[i];
-    }
 
     // load all skins
     src_skin = (char *)rawdata + header.ofs_skins;
@@ -412,9 +407,8 @@ static int MOD_LoadMD2(model_t *model, const void *rawdata, size_t length)
     scale_s = 1.0f / header.skinwidth;
     scale_t = 1.0f / header.skinheight;
     for (i = 0; i < numindices; i++) {
-        if (remap[i] != i) {
+        if (remap[i] != i)
             continue;
-        }
         dst_tc[finalIndices[i]].st[0] =
             (int16_t)LittleShort(src_tc[tcIndices[i]].s) * scale_s;
         dst_tc[finalIndices[i]].st[1] =
@@ -431,9 +425,9 @@ static int MOD_LoadMD2(model_t *model, const void *rawdata, size_t length)
         // load frame vertices
         ClearBounds(mins, maxs);
         for (i = 0; i < numindices; i++) {
-            if (remap[i] != i) {
+            if (remap[i] != i)
                 continue;
-            }
+
             src_vert = &src_frame->verts[vertIndices[i]];
             dst_vert = &mesh->verts[j * numverts + finalIndices[i]];
 
@@ -482,24 +476,24 @@ fail:
 #if USE_MD3
 static const char *MOD_ValidateMD3Mesh(const model_t *model, const dmd3mesh_t *header, size_t length)
 {
-    ENSURE(header->meshsize >= sizeof(*header) && header->meshsize <= length, "bad mesh size");
-    ENSURE(!(header->meshsize % q_alignof(dmd3mesh_t)), "odd mesh size");
+    ENSURE(header->meshsize >= sizeof(*header) && header->meshsize <= length, "Bad mesh size");
+    ENSURE(!(header->meshsize % q_alignof(dmd3mesh_t)), "Odd mesh size");
 
-    ENSURE(header->num_verts >= 3, "too few verts");
-    ENSURE(header->num_verts <= TESS_MAX_VERTICES, "too many verts");
-    ENSURE(header->num_tris >= 1, "too few tris");
-    ENSURE(header->num_tris <= TESS_MAX_INDICES / 3, "too many tris");
-    ENSURE(header->num_skins <= MD3_MAX_SKINS, "too many skins");
+    ENSURE(header->num_verts >= 3, "Too few verts");
+    ENSURE(header->num_verts <= TESS_MAX_VERTICES, "Too many verts");
+    ENSURE(header->num_tris >= 1, "Too few tris");
+    ENSURE(header->num_tris <= TESS_MAX_INDICES / 3, "Too many tris");
+    ENSURE(header->num_skins <= MD3_MAX_SKINS, "Too many skins");
 
-    ENSURE((uint64_t)header->ofs_skins + header->num_skins * sizeof(dmd3skin_t) <= length, "bad skins offset");
-    ENSURE((uint64_t)header->ofs_verts + header->num_verts * model->numframes * sizeof(dmd3vertex_t) <= length, "bad verts offset");
-    ENSURE((uint64_t)header->ofs_tcs + header->num_verts * sizeof(dmd3coord_t) <= length, "bad tcs offset");
-    ENSURE((uint64_t)header->ofs_indexes + header->num_tris * 3 * sizeof(uint32_t) <= length, "bad indexes offset");
+    ENSURE((uint64_t)header->ofs_skins + header->num_skins * sizeof(dmd3skin_t) <= length, "Bad skins offset");
+    ENSURE((uint64_t)header->ofs_verts + header->num_verts * model->numframes * sizeof(dmd3vertex_t) <= length, "Bad verts offset");
+    ENSURE((uint64_t)header->ofs_tcs + header->num_verts * sizeof(dmd3coord_t) <= length, "Bad tcs offset");
+    ENSURE((uint64_t)header->ofs_indexes + header->num_tris * 3 * sizeof(uint32_t) <= length, "Bad indexes offset");
 
-    ENSURE(!(header->ofs_skins % q_alignof(dmd3skin_t)), "odd skins offset");
-    ENSURE(!(header->ofs_verts % q_alignof(dmd3vertex_t)), "odd verts offset");
-    ENSURE(!(header->ofs_tcs % q_alignof(dmd3coord_t)), "odd tcs offset");
-    ENSURE(!(header->ofs_indexes & 3), "odd indexes offset");
+    ENSURE(!(header->ofs_skins % q_alignof(dmd3skin_t)), "Odd skins offset");
+    ENSURE(!(header->ofs_verts % q_alignof(dmd3vertex_t)), "Odd verts offset");
+    ENSURE(!(header->ofs_tcs % q_alignof(dmd3coord_t)), "Odd tcs offset");
+    ENSURE(!(header->ofs_indexes & 3), "Odd indexes offset");
     return NULL;
 }
 
@@ -513,7 +507,7 @@ static int MOD_LoadMD3Mesh(model_t *model, maliasmesh_t *mesh,
     uint32_t        *src_idx;
     maliasvert_t    *dst_vert;
     maliastc_t      *dst_tc;
-    QGL_INDEX_TYPE  *dst_idx;
+    glIndex_t       *dst_idx;
     uint32_t        index;
     int             i, j, k, ret;
     const char      *err;
@@ -596,7 +590,7 @@ static int MOD_LoadMD3Mesh(model_t *model, maliasmesh_t *mesh,
     for (i = 0; i < header.num_tris * 3; i++) {
         index = LittleLong(*src_idx++);
         if (index >= header.num_verts) {
-            Com_SetLastError("bad triangle index");
+            Com_SetLastError("Bad triangle index");
             return Q_ERR_INVALID_FORMAT;
         }
         *dst_idx++ = index;
@@ -611,14 +605,14 @@ fail:
 
 static const char *MOD_ValidateMD3(const dmd3header_t *header, size_t length)
 {
-    ENSURE(header->num_frames >= 1, "too few frames");
-    ENSURE(header->num_frames <= MD3_MAX_FRAMES, "too many frames");
-    ENSURE((uint64_t)header->ofs_frames + header->num_frames * sizeof(dmd3frame_t) <= length, "bad frames offset");
-    ENSURE(!(header->ofs_frames % q_alignof(dmd3frame_t)), "odd frames offset");
-    ENSURE(header->num_meshes >= 1, "too few meshes");
-    ENSURE(header->num_meshes <= MD3_MAX_MESHES, "too many meshes");
-    ENSURE(header->ofs_meshes <= length, "bad meshes offset");
-    ENSURE(!(header->ofs_meshes % q_alignof(dmd3mesh_t)), "odd meshes offset");
+    ENSURE(header->num_frames >= 1, "Too few frames");
+    ENSURE(header->num_frames <= MD3_MAX_FRAMES, "Too many frames");
+    ENSURE((uint64_t)header->ofs_frames + header->num_frames * sizeof(dmd3frame_t) <= length, "Bad frames offset");
+    ENSURE(!(header->ofs_frames % q_alignof(dmd3frame_t)), "Odd frames offset");
+    ENSURE(header->num_meshes >= 1, "Too few meshes");
+    ENSURE(header->num_meshes <= MD3_MAX_MESHES, "Too many meshes");
+    ENSURE(header->ofs_meshes <= length, "Bad meshes offset");
+    ENSURE(!(header->ofs_meshes % q_alignof(dmd3mesh_t)), "Odd meshes offset");
     return NULL;
 }
 
@@ -706,7 +700,7 @@ fail:
 
 static void MOD_PrintError(const char *path, int err)
 {
-    Com_EPrintf("Couldn't load %s: %s\n", path,
+    Com_EPrintf("Couldn't load %s: %s\n", Com_MakePrintable(path),
                 err == Q_ERR_INVALID_FORMAT ?
                 Com_GetLastError() : Q_ErrorString(err));
 }
@@ -720,7 +714,7 @@ static bool MD5_ParseExpect(const char **buffer, const char *expect)
     char *token = COM_Parse(buffer);
 
     if (strcmp(token, expect)) {
-        Com_SetLastError(va("expected %s, got %s", expect, token));
+        Com_SetLastError(va("Expected %s, got %s", expect, Com_MakePrintable(token)));
         return false;
     }
 
@@ -734,7 +728,7 @@ static bool MD5_ParseFloat(const char **buffer, float *output)
 
     *output = strtof(token, &endptr);
     if (endptr == token || *endptr) {
-        Com_SetLastError(va("expected float, got %s", token));
+        Com_SetLastError(va("Expected float, got %s", Com_MakePrintable(token)));
         return false;
     }
 
@@ -748,7 +742,7 @@ static bool MD5_ParseUint(const char **buffer, uint32_t *output)
 
     *output = strtoul(token, &endptr, 10);
     if (endptr == token || *endptr) {
-        Com_SetLastError(va("expected int, got %s", token));
+        Com_SetLastError(va("Expected int, got %s", Com_MakePrintable(token)));
         return false;
     }
 
@@ -769,18 +763,19 @@ static bool MD5_ParseVector(const char **buffer, vec3_t output)
     ret = Q_ERR_INVALID_FORMAT; goto fail;
 
 #define MD5_CHECK(x) \
-    if (!(x)) { MD5_FAIL(); }
+    do { if (!(x)) { MD5_FAIL() } } while (0)
 
 #define MD5_ERROR(e) \
     Com_SetLastError(e); MD5_FAIL();
 
 #define MD5_ENSURE(x, e) \
-    if (!(x)) { MD5_ERROR(e); }
+    do { if (!(x)) { MD5_ERROR(e) } } while (0)
 
 #define MD5_EXPECT(x)   MD5_CHECK(MD5_ParseExpect(&s, x))
-#define MD5_UINT(x)     MD5_CHECK(MD5_ParseUint(&s, x))
-#define MD5_FLOAT(x)    MD5_CHECK(MD5_ParseFloat(&s, x))
+#define MD5_UINT(x)     MD5_CHECK(MD5_ParseUint(&s, &x))
+#define MD5_FLOAT(x)    MD5_CHECK(MD5_ParseFloat(&s, &x))
 #define MD5_VECTOR(x)   MD5_CHECK(MD5_ParseVector(&s, x))
+#define MD5_SKIP()      COM_Parse(&s)
 
 static void MD5_ComputeNormals(md5_mesh_t *mesh, const md5_joint_t *base_skeleton)
 {
@@ -825,7 +820,7 @@ static void MD5_ComputeNormals(md5_mesh_t *mesh, const md5_joint_t *base_skeleto
         CrossProduct(d1, d2, norm);
         VectorNormalize(norm);
 
-        float angle = acos(DotProduct(d1, d2));
+        float angle = acosf(DotProduct(d1, d2));
         VectorScale(norm, angle, norm);
 
         for (j = 0; j < 3; j++) {
@@ -888,20 +883,19 @@ static bool MOD_LoadMD5Mesh(model_t *model, const char *path)
     OOM_CHECK(model->skeleton = mdl = MD5_Malloc(sizeof(*mdl)));
 
     MD5_EXPECT("commandline");
-    COM_Parse(&s);
+    MD5_SKIP();
 
     MD5_EXPECT("numJoints");
-    MD5_UINT(&num_joints);
-    MD5_ENSURE(num_joints, "no joints");
-    MD5_ENSURE(num_joints <= MD5_MAX_JOINTS, "too many joints");
+    MD5_UINT(num_joints);
+    MD5_ENSURE(num_joints > 0, "No joints");
+    MD5_ENSURE(num_joints <= MD5_MAX_JOINTS, "Too many joints");
     OOM_CHECK(mdl->base_skeleton = MD5_Malloc(num_joints * sizeof(mdl->base_skeleton[0])));
-    OOM_CHECK(mdl->jointnames = MD5_Malloc(num_joints * sizeof(mdl->jointnames[0])));
     mdl->num_joints = num_joints;
 
     MD5_EXPECT("numMeshes");
-    MD5_UINT(&num_meshes);
-    MD5_ENSURE(num_meshes, "no meshes");
-    MD5_ENSURE(num_meshes <= MD5_MAX_MESHES, "too many meshes");
+    MD5_UINT(num_meshes);
+    MD5_ENSURE(num_meshes > 0, "No meshes");
+    MD5_ENSURE(num_meshes <= MD5_MAX_MESHES, "Too many meshes");
     OOM_CHECK(mdl->meshes = MD5_Malloc(num_meshes * sizeof(mdl->meshes[0])));
     mdl->num_meshes = num_meshes;
 
@@ -911,11 +905,12 @@ static bool MOD_LoadMD5Mesh(model_t *model, const char *path)
     for (i = 0; i < num_joints; i++) {
         md5_joint_t *joint = &mdl->base_skeleton[i];
 
-        Q_strlcpy(mdl->jointnames[i], COM_Parse(&s), sizeof(mdl->jointnames[0]));
+        // skip name
+        MD5_SKIP();
 
         uint32_t parent;
-        MD5_UINT(&parent);
-        MD5_ENSURE(parent == -1 || (parent < num_joints && parent != i), "bad parent joint");
+        MD5_UINT(parent);
+        MD5_ENSURE(parent == -1 || (parent < num_joints && parent != i), "Bad parent joint");
         joint->parent = parent;
 
         MD5_VECTOR(joint->pos);
@@ -935,11 +930,11 @@ static bool MOD_LoadMD5Mesh(model_t *model, const char *path)
         MD5_EXPECT("{");
 
         MD5_EXPECT("shader");
-        COM_Parse(&s);
+        MD5_SKIP();
 
         MD5_EXPECT("numverts");
-        MD5_UINT(&num_verts);
-        MD5_ENSURE(num_verts <= TESS_MAX_VERTICES, "too many verts");
+        MD5_UINT(num_verts);
+        MD5_ENSURE(num_verts <= TESS_MAX_VERTICES, "Too many verts");
         OOM_CHECK(mesh->vertices = MD5_Malloc(num_verts * sizeof(mesh->vertices[0])));
         OOM_CHECK(mesh->tcoords = MD5_Malloc(num_verts * sizeof(mesh->tcoords[0])));
         mesh->num_verts = num_verts;
@@ -948,23 +943,23 @@ static bool MOD_LoadMD5Mesh(model_t *model, const char *path)
             MD5_EXPECT("vert");
 
             uint32_t vert_index;
-            MD5_UINT(&vert_index);
-            MD5_ENSURE(vert_index < num_verts, "bad vert index");
+            MD5_UINT(vert_index);
+            MD5_ENSURE(vert_index < num_verts, "Bad vert index");
 
             maliastc_t *tc = &mesh->tcoords[vert_index];
             MD5_EXPECT("(");
-            MD5_FLOAT(&tc->st[0]);
-            MD5_FLOAT(&tc->st[1]);
+            MD5_FLOAT(tc->st[0]);
+            MD5_FLOAT(tc->st[1]);
             MD5_EXPECT(")");
 
             md5_vertex_t *vert = &mesh->vertices[vert_index];
-            MD5_UINT(&vert->start);
-            MD5_UINT(&vert->count);
+            MD5_UINT(vert->start);
+            MD5_UINT(vert->count);
         }
 
         MD5_EXPECT("numtris");
-        MD5_UINT(&num_tris);
-        MD5_ENSURE(num_tris <= TESS_MAX_INDICES / 3, "too many tris");
+        MD5_UINT(num_tris);
+        MD5_ENSURE(num_tris <= TESS_MAX_INDICES / 3, "Too many tris");
         OOM_CHECK(mesh->indices = MD5_Malloc(num_tris * 3 * sizeof(mesh->indices[0])));
         mesh->num_indices = num_tris * 3;
 
@@ -972,20 +967,20 @@ static bool MOD_LoadMD5Mesh(model_t *model, const char *path)
             MD5_EXPECT("tri");
 
             uint32_t tri_index;
-            MD5_UINT(&tri_index);
-            MD5_ENSURE(tri_index < num_tris, "bad tri index");
+            MD5_UINT(tri_index);
+            MD5_ENSURE(tri_index < num_tris, "Bad tri index");
 
             for (k = 0; k < 3; k++) {
                 uint32_t vert_index;
-                MD5_UINT(&vert_index);
-                MD5_ENSURE(vert_index < mesh->num_verts, "bad tri vert");
+                MD5_UINT(vert_index);
+                MD5_ENSURE(vert_index < mesh->num_verts, "Bad tri vert");
                 mesh->indices[tri_index * 3 + k] = vert_index;
             }
         }
 
         MD5_EXPECT("numweights");
-        MD5_UINT(&num_weights);
-        MD5_ENSURE(num_weights <= MD5_MAX_WEIGHTS, "too many weights");
+        MD5_UINT(num_weights);
+        MD5_ENSURE(num_weights <= MD5_MAX_WEIGHTS, "Too many weights");
         OOM_CHECK(mesh->weights = MD5_Malloc(num_weights * sizeof(mesh->weights[0])));
         mesh->num_weights = num_weights;
 
@@ -993,17 +988,17 @@ static bool MOD_LoadMD5Mesh(model_t *model, const char *path)
             MD5_EXPECT("weight");
 
             uint32_t weight_index;
-            MD5_UINT(&weight_index);
-            MD5_ENSURE(weight_index < num_weights, "bad weight index");
+            MD5_UINT(weight_index);
+            MD5_ENSURE(weight_index < num_weights, "Bad weight index");
 
             md5_weight_t *weight = &mesh->weights[weight_index];
 
             uint32_t joint;
-            MD5_UINT(&joint);
-            MD5_ENSURE(joint < mdl->num_joints, "bad weight joint");
+            MD5_UINT(joint);
+            MD5_ENSURE(joint < mdl->num_joints, "Bad weight joint");
             weight->joint = joint;
 
-            MD5_FLOAT(&weight->bias);
+            MD5_FLOAT(weight->bias);
             MD5_VECTOR(weight->pos);
         }
 
@@ -1013,7 +1008,7 @@ static bool MOD_LoadMD5Mesh(model_t *model, const char *path)
         // because of circular data dependencies
         for (j = 0; j < num_verts; j++) {
             md5_vertex_t *vert = &mesh->vertices[j];
-            MD5_ENSURE((uint64_t)vert->start + vert->count <= num_weights, "bad start/count");
+            MD5_ENSURE((uint64_t)vert->start + vert->count <= num_weights, "Bad vert start/count");
         }
 
         MD5_ComputeNormals(mesh, mdl->base_skeleton);
@@ -1029,10 +1024,11 @@ fail:
 }
 
 typedef struct {
+    char name[MD5_MAX_JOINTNAME];
     uint32_t parent;
     uint32_t flags;
     uint32_t start_index;
-    bool scale_positions;
+    bool scale_pos;
 } joint_info_t;
 
 typedef struct {
@@ -1053,7 +1049,6 @@ static void MD5_BuildFrameSkeleton(const joint_info_t *joint_infos,
 {
     for (int i = 0; i < num_joints; i++) {
         const baseframe_joint_t *baseJoint = &base_frame[i];
-        bool scale_positions = joint_infos[i].scale_positions;
         float components[7];
 
         float *animated_position = components + 0;
@@ -1062,35 +1057,31 @@ static void MD5_BuildFrameSkeleton(const joint_info_t *joint_infos,
         VectorCopy(baseJoint->pos, animated_position);
         VectorCopy(baseJoint->orient, animated_quat); // W will be re-calculated below
 
-        for (int c = 0, j = 0; c < MD5_NUM_ANIMATED_COMPONENT_BITS; c++) {
-            if (joint_infos[i].flags & BIT(c)) {
+        for (int c = 0, j = 0; c < MD5_NUM_ANIMATED_COMPONENT_BITS; c++)
+            if (joint_infos[i].flags & BIT(c))
                 components[c] = anim_frame_data[joint_infos[i].start_index + j++];
-            }
-        }
 
         Quat_ComputeW(animated_quat);
 
         // parent should already be calculated
         md5_joint_t *thisJoint = &skeleton_frame[i];
 
+        if (joint_infos[i].scale_pos)
+            VectorScale(animated_position, thisJoint->scale, animated_position);
+
         int parent = thisJoint->parent = (int32_t)joint_infos[i].parent;
         if (parent < 0) {
             VectorCopy(animated_position, thisJoint->pos);
-            if (scale_positions) {
-                VectorScale(animated_position, thisJoint->scale, animated_position);
-            }
             Vector4Copy(animated_quat, thisJoint->orient);
             continue;
         }
 
+        Q_assert(parent < num_joints);
         md5_joint_t *parentJoint = &skeleton_frame[parent];
 
         // add positions
         vec3_t rotated_pos;
         Quat_RotatePoint(parentJoint->orient, animated_position, rotated_pos);
-        if (scale_positions) {
-            VectorScale(rotated_pos, thisJoint->scale, rotated_pos);
-        }
         VectorAdd(rotated_pos, parentJoint->pos, thisJoint->pos);
 
         // concat rotations
@@ -1099,9 +1090,10 @@ static void MD5_BuildFrameSkeleton(const joint_info_t *joint_infos,
     }
 }
 
-// icky icky ""JSON"" parser. it works for re-release *.md5scale files, and I
-// don't care about anything else...
-static void MOD_LoadMD5Scale(md5_model_t *model, joint_info_t *joint_infos, const char *path)
+/**
+ * Parse some JSON vomit. Don't ask.
+ */
+static void MOD_LoadMD5Scale(md5_model_t *model, const char *path, joint_info_t *joint_infos)
 {
     void *buffer;
     const char *s;
@@ -1115,21 +1107,21 @@ static void MOD_LoadMD5Scale(md5_model_t *model, joint_info_t *joint_infos, cons
     MD5_EXPECT("{");
     while (s) {
         int joint_id = -1;
-        char *tok;
+        char *tok, *tok2;
 
         tok = COM_Parse(&s);
         if (!strcmp(tok, "}"))
             break;
 
         for (int i = 0; i < model->num_joints; i++) {
-            if (!strcmp(tok, model->jointnames[i])) {
+            if (!strcmp(tok, joint_infos[i].name)) {
                 joint_id = i;
                 break;
             }
         }
 
         if (joint_id == -1)
-            Com_WPrintf("No such joint %s in %s\n", tok, path);
+            Com_WPrintf("No such joint %s in %s\n", Com_MakePrintable(tok), path);
 
         MD5_EXPECT(":");
         MD5_EXPECT("{");
@@ -1140,36 +1132,22 @@ static void MOD_LoadMD5Scale(md5_model_t *model, joint_info_t *joint_infos, cons
                 break;
             MD5_EXPECT(":");
 
-            if (!strncmp(tok, "scale_positions", 15)) {
-                tok = COM_Parse(&s);
-                if (!strcmp(tok, "true") || !strcmp(tok, "true,")) {
-                    joint_infos[joint_id].scale_positions = true;
-                } else {
-                    MD5_ERROR(va("expected true, got %s", tok));
-                }
-                continue;
-            }
-
-            char *endptr;
-            unsigned frame_id = strtoul(tok, &endptr, 10);
-
-            // failed to parse number; check the key
-            if (endptr == tok) {
-                Com_WPrintf("Failed to parse a frame id in joint id %d in %s\n", joint_id, path);
-                continue;
-            }
-
-            float scale = strtof(COM_Parse(&s), NULL);
-
+            tok2 = COM_Parse(&s);
             if (joint_id == -1)
                 continue;
 
+            if (!strcmp(tok, "scale_positions")) {
+                joint_infos[joint_id].scale_pos = !strncmp(tok2, "true", 4);
+                continue;
+            }
+
+            unsigned frame_id = Q_atoi(tok);
             if (frame_id >= model->num_frames) {
                 Com_WPrintf("No such frame %d in %s\n", frame_id, path);
                 continue;
             }
 
-            model->skeleton_frames[(frame_id * model->num_joints) + joint_id].scale = scale;
+            model->skeleton_frames[frame_id * model->num_joints + joint_id].scale = Q_atof(tok2);
         }
     }
 
@@ -1195,7 +1173,6 @@ static bool MOD_LoadMD5Anim(model_t *model, const char *path, const char *base_p
     int i, j, ret;
     void *buffer;
     const char *s;
-    char scale_path[MAX_QPATH];
 
     ret = FS_LoadFile(path, &buffer);
     if (!buffer)
@@ -1207,59 +1184,57 @@ static bool MOD_LoadMD5Anim(model_t *model, const char *path, const char *base_p
     MD5_EXPECT("10");
 
     MD5_EXPECT("commandline");
-    COM_Parse(&s);
+    MD5_SKIP();
 
     MD5_EXPECT("numFrames");
-    MD5_UINT(&num_frames);
+    MD5_UINT(num_frames);
     // md5 replacements need at least 1 frame, because the
     // pose frame isn't used
-    MD5_ENSURE(num_frames, "no frames");
-    MD5_ENSURE(num_frames <= MD5_MAX_FRAMES, "too many frames");
+    MD5_ENSURE(num_frames > 0, "No frames");
+    MD5_ENSURE(num_frames <= MD5_MAX_FRAMES, "Too many frames");
     mdl->num_frames = num_frames;
 
     // warn on mismatched frame counts (not fatal)
-    if (mdl->num_frames != model->numframes) {
+    if (mdl->num_frames != model->numframes)
         Com_WPrintf("%s doesn't match frame count for %s (%i vs %i)\n",
                     path, model->name, mdl->num_frames, model->numframes);
-    }
 
     MD5_EXPECT("numJoints");
-    MD5_UINT(&num_joints);
-    MD5_ENSURE(num_joints == mdl->num_joints, "bad numJoints");
+    MD5_UINT(num_joints);
+    MD5_ENSURE(num_joints == mdl->num_joints, "Bad numJoints");
 
     MD5_EXPECT("frameRate");
-    COM_Parse(&s);
+    MD5_SKIP();
 
     MD5_EXPECT("numAnimatedComponents");
-    MD5_UINT(&num_animated_components);
-    MD5_ENSURE(num_animated_components <= q_countof(anim_frame_data), "bad numAnimatedComponents");
+    MD5_UINT(num_animated_components);
+    MD5_ENSURE(num_animated_components <= q_countof(anim_frame_data), "Bad numAnimatedComponents");
 
     MD5_EXPECT("hierarchy");
     MD5_EXPECT("{");
 
-    for (i = 0; i < mdl->num_joints; ++i) {
+    for (i = 0; i < mdl->num_joints; i++) {
         joint_info_t *joint_info = &joint_infos[i];
 
-        COM_Parse(&s); // ignore name
+        Q_strlcpy(joint_info->name, COM_Parse(&s), sizeof(joint_info->name));
 
-        MD5_UINT(&joint_info->parent);
-        MD5_UINT(&joint_info->flags);
-        MD5_UINT(&joint_info->start_index);
-        joint_info->scale_positions = false;
+        MD5_UINT(joint_info->parent);
+        MD5_UINT(joint_info->flags);
+        MD5_UINT(joint_info->start_index);
+
+        joint_info->scale_pos = false;
 
         // validate animated components
         int num_components = 0;
 
-        for (j = 0; j < MD5_NUM_ANIMATED_COMPONENT_BITS; j++) {
-            if (joint_info->flags & BIT(j)) {
+        for (j = 0; j < MD5_NUM_ANIMATED_COMPONENT_BITS; j++)
+            if (joint_info->flags & BIT(j))
                 num_components++;
-            }
-        }
 
-        MD5_ENSURE((uint64_t)joint_info->start_index + num_components <= num_animated_components, "bad joint info");
+        MD5_ENSURE((uint64_t)joint_info->start_index + num_components <= num_animated_components, "Bad joint info");
 
         // validate parents; they need to match the base skeleton
-        MD5_ENSURE(joint_info->parent == mdl->base_skeleton[i].parent, "bad parent");
+        MD5_ENSURE(joint_info->parent == mdl->base_skeleton[i].parent, "Bad parent joint");
     }
 
     MD5_EXPECT("}");
@@ -1293,24 +1268,28 @@ static bool MOD_LoadMD5Anim(model_t *model, const char *path, const char *base_p
 
     OOM_CHECK(mdl->skeleton_frames = MD5_Malloc(sizeof(mdl->skeleton_frames[0]) * mdl->num_frames * mdl->num_joints));
 
-    // initialize scales & load
+    // initialize scales
     for (i = 0; i < mdl->num_frames * mdl->num_joints; i++)
         mdl->skeleton_frames[i].scale = 1.0f;
 
-    if (Q_concat(scale_path, sizeof(scale_path), base_path, "md5/", model_name, ".md5scale") < sizeof(scale_path))
-        MOD_LoadMD5Scale(model->skeleton, joint_infos, scale_path);
+    // load scales
+    char scale_path[MAX_QPATH];
+    if (COM_StripExtension(scale_path, path, sizeof(scale_path)) < sizeof(scale_path) &&
+        Q_strlcat(scale_path, ".md5scale", sizeof(scale_path)) < sizeof(scale_path))
+        MOD_LoadMD5Scale(model->skeleton, scale_path, joint_infos);
+    else
+        Com_WPrintf("MD5 scale path too long: %s\n", scale_path);
 
     for (i = 0; i < mdl->num_frames; i++) {
         MD5_EXPECT("frame");
 
         uint32_t frame_index;
-        MD5_UINT(&frame_index);
-        MD5_ENSURE(frame_index < mdl->num_frames, "bad frame index");
+        MD5_UINT(frame_index);
+        MD5_ENSURE(frame_index < mdl->num_frames, "Bad frame index");
 
         MD5_EXPECT("{");
-        for (j = 0; j < num_animated_components; j++) {
-            MD5_FLOAT(&anim_frame_data[j]);
-        }
+        for (j = 0; j < num_animated_components; j++)
+            MD5_FLOAT(anim_frame_data[j]);
         MD5_EXPECT("}");
 
         /* Build frame skeleton from the collected data */
@@ -1370,7 +1349,6 @@ static void MOD_LoadMD5(model_t *model)
     }
 
     Hunk_End(&model->skeleton_hunk);
-
     return;
 
 fail:
@@ -1389,22 +1367,18 @@ static void MOD_Reference(model_t *model)
     case MOD_ALIAS:
         for (i = 0; i < model->nummeshes; i++) {
             maliasmesh_t *mesh = &model->meshes[i];
-            for (j = 0; j < mesh->numskins; j++) {
-                mesh->skins[j]->registration_sequence = registration_sequence;
-            }
+            for (j = 0; j < mesh->numskins; j++)
+                mesh->skins[j]->registration_sequence = r_registration_sequence;
         }
 #if USE_MD5
-        if (model->skeleton) {
-            for (j = 0; j < model->skeleton->num_skins; j++) {
-                model->skeleton->skins[j]->registration_sequence = registration_sequence;
-            }
-        }
+        if (model->skeleton)
+            for (j = 0; j < model->skeleton->num_skins; j++)
+                model->skeleton->skins[j]->registration_sequence = r_registration_sequence;
 #endif
         break;
     case MOD_SPRITE:
-        for (i = 0; i < model->numframes; i++) {
-            model->spriteframes[i].image->registration_sequence = registration_sequence;
-        }
+        for (i = 0; i < model->numframes; i++)
+            model->spriteframes[i].image->registration_sequence = r_registration_sequence;
         break;
     case MOD_EMPTY:
         break;
@@ -1412,7 +1386,71 @@ static void MOD_Reference(model_t *model)
         Q_assert(!"bad model type");
     }
 
-    model->registration_sequence = registration_sequence;
+    model->registration_sequence = r_registration_sequence;
+}
+
+static void MOD_UploadBuffer(model_t *model)
+{
+    size_t verts_size = 0;
+    size_t index_size = 0;
+    int i;
+
+    for (i = 0; i < model->nummeshes; i++) {
+        const maliasmesh_t *mesh = &model->meshes[i];
+        verts_size += sizeof(mesh->tcoords[0]) * mesh->numverts;
+        index_size += sizeof(mesh->indices[0]) * mesh->numindices;
+    }
+
+#if USE_MD5
+    const md5_model_t *skel = model->skeleton;
+    if (skel) {
+        for (i = 0; i < skel->num_meshes; i++) {
+            const md5_mesh_t *mesh = &skel->meshes[i];
+            verts_size += sizeof(mesh->tcoords[0]) * mesh->num_verts;
+            index_size += sizeof(mesh->indices[0]) * mesh->num_indices;
+        }
+    }
+#endif
+
+    GL_ClearErrors();
+
+    qglGenBuffers(1, &model->buffer);
+    GL_BindBuffer(GL_ARRAY_BUFFER, model->buffer);
+    qglBufferData(GL_ARRAY_BUFFER, verts_size + index_size, NULL, GL_STATIC_DRAW);
+    Com_DDPrintf("%s: %zu bytes buffer\n", model->name, verts_size + index_size);
+
+    size_t verts_offset = 0;
+    size_t index_offset = verts_size;
+
+    for (i = 0; i < model->nummeshes; i++) {
+        maliasmesh_t *mesh = &model->meshes[i];
+        verts_size = sizeof(mesh->tcoords[0]) * mesh->numverts;
+        index_size = sizeof(mesh->indices[0]) * mesh->numindices;
+        qglBufferSubData(GL_ARRAY_BUFFER, verts_offset, verts_size, mesh->tcoords);
+        qglBufferSubData(GL_ARRAY_BUFFER, index_offset, index_size, mesh->indices);
+        mesh->tcoords = (maliastc_t *)verts_offset;
+        mesh->indices = (glIndex_t *)index_offset;
+        verts_offset += verts_size;
+        index_offset += index_size;
+    }
+
+#if USE_MD5
+    if (skel) {
+        for (i = 0; i < skel->num_meshes; i++) {
+            md5_mesh_t *mesh = &skel->meshes[i];
+            verts_size = sizeof(mesh->tcoords[0]) * mesh->num_verts;
+            index_size = sizeof(mesh->indices[0]) * mesh->num_indices;
+            qglBufferSubData(GL_ARRAY_BUFFER, verts_offset, verts_size, mesh->tcoords);
+            qglBufferSubData(GL_ARRAY_BUFFER, index_offset, index_size, mesh->indices);
+            mesh->tcoords = (maliastc_t *)verts_offset;
+            mesh->indices = (glIndex_t *)index_offset;
+            verts_offset += verts_size;
+            index_offset += index_size;
+        }
+    }
+#endif
+
+    GL_ShowErrors(__func__);
 }
 
 qhandle_t R_RegisterModel(const char *name)
@@ -1420,10 +1458,8 @@ qhandle_t R_RegisterModel(const char *name)
     char normalized[MAX_QPATH];
     qhandle_t index;
     size_t namelen;
-    int filelen;
     model_t *model;
     byte *rawdata;
-    uint32_t ident;
     int (*load)(model_t *, const void *, size_t);
     int ret;
 
@@ -1461,25 +1497,21 @@ qhandle_t R_RegisterModel(const char *name)
         goto done;
     }
 
-    filelen = FS_LoadFile(normalized, (void **)&rawdata);
+    ret = FS_LoadFile(normalized, (void **)&rawdata);
     if (!rawdata) {
         // don't spam about missing models
-        if (filelen == Q_ERR(ENOENT)) {
+        if (ret == Q_ERR(ENOENT))
             return 0;
-        }
-
-        ret = filelen;
         goto fail1;
     }
 
-    if (filelen < 4) {
+    if (ret < 4) {
         ret = Q_ERR_FILE_TOO_SMALL;
         goto fail2;
     }
 
     // check ident
-    ident = LittleLong(*(uint32_t *)rawdata);
-    switch (ident) {
+    switch (LittleLong(*(uint32_t *)rawdata)) {
     case MD2_IDENT:
         load = MOD_LoadMD2;
         break;
@@ -1503,13 +1535,13 @@ qhandle_t R_RegisterModel(const char *name)
     }
 
     memcpy(model->name, normalized, namelen + 1);
-    model->registration_sequence = registration_sequence;
+    model->registration_sequence = r_registration_sequence;
 
-    ret = load(model, rawdata, filelen);
+    ret = load(model, rawdata, ret);
 
     FS_FreeFile(rawdata);
 
-    if (ret) {
+    if (ret < 0) {
         memset(model, 0, sizeof(*model));
         goto fail1;
     }
@@ -1520,6 +1552,9 @@ qhandle_t R_RegisterModel(const char *name)
     if (model->type == MOD_ALIAS && gl_md5_load->integer)
         MOD_LoadMD5(model);
 #endif
+
+    if (model->type == MOD_ALIAS && !(gl_config.caps & QGL_CAP_CLIENT_VA))
+        MOD_UploadBuffer(model);
 
 done:
     index = (model - r_models) + 1;
@@ -1536,15 +1571,13 @@ model_t *MOD_ForHandle(qhandle_t h)
 {
     model_t *model;
 
-    if (!h) {
+    if (!h)
         return NULL;
-    }
 
     Q_assert(h > 0 && h <= r_numModels);
     model = &r_models[h - 1];
-    if (!model->type) {
+    if (!model->type)
         return NULL;
-    }
 
     return model;
 }

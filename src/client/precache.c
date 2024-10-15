@@ -275,6 +275,7 @@ void CL_RegisterSounds(void)
 
     S_BeginRegistration();
     CL_RegisterTEntSounds();
+    cl.sfx_hit_marker = S_RegisterSound("weapons/marker.wav");
     for (i = 1; i < cl.csr.max_sounds; i++) {
         s = cl.configstrings[cl.csr.sounds + i];
         if (!s[0])
@@ -379,7 +380,7 @@ void CL_SetSky(void)
     if (cl.csr.extended)
         sscanf(cl.configstrings[CS_SKYROTATE], "%f %d", &rotate, &autorotate);
     else
-        rotate = atof(cl.configstrings[CS_SKYROTATE]);
+        rotate = Q_atof(cl.configstrings[CS_SKYROTATE]);
 
     if (sscanf(cl.configstrings[CS_SKYAXIS], "%f %f %f",
                &axis[0], &axis[1], &axis[2]) != 3) {

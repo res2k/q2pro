@@ -69,7 +69,7 @@ static bool Loc_Parse(loc_string_t *loc)
     // parse out arguments
     size_t arg_rover = 0;
 
-    size_t format_len = sizeof(loc->format);
+    size_t format_len = strlen(loc->format);
 
     while (true) {
         if (arg_rover >= format_len || !loc->format[arg_rover]) {

@@ -3423,6 +3423,18 @@ bool CL_ProcessEvents(void)
 CL_Init
 ====================
 */
+static void CL_Client_stat(void)
+{
+    SCR_StatKeyValue("realtime", va("%u", cls.realtime));
+    SCR_StatKeyValue("time", va("%u", cl.time));
+    SCR_StatKeyValue("servertime", va("%u", cl.servertime));
+}
+
+/*
+====================
+CL_Init
+====================
+*/
 void CL_Init(void)
 {
     if (dedicated->integer) {
@@ -3465,6 +3477,8 @@ void CL_Init(void)
     cl_cmdbuf.text = cl_cmdbuf_text;
     cl_cmdbuf.maxsize = sizeof(cl_cmdbuf_text);
     cl_cmdbuf.exec = exec_server_string;
+    
+    SCR_RegisterStat("client", CL_Client_stat);
 
     Cvar_Set("cl_running", "1");
 }
@@ -3507,6 +3521,8 @@ void CL_Shutdown(void)
     CL_ShutdownRefresh();
     CL_WriteConfig();
     CG_Unload();
+    
+    SCR_UnregisterStat("client");
 
     memset(&cls, 0, sizeof(cls));
 

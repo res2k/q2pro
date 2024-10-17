@@ -800,9 +800,9 @@ typedef struct {
 
 extern drawStatic_t draw;
 
-#if USE_DEBUG
 extern qhandle_t r_charset;
 
+#if USE_DEBUG
 void Draw_Stats(void);
 void Draw_Lightmaps(void);
 void Draw_Scrap(void);
@@ -911,12 +911,6 @@ void HQ2x_Init(void);
  * debug.c
  *
  */
-#if USE_DEBUG
 void GL_InitDebugDraw(void);
 void GL_ShutdownDebugDraw(void);
 void GL_DrawDebugObjects(void);
-#else
-#define GL_InitDebugDraw()      (void)0
-#define GL_ShutdownDebugDraw()  (void)0
-#define GL_DrawDebugObjects()   (void)0
-#endif

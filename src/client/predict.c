@@ -26,7 +26,7 @@ CL_CheckPredictionError
 void CL_CheckPredictionError(void)
 {
     int         frame;
-    int         delta[3];
+    float       delta[3];
     unsigned    cmd;
     int         len;
 

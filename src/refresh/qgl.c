@@ -58,9 +58,6 @@ static const glsection_t sections[] = {
             QGL_FN(DrawElements),
             QGL_FN(Enable),
             QGL_FN(Finish),
-            QGL_FN(Fogi),
-            QGL_FN(Fogf),
-            QGL_FN(Fogfv),
             QGL_FN(FrontFace),
             QGL_FN(GenTextures),
             QGL_FN(GetError),
@@ -461,6 +458,7 @@ static bool parse_gl_version(void)
         if (!strncmp(s, es_prefixes[i], len)) {
             s += len;
             gl_es = true;
+            break;
         }
     }
 

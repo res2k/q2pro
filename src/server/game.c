@@ -845,7 +845,9 @@ static void PF_Draw_Cylinder(const vec3_t origin, const float halfHeight, const 
 }
 static void PF_Draw_Ray(const vec3_t origin, const vec3_t direction, const float length, const float size, const rgba_t* color, const float lifeTime, const bool depthTest)
 {
-    R_AddDebugRay(origin, direction, length, size, MakeColor(color->r, color->g, color->b, color->a),
+    vec3_t end;
+    VectorMA(origin, length, direction, end);
+    R_AddDebugArrow(origin, end, size, MakeColor(color->r, color->g, color->b, color->a),
                   MakeColor(color->r, color->g, color->b, color->a), lifeTime * 1000, depthTest);
 }
 static void PF_Draw_Arrow(const vec3_t start, const vec3_t end, const float size, const rgba_t* lineColor, const rgba_t* arrowColor, const float lifeTime, const bool depthTest)

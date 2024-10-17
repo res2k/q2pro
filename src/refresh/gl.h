@@ -53,7 +53,7 @@ typedef GLuint glIndex_t;
 #define TAB_SIN(x)  gl_static.sintab[(x) & 255]
 #define TAB_COS(x)  gl_static.sintab[((x) + 64) & 255]
 
-#define NUM_AUTO_TEXTURES   7
+#define NUM_AUTO_TEXTURES   9
 
 typedef struct {
     GLuint query;
@@ -77,10 +77,13 @@ typedef struct glprogram_s glprogram_t;
 typedef struct {
     bool            registering;
     bool            use_shaders;
+    bool            use_cubemaps;
+    bool            use_bmodel_skies;
     struct {
         bsp_t       *cache;
         vec_t       *vertices;
         GLuint      buffer;
+        size_t      buffer_size;
         vec_t       size;
     } world;
     GLuint          warp_texture;
@@ -104,7 +107,6 @@ typedef struct {
     byte            lightstylemap[MAX_LIGHTSTYLES];
     hash_map_t      *queries;
     hash_map_t      *programs;
-    image_t         *classic_sky;
 } glStatic_t;
 
 typedef struct {
@@ -125,6 +127,7 @@ typedef struct {
     float           entscale;
     vec3_t          entaxis[3];
     GLfloat         entmatrix[16];
+    GLfloat         skymatrix[2][16];
     lightpoint_t    lightpoint;
     int             num_beams;
     int             num_flares;
@@ -262,7 +265,7 @@ bool GL_AllocBlock(int width, int height, uint16_t *inuse,
 void GL_MultMatrix(GLfloat *restrict out, const GLfloat *restrict a, const GLfloat *restrict b);
 void GL_SetEntityAxis(void);
 void GL_RotationMatrix(GLfloat *matrix);
-void GL_RotateForEntity(void);
+void GL_RotateForEntity(bool skies);
 
 void GL_ClearErrors(void);
 bool GL_ShowErrors(const char *func);
@@ -468,7 +471,7 @@ void GL_LoadWorld(const char *name);
  * gl_state.c
  *
  */
-typedef enum glStateBits_e {
+typedef enum {
     GLS_DEFAULT             = 0,
     GLS_DEPTHMASK_FALSE     = BIT(0),
     GLS_DEPTHTEST_DISABLE   = BIT(1),
@@ -485,25 +488,28 @@ typedef enum glStateBits_e {
     GLS_WARP_ENABLE         = BIT(10),
     GLS_INTENSITY_ENABLE    = BIT(11),
     GLS_GLOWMAP_ENABLE      = BIT(12),
-    GLS_FOG_ENABLE          = BIT(13),
-    GLS_SKY_FOG             = BIT(14),
-    GLS_CLASSIC_SKY         = BIT(15),
-    GLS_DYNAMIC_LIGHTS      = BIT(16),
-    GLS_DEFAULT_FLARE       = BIT(17),
+    GLS_CLASSIC_SKY         = BIT(13),
+    GLS_DEFAULT_SKY         = BIT(14),
+    GLS_DEFAULT_FLARE       = BIT(15),
 
-    GLS_SHADE_SMOOTH        = BIT(18),
-    GLS_SCROLL_X            = BIT(19),
-    GLS_SCROLL_Y            = BIT(20),
-    GLS_SCROLL_FLIP         = BIT(21),
-    GLS_SCROLL_SLOW         = BIT(22),
+    GLS_SHADE_SMOOTH        = BIT(16),
+    GLS_SCROLL_X            = BIT(17),
+    GLS_SCROLL_Y            = BIT(18),
+    GLS_SCROLL_FLIP         = BIT(19),
+    GLS_SCROLL_SLOW         = BIT(20),
+
+    GLS_FOG_ENABLE          = BIT(21),
+    GLS_SKY_FOG             = BIT(22),
+    GLS_DYNAMIC_LIGHTS      = BIT(23),
 
     GLS_BLEND_MASK  = GLS_BLEND_BLEND | GLS_BLEND_ADD | GLS_BLEND_MODULATE,
     GLS_COMMON_MASK = GLS_DEPTHMASK_FALSE | GLS_DEPTHTEST_DISABLE | GLS_CULL_DISABLE | GLS_BLEND_MASK,
+    GLS_SKY_MASK    = GLS_CLASSIC_SKY | GLS_DEFAULT_SKY,
     GLS_SHADER_MASK = GLS_ALPHATEST_ENABLE | GLS_TEXTURE_REPLACE | GLS_SCROLL_ENABLE |
         GLS_LIGHTMAP_ENABLE | GLS_WARP_ENABLE | GLS_INTENSITY_ENABLE | GLS_GLOWMAP_ENABLE |
-        GLS_FOG_ENABLE | GLS_SKY_FOG | GLS_CLASSIC_SKY | GLS_DYNAMIC_LIGHTS | GLS_DEFAULT_FLARE,
+        GLS_SKY_MASK | GLS_DEFAULT_FLARE | GLS_DYNAMIC_LIGHTS | GLS_FOG_ENABLE | GLS_SKY_FOG,
     GLS_SCROLL_MASK = GLS_SCROLL_ENABLE | GLS_SCROLL_X | GLS_SCROLL_Y | GLS_SCROLL_FLIP | GLS_SCROLL_SLOW,
-    GLS_UBLOCK_MASK = GLS_SCROLL_MASK | GLS_FOG_ENABLE | GLS_SKY_FOG | GLS_CLASSIC_SKY,
+    GLS_UBLOCK_MASK = GLS_SCROLL_MASK | GLS_FOG_ENABLE | GLS_SKY_FOG | GLS_SKY_MASK,
 } glStateBits_t;
 
 typedef enum {
@@ -547,9 +553,7 @@ typedef enum {
     TMU_TEXTURE,
     TMU_LIGHTMAP,
     TMU_GLOWMAP,
-    MAX_TMUS,
-
-    TMU_ALPHAMAP = TMU_LIGHTMAP // classic sky alphamap
+    MAX_TMUS
 } glTmu_t;
 
 typedef enum {
@@ -570,6 +574,7 @@ typedef struct {
     GLfloat     model[16];
     GLfloat     view[16];
     GLfloat     proj[16];
+    GLfloat     msky[2][16];
     GLfloat     time;
     GLfloat     modulate;
     GLfloat     add;
@@ -602,6 +607,7 @@ typedef struct {
     glTmu_t             client_tmu;
     glTmu_t             server_tmu;
     GLuint              texnums[MAX_TMUS];
+    GLuint              texnumcube;
     glStateBits_t       state_bits;
     glArrayBits_t       array_bits;
     GLuint              currentbuffer[GLB_COUNT];
@@ -639,8 +645,7 @@ typedef struct {
     void (*setup_2d)(void);
     void (*setup_3d)(void);
 
-    void (*load_proj_matrix)(const GLfloat *matrix);
-    void (*load_view_matrix)(const GLfloat *model, const GLfloat *view);
+    void (*load_matrix)(GLenum mode, const GLfloat *matrix, const GLfloat *view);
     void (*load_uniforms)(void);
 
     void (*state_bits)(glStateBits_t bits);
@@ -688,9 +693,11 @@ static inline void GL_ArrayBits(glArrayBits_t bits)
     }
 }
 
+static const GLfloat mat_identity[16] = { [0] = 1, [5] = 1, [10] = 1, [15] = 1 };
+
 static inline void GL_ForceMatrix(const GLfloat *model, const GLfloat *view)
 {
-    gl_backend->load_view_matrix(model, view);
+    gl_backend->load_matrix(GL_MODELVIEW, model, view);
     gls.currentmodelmatrix = model;
     gls.currentviewmatrix = view;
 }
@@ -699,7 +706,9 @@ static inline void GL_LoadMatrix(const GLfloat *model, const GLfloat *view)
 {
     if (gls.currentmodelmatrix != model ||
         gls.currentviewmatrix != view) {
-        GL_ForceMatrix(model, view);
+        gl_backend->load_matrix(GL_MODELVIEW, model, view);
+        gls.currentmodelmatrix = model;
+        gls.currentviewmatrix = view;
     }
 }
 
@@ -765,6 +774,8 @@ typedef enum {
 
 void GL_ForceTexture(glTmu_t tmu, GLuint texnum);
 void GL_BindTexture(glTmu_t tmu, GLuint texnum);
+void GL_ForceCubemap(GLuint texnum);
+void GL_BindCubemap(GLuint texnum);
 void GL_DeleteBuffer(GLuint buffer);
 void GL_CommonStateBits(glStateBits_t bits);
 void GL_ScrollPos(vec2_t scroll, glStateBits_t bits);
@@ -813,6 +824,8 @@ void GL_Blend(void);
 #define TEXNUM_WHITE    gl_static.texnums[4]
 #define TEXNUM_BLACK    gl_static.texnums[5]
 #define TEXNUM_RAW      gl_static.texnums[6]
+#define TEXNUM_CUBEMAP_DEFAULT  gl_static.texnums[7]
+#define TEXNUM_CUBEMAP_BLACK    gl_static.texnums[8]
 
 void Scrap_Upload(void);
 
@@ -822,8 +835,6 @@ void GL_ShutdownImages(void);
 bool GL_InitWarpTexture(void);
 
 extern cvar_t *gl_intensity;
-
-extern image_t shell_texture;
 
 /*
  * gl_tess.c
@@ -857,16 +868,11 @@ void GL_ShutdownArrays(void);
 
 void GL_Flush3D(void);
 
-void GL_AddAlphaFace(mface_t *face, entity_t *ent);
+void GL_AddAlphaFace(mface_t *face);
 void GL_AddSolidFace(mface_t *face);
 void GL_DrawAlphaFaces(void);
 void GL_DrawSolidFaces(void);
 void GL_ClearSolidFaces(void);
-
-// gl_debug.c
-void GL_DrawDebugLines(void);
-void GL_InitDebugDraw(void);
-void GL_ShutdownDebugDraw(void);
 
 /*
  * gl_world.c
@@ -884,8 +890,8 @@ void GL_LightPoint(const vec3_t origin, vec3_t color);
 void R_AddSkySurface(const mface_t *surf);
 void R_ClearSkyBox(void);
 void R_DrawSkyBox(void);
+void R_RotateForSky(void);
 void R_SetSky(const char *name, float rotate, bool autorotate, const vec3_t axis);
-bool R_SetClassicSky(const char *name);
 
 /*
  * gl_mesh.c
@@ -905,6 +911,12 @@ void HQ2x_Init(void);
  * debug.c
  *
  */
+#if USE_DEBUG
 void GL_InitDebugDraw(void);
 void GL_ShutdownDebugDraw(void);
-void GL_DrawDebugLines(void);
+void GL_DrawDebugObjects(void);
+#else
+#define GL_InitDebugDraw()      (void)0
+#define GL_ShutdownDebugDraw()  (void)0
+#define GL_DrawDebugObjects()   (void)0
+#endif

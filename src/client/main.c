@@ -2304,6 +2304,19 @@ static size_t CL_NumEntities_m(char *buffer, size_t size)
     return Q_snprintf(buffer, size, "%i", cl.frame.numEntities);
 }
 
+static size_t CL_Surface_m(char *buffer, size_t size)
+{
+    trace_t trace;
+    vec3_t end;
+
+    if (cls.state != ca_active)
+        return Q_strlcpy(buffer, "", size);
+
+    VectorMA(cl.refdef.vieworg, 8192, cl.v_forward, end);
+    CL_Trace(&trace, cl.refdef.vieworg, end, vec3_origin, vec3_origin, NULL, MASK_SOLID | MASK_WATER);
+    return Q_strlcpy(buffer, trace.surface->name, size);
+}
+
 /*
 ===============
 CL_WriteConfig
@@ -2836,6 +2849,7 @@ static void CL_InitLocal(void)
     Cmd_AddMacro("cl_armor", CL_Armor_m);
     Cmd_AddMacro("cl_weaponmodel", CL_WeaponModel_m);
     Cmd_AddMacro("cl_numentities", CL_NumEntities_m);
+    Cmd_AddMacro("cl_surface", CL_Surface_m);
 }
 
 static const cmdreg_t c_ignores[] = {
@@ -2941,7 +2955,7 @@ static void CL_SetClientTime(void)
         cl.lerpfrac = (cl.time - prevtime) * CL_1_FRAMETIME;
     }
 
-    SHOWCLAMP(2, "time %d %d, lerpfrac %f\n",
+    SHOWCLAMP(2, "time %d %d, lerpfrac %.3f\n",
               cl.time, cl.servertime, cl.lerpfrac);
 
 #if USE_FPS
@@ -3450,10 +3464,10 @@ void CL_Init(void)
     // start with full screen console
     cls.key_dest = KEY_CONSOLE;
 
-    CL_InitLocal();
     CL_InitRefresh();
     S_Init();   // sound must be initialized after window is created
 
+    CL_InitLocal();
     IN_Init();
 
 #if USE_ZLIB

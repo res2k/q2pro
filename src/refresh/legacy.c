@@ -79,21 +79,6 @@ static void legacy_state_bits(glStateBits_t bits)
         else
             qglShadeModel(GL_FLAT);
     }
-
-    if (diff & GLS_FOG_ENABLE) {
-        if (bits & GLS_FOG_ENABLE) {
-            if (gl_fog->integer && glr.fd.fog.global.density) {
-                qglEnable(GL_FOG);
-                qglFogi(GL_FOG_MODE, GL_EXP2);
-                qglFogf(GL_FOG_DENSITY, glr.fd.fog.global.density);
-                qglFogfv(GL_FOG_COLOR, (const vec4_t) {
-                    glr.fd.fog.global.r, glr.fd.fog.global.g, glr.fd.fog.global.b, 1.0f
-                });
-            }
-        } else {
-            qglDisable(GL_FOG);
-        }
-    }
 }
 
 static void legacy_array_bits(glArrayBits_t bits)
@@ -167,23 +152,11 @@ static void legacy_color(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
     qglColor4f(r, g, b, a);
 }
 
-static void legacy_load_view_matrix(const GLfloat *model, const GLfloat *view)
+static void legacy_load_matrix(GLenum mode, const GLfloat *matrix, const GLfloat *view)
 {
-    qglMatrixMode(GL_MODELVIEW);
-
-    if (view)
-        qglLoadMatrixf(view);
-    else
-        qglLoadIdentity();
-
-    if (model)
-        qglMultMatrixf(model);
-}
-
-static void legacy_load_proj_matrix(const GLfloat *matrix)
-{
-    qglMatrixMode(GL_PROJECTION);
+    qglMatrixMode(mode);
     qglLoadMatrixf(matrix);
+    qglMultMatrixf(view);
 }
 
 static void legacy_disable_state(void)
@@ -273,8 +246,7 @@ const glbackend_t backend_legacy = {
     .shutdown = legacy_shutdown,
     .clear_state = legacy_clear_state,
 
-    .load_proj_matrix = legacy_load_proj_matrix,
-    .load_view_matrix = legacy_load_view_matrix,
+    .load_matrix = legacy_load_matrix,
 
     .state_bits = legacy_state_bits,
     .array_bits = legacy_array_bits,

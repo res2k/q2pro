@@ -388,8 +388,7 @@ void CL_SetSky(void)
         VectorClear(axis);
     }
 
-    if (!cl.bsp->classic_sky || !R_SetClassicSky(cl.bsp->classic_sky))
-        R_SetSky(cl.configstrings[CS_SKY], rotate, autorotate, axis);
+    R_SetSky(cl.configstrings[CS_SKY], rotate, autorotate, axis);
 }
 
 /*

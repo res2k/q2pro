@@ -1523,8 +1523,7 @@ static void IMG_List_f(void)
         case 'm': mask |= BIT(IT_SKIN);     break;
         case 's': mask |= BIT(IT_SPRITE);   break;
         case 'w': mask |= BIT(IT_WALL);     break;
-        case 'y': mask |= BIT(IT_SKY)
-                       | BIT(IT_CLASSIC_SKY); break;
+        case 'y': mask |= BIT(IT_SKY);      break;
         case '8': paletted = 1;             break;
         case 'r': paletted = -1;            break;
         case 'x': missing = true;           break;
@@ -1558,7 +1557,7 @@ static void IMG_List_f(void)
     Com_Printf("------------------\n");
     texels = count = 0;
 
-    for (i = 1, image = r_images + 1; i < r_numImages; i++, image++) {
+    for (i = R_NUM_AUTO_IMG, image = r_images + i; i < r_numImages; i++, image++) {
         if (!image->name[0])
             continue;
         if (mask && !(mask & BIT(image->type)))
@@ -1596,7 +1595,7 @@ static image_t *alloc_image(void)
     image_t *image, *placeholder = NULL;
 
     // find a free image_t slot
-    for (i = 1, image = r_images + 1; i < r_numImages; i++, image++) {
+    for (i = R_NUM_AUTO_IMG, image = r_images + i; i < r_numImages; i++, image++) {
         if (!image->name[0])
             return image;
         if (!image->upload_width && !image->upload_height && !placeholder)
@@ -1972,7 +1971,7 @@ static image_t *find_or_load_image(const char *name, size_t len,
         // load the pic from disk
         pic = NULL;
 
-        if (flags & IF_DIRECT) {
+        if (flags & IF_KEEP_EXTENSION) {
             // direct load requested (for testing code)
             if (fmt == IM_MAX)
                 ret = Q_ERR_INVALID_PATH;
@@ -2043,14 +2042,27 @@ fail:
 
 image_t *IMG_Find(const char *name, imagetype_t type, imageflags_t flags)
 {
+    char buffer[MAX_QPATH];
     image_t *image;
+    size_t len;
 
     Q_assert(name);
 
-    if ((image = find_or_load_image(name, strlen(name), type, flags)))
-        return image;
+    // path MUST never overflow
+    len = FS_NormalizePathBuffer(buffer, name, sizeof(buffer));
+    image = find_or_load_image(buffer, len, type, flags);
 
-    return R_NOTEXTURE;
+    // missing (or invalid) sky texture will use default sky
+    if (type == IT_SKY) {
+        if (!image)
+            return R_SKYTEXTURE;
+        if (~image->flags & flags & IF_CUBEMAP)
+            return R_SKYTEXTURE;
+    }
+
+    if (!image)
+        return R_NOTEXTURE;
+    return image;
 }
 
 /*
@@ -2138,7 +2150,7 @@ void IMG_FreeUnused(void)
     image_t *image;
     int i, count = 0;
 
-    for (i = 1, image = r_images + 1; i < r_numImages; i++, image++) {
+    for (i = R_NUM_AUTO_IMG, image = r_images + i; i < r_numImages; i++, image++) {
         if (!image->name[0])
             continue;        // free image_t slot
         if (image->registration_sequence == r_registration_sequence)
@@ -2165,7 +2177,7 @@ void IMG_FreeAll(void)
     image_t *image;
     int i, count = 0;
 
-    for (i = 1, image = r_images + 1; i < r_numImages; i++, image++) {
+    for (i = R_NUM_AUTO_IMG, image = r_images + i; i < r_numImages; i++, image++) {
         if (!image->name[0])
             continue;        // free image_t slot
         // free it
@@ -2182,7 +2194,7 @@ void IMG_FreeAll(void)
         List_Init(&r_imageHash[i]);
 
     // &r_images[0] == R_NOTEXTURE
-    r_numImages = 1;
+    r_numImages = R_NUM_AUTO_IMG;
 }
 
 /*
@@ -2273,15 +2285,15 @@ void IMG_Init(void)
         List_Init(&r_imageHash[i]);
 
     // &r_images[0] == R_NOTEXTURE
-    r_numImages = 1;
+    r_numImages = R_NUM_AUTO_IMG;
     
-    // &r_images[1] == white pic
+    // &r_images[R_NUM_AUTO_IMG] == white pic
     R_RegisterImage("_white", IT_PIC, IF_PERMANENT | IF_REPEAT | IF_SPECIAL);
 }
 
 void IMG_Shutdown(void)
 {
     Cmd_Deregister(img_cmd);
-    memset(r_images, 0, sizeof(r_images[0]));   // clear R_NOTEXTURE
+    memset(r_images, 0, R_NUM_AUTO_IMG * sizeof(r_images[0]));   // clear R_NOTEXTURE
     r_numImages = 0;
 }

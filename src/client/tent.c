@@ -102,6 +102,8 @@ static int CL_FindFootstepSurface(int entnum)
     const vec3_t trace_mins = {cent->mins[0], cent->mins[1], 0};
     const vec3_t trace_maxs = {cent->maxs[0], cent->maxs[1], 0};
 
+    // trace start position is the entity's current origin + { 0 0 1 },
+    // so that entities with their mins at 0 won't get caught in the floor
     vec3_t trace_start;
     LerpVector(cent->prev.origin, cent->current.origin, cl.lerpfrac, trace_start);
     trace_start[2] += 1;
@@ -323,19 +325,6 @@ void CL_RegisterTEntModels(void)
     len = FS_LoadFile("models/items/armor/effect/tris.md2", &data);
     cl.need_powerscreen_scale = len == 2300 && Com_BlockChecksum(data, len) == 0x19fca65b;
     FS_FreeFile(data);
-    
-    cl_mod_muzzles[MFLASH_MACHN] = R_RegisterModel("models/weapons/v_machn/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_SHOTG2] = R_RegisterModel("models/weapons/v_shotg2/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_SHOTG] = R_RegisterModel("models/weapons/v_shotg/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_ROCKET] = R_RegisterModel("models/weapons/v_rocket/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_RAIL] = R_RegisterModel("models/weapons/v_rail/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_LAUNCH] = R_RegisterModel("models/weapons/v_launch/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_ETF_RIFLE] = R_RegisterModel("models/weapons/v_etf_rifle/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_DIST] = R_RegisterModel("models/weapons/v_dist/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_BOOMER] = R_RegisterModel("models/weapons/v_boomer/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_BLAST] = R_RegisterModel("models/weapons/v_blast/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_BFG] = R_RegisterModel("models/weapons/v_bfg/flash/tris.md2");
-    cl_mod_muzzles[MFLASH_BEAMER] = R_RegisterModel("models/weapons/v_beamer/flash/tris.md2");
 }
 
 /*
@@ -437,7 +426,6 @@ static void CL_BFGExplosion(const vec3_t pos)
     ex->frames = 4;
 }
 
-// muzzleflashes
 void CL_AddWeaponMuzzleFX(cl_muzzlefx_t fx, const vec3_t offset, float scale)
 {
     if (!cl_muzzleflashes->integer)

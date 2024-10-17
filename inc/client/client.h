@@ -162,7 +162,7 @@ int CL_ServerTime(void);
 
 #endif // !USE_CLIENT
 
-#if USE_REF
+#if USE_REF && USE_DEBUG
 void R_ClearDebugLines(void);
 void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32_t time, qboolean depth_test);
 void R_AddDebugPoint(const vec3_t point, float size, uint32_t color, uint32_t time, qboolean depth_test);

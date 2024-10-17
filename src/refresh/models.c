@@ -217,7 +217,6 @@ static int MOD_LoadSP2(model_t *model, const void *rawdata, size_t length)
             Com_WPrintf("%s has bad frame name\n", model->name);
             dst_frame->image = R_NOTEXTURE;
         } else {
-            FS_NormalizePath(buffer);
             dst_frame->image = IMG_Find(buffer, IT_SPRITE, IF_NONE);
         }
 
@@ -238,7 +237,6 @@ static const char *MOD_ValidateMD2(const dmd2header_t *header, size_t length)
     ENSURE(header->num_frames <= MD2_MAX_FRAMES, "Too many frames");
     ENSURE(header->num_skins <= MD2_MAX_SKINS, "Too many skins");
 
-    Q_assert(header->num_xyz);
     ENSURE(header->framesize >= sizeof(dmd2frame_t) + (header->num_xyz - 1) * sizeof(dmd2trivertx_t), "Too small frame size");
     ENSURE(header->framesize <= MD2_MAX_FRAMESIZE, "Too big frame size");
 
@@ -400,7 +398,6 @@ static int MOD_LoadMD2(model_t *model, const void *rawdata, size_t length)
             ret = Q_ERR_STRING_TRUNCATED;
             goto fail;
         }
-        FS_NormalizePath(skinname);
         mesh->skins[i] = IMG_Find(skinname, IT_SKIN, IF_NONE);
         src_skin += MD2_MAX_SKINNAME;
     }
@@ -551,7 +548,6 @@ static int MOD_LoadMD3Mesh(model_t *model, maliasmesh_t *mesh,
 #endif
         if (!Q_memccpy(skinname, src_skin->name, 0, sizeof(maliasskinname_t)))
             return Q_ERR_STRING_TRUNCATED;
-        FS_NormalizePath(skinname);
         mesh->skins[i] = IMG_Find(skinname, IT_SKIN, IF_NONE);
         src_skin++;
     }

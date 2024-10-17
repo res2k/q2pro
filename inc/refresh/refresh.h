@@ -174,11 +174,13 @@ typedef enum {
     IF_NEAREST          = BIT(7),   // don't bilerp
     IF_OPAQUE           = BIT(8),   // known to be opaque
     IF_DEFAULT_FLARE    = BIT(9),   // default flare hack
-    IF_SPECIAL          = BIT(10),  // 1x1 pixel pure white image
+    IF_CUBEMAP          = BIT(10),  // cubemap (or part of it)
+    IF_SPECIAL          = BIT(11),  // 1x1 pixel pure white image
 
-    // not stored in image
+    // these flags only affect R_RegisterImage() behavior,
+    // and are not stored in image
     IF_OPTIONAL         = BIT(16),  // don't warn if not found
-    IF_DIRECT           = BIT(17),  // don't override extension
+    IF_KEEP_EXTENSION   = BIT(17),  // don't override extension
     IF_CLASSIC_SKY      = BIT(18),  // split in two halves
 } imageflags_t;
 
@@ -189,7 +191,6 @@ typedef enum {
     IT_SPRITE,
     IT_WALL,
     IT_SKY,
-    IT_CLASSIC_SKY,
 
     IT_MAX
 } imagetype_t;
@@ -218,7 +219,6 @@ qhandle_t R_RegisterModel(const char *name);
 qhandle_t R_RegisterImage(const char *name, imagetype_t type,
                           imageflags_t flags);
 void    R_SetSky(const char *name, float rotate, bool autorotate, const vec3_t axis);
-bool    R_SetClassicSky(const char *name);
 void    R_EndRegistration(void);
 
 #define R_RegisterPic(name)     R_RegisterImage(name, IT_PIC, IF_PERMANENT)
@@ -270,20 +270,6 @@ void    R_UpdateRawPic(int pic_w, int pic_h, const uint32_t *pic);
 void    R_TileClear(int x, int y, int w, int h, qhandle_t pic);
 void    R_DrawFill8(int x, int y, int w, int h, int c);
 void    R_DrawFill32(int x, int y, int w, int h, uint32_t color);
-
-void    R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32_t time, qboolean depth_test);
-void    R_AddDebugPoint(const vec3_t point, float size, uint32_t color, uint32_t time, qboolean depth_test);
-void    R_AddDebugAxis(const vec3_t origin, const vec3_t angles, float size, uint32_t time, qboolean depth_test);
-void    R_AddDebugCircle(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test);
-void    R_AddDebugBounds(const vec3_t absmins, const vec3_t absmaxs, uint32_t color, uint32_t time, qboolean depth_test);
-void    R_AddDebugSphere(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test);
-// angles = null to make oriented text
-void    R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text, float size, uint32_t color, uint32_t time, qboolean depth_test);
-void    R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, uint32_t color, uint32_t time, qboolean depth_test);
-void    R_AddDebugRay(const vec3_t start, const vec3_t dir, float length, float size, uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test);
-void    R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test);
-
-void    R_AddDebugCurveArrow(const vec3_t start, const vec3_t ctrl, const vec3_t end, float size, uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test);
 
 // video mode and refresh state management entry points
 void    R_BeginFrame(void);

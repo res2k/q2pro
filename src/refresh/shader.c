@@ -45,11 +45,20 @@ static void write_block(sizebuf_t *buf)
         mat4 m_model;
         mat4 m_view;
         mat4 m_proj;
-        float u_time; float u_modulate; float u_add; float u_intensity;
-        float u_intensity2; float fog_sky_factor;
-        vec2 w_amp; vec2 w_phase;
+        mat4 m_sky[2];
+        float u_time;
+        float u_modulate;
+        float u_add;
+        float u_intensity;
+        float u_intensity2;
+        float fog_sky_factor;
+        vec2 w_amp;
+        vec2 w_phase;
         vec2 u_scroll;
-        float height_fog_falloff; float height_fog_density; int num_dlights; float pad;
+        float height_fog_falloff;
+        float height_fog_density;
+        int num_dlights;
+        float pad;
         vec4 u_vieworg;
         vec4 global_fog;
         vec4 height_fog_start;
@@ -83,7 +92,7 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
     write_block(buf);
 
     GLSL(in vec4 a_pos;)
-    if (bits & GLS_CLASSIC_SKY) {
+    if (bits & GLS_SKY_MASK) {
         GLSL(out vec3 v_dir;)
     } else {
         GLSL(in vec2 a_tc;)
@@ -110,8 +119,9 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
     }
     GLSF("void main() {\n");
         if (bits & GLS_CLASSIC_SKY) {
-            GLSL(v_dir = a_pos.xyz - u_vieworg.xyz;)
-            GLSL(v_dir[2] *= 3.0;)
+            GLSL(v_dir = (m_sky[1] * a_pos).xyz;)
+        } else if (bits & GLS_DEFAULT_SKY) {
+            GLSL(v_dir = (m_sky[0] * a_pos).xyz;)
         } else if (bits & GLS_SCROLL_ENABLE) {
             GLSL(v_tc = a_tc + u_scroll;)
         } else {
@@ -129,10 +139,6 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
             GLSL(v_wpos = (m_view * m_model * a_pos).xyz;)
         if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
             GLSL(v_world_pos = (m_model * a_pos).xyz;)
-        if (bits & GLS_CLASSIC_SKY) {
-            GLSL(v_dir = a_pos.xyz - u_vieworg.xyz;)
-            GLSL(v_dir[2] *= 3.0f;)
-        }
         if (bits & GLS_DYNAMIC_LIGHTS)
             GLSL(v_normal = normalize((mat3(m_model) * a_normal).xyz);)
     GLSF("}\n");
@@ -145,7 +151,7 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
     if (gl_config.ver_es)
         GLSL(precision mediump float;)
 
-    if (bits & (GLS_WARP_ENABLE | GLS_LIGHTMAP_ENABLE | GLS_INTENSITY_ENABLE | GLS_UBLOCK_MASK | GLS_DYNAMIC_LIGHTS))
+    if (bits & (GLS_WARP_ENABLE | GLS_LIGHTMAP_ENABLE | GLS_INTENSITY_ENABLE | GLS_SKY_MASK | GLS_UBLOCK_MASK | GLS_DYNAMIC_LIGHTS))
         write_block(buf);
 
     if (bits & GLS_DYNAMIC_LIGHTS)
@@ -155,12 +161,17 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
         GLSL(
             uniform sampler2D u_texture1;
             uniform sampler2D u_texture2;
-            in vec3 v_dir;
         )
+    } else if (bits & GLS_DEFAULT_SKY) {
+        GLSL(uniform samplerCube u_texture;)
     } else {
         GLSL(uniform sampler2D u_texture;)
-        GLSL(in vec2 v_tc;)
     }
+
+    if (bits & GLS_SKY_MASK)
+        GLSL(in vec3 v_dir;)
+    else
+        GLSL(in vec2 v_tc;)
 
     if (bits & GLS_LIGHTMAP_ENABLE) {
         GLSL(uniform sampler2D u_lightmap;)
@@ -212,6 +223,8 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
                 vec4 alpha = texture(u_texture2, tc2);
                 vec4 diffuse = vec4((solid.rgb - alpha.rgb * 0.25) * 0.65, 1.0);
             )
+        } else if (bits & GLS_DEFAULT_SKY) {
+            GLSL(vec4 diffuse = texture(u_texture, v_dir);)
         } else {
             GLSL(vec2 tc = v_tc;)
 
@@ -228,7 +241,6 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
             GLSL(vec4 color = v_color;)
 
         if (bits & GLS_LIGHTMAP_ENABLE) {
-
             GLSL(vec4 lightmap = texture(u_lightmap, v_lmtc);)
 
             if (bits & GLS_GLOWMAP_ENABLE) {
@@ -342,7 +354,7 @@ static GLuint create_and_use_program(glStateBits_t bits)
     GLuint program = qglCreateProgram();
     if (!program) {
         Com_EPrintf("Couldn't create program\n");
-        return program;
+        return 0;
     }
 
     SZ_Init(&sb, buffer, sizeof(buffer), "GLSL");
@@ -363,7 +375,7 @@ static GLuint create_and_use_program(glStateBits_t bits)
     qglAttachShader(program, shader_f);
 
     qglBindAttribLocation(program, VERT_ATTR_POS, "a_pos");
-    if (!(bits & GLS_CLASSIC_SKY))
+    if (!(bits & GLS_SKY_MASK))
         qglBindAttribLocation(program, VERT_ATTR_TC, "a_tc");
     if (bits & GLS_LIGHTMAP_ENABLE)
         qglBindAttribLocation(program, VERT_ATTR_LMTC, "a_lmtc");
@@ -434,8 +446,6 @@ static GLuint create_and_use_program(glStateBits_t bits)
     }
     if (bits & GLS_LIGHTMAP_ENABLE)
         qglUniform1i(qglGetUniformLocation(program, "u_lightmap"), TMU_LIGHTMAP);
-    if (bits & GLS_CLASSIC_SKY)
-        qglUniform1i(qglGetUniformLocation(program, "u_alphamap"), TMU_ALPHAMAP);
     if (bits & GLS_GLOWMAP_ENABLE)
         qglUniform1i(qglGetUniformLocation(program, "u_glowmap"), TMU_GLOWMAP);
 
@@ -543,24 +553,20 @@ static void shader_load_uniforms(void)
     }
 }
 
-
-static void shader_load_view_matrix(const GLfloat *model, const GLfloat *view)
+static void shader_load_matrix(GLenum mode, const GLfloat *matrix, const GLfloat *view)
 {
-    static const GLfloat identity[16] = { [0] = 1, [5] = 1, [10] = 1, [15] = 1 };
+    switch (mode) {
+    case GL_MODELVIEW:
+    	memcpy(gls.u_block.model, matrix, sizeof(gls.u_block.model));
+    	memcpy(gls.u_block.view, view, sizeof(gls.u_block.view));
+        break;
+    case GL_PROJECTION:
+    	memcpy(gls.u_block.proj, matrix, sizeof(gls.u_block.proj));
+        break;
+    default:
+        Q_assert(!"bad mode");
+    }
     
-    if (!view)
-        view = identity;
-    if (!model)
-        model = identity;
-    
-    memcpy(gls.u_block.model, model, sizeof(gls.u_block.model));
-    memcpy(gls.u_block.view, view, sizeof(gls.u_block.view));
-    gls.u_block_dirtybits |= GLU_BLOCK;
-}
-
-static void shader_load_proj_matrix(const GLfloat *matrix)
-{
-    memcpy(gls.u_block.proj, matrix, sizeof(gls.u_block.proj));
     gls.u_block_dirtybits |= GLU_BLOCK;
 }
 
@@ -592,6 +598,10 @@ static void shader_setup_3d(void)
     gls.u_block.w_amp[1] = 0.0625f;
     gls.u_block.w_phase[0] = 4;
     gls.u_block.w_phase[1] = 4;
+
+    R_RotateForSky();
+
+    memcpy(gls.u_block.msky, glr.skymatrix, sizeof(glr.skymatrix));
     
     gls.u_block.global_fog[0] = glr.fd.fog.global.r;
     gls.u_block.global_fog[1] = glr.fd.fog.global.g;
@@ -639,6 +649,8 @@ static void shader_disable_state(void)
     qglActiveTexture(GL_TEXTURE0);
     qglBindTexture(GL_TEXTURE_2D, 0);
 
+    qglBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
     for (int i = 0; i < VERT_ATTR_COUNT; i++)
         qglDisableVertexAttribArray(i);
 }
@@ -651,13 +663,16 @@ static void shader_clear_state(void)
 
 static void shader_init(void)
 {
-    gl_static.programs = HashMap_Create(glStateBits_t, GLuint, HashInt32, NULL);
+    gl_static.programs = HashMap_TagCreate(glStateBits_t, GLuint, HashInt32, NULL, TAG_RENDERER);
 
     qglGenBuffers(NUM_UNIFORM_BUFFERS, gl_static.uniform_buffers);
 
     qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_MAIN]);
     qglBindBufferBase(GL_UNIFORM_BUFFER, UNIFORM_BUFFER_MAIN, gl_static.uniform_buffers[UNIFORM_BUFFER_MAIN]);
     qglBufferData(GL_UNIFORM_BUFFER, sizeof(gls.u_block), NULL, GL_DYNAMIC_DRAW);
+
+    if (gl_config.ver_gl >= QGL_VER(3, 2))
+        qglEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
     qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffers[UNIFORM_BUFFER_DLIGHTS]);
     qglBindBufferBase(GL_UNIFORM_BUFFER, UNIFORM_BUFFER_DLIGHTS, gl_static.uniform_buffers[UNIFORM_BUFFER_DLIGHTS]);
@@ -687,6 +702,9 @@ static void shader_shutdown(void)
     qglBindBuffer(GL_UNIFORM_BUFFER, 0);
     qglDeleteBuffers(NUM_UNIFORM_BUFFERS, gl_static.uniform_buffers);
     memset(gl_static.uniform_buffers, 0, sizeof(gl_static.uniform_buffers));
+
+    if (gl_config.ver_gl >= QGL_VER(3, 2))
+        qglDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 }
 
 static bool shader_use_dlights(void)
@@ -703,8 +721,7 @@ const glbackend_t backend_shader = {
     .setup_2d = shader_setup_2d,
     .setup_3d = shader_setup_3d,
 
-    .load_proj_matrix = shader_load_proj_matrix,
-    .load_view_matrix = shader_load_view_matrix,
+    .load_matrix = shader_load_matrix,
     .load_uniforms = shader_load_uniforms,
 
     .state_bits = shader_state_bits,

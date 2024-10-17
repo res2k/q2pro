@@ -314,9 +314,13 @@ void GL_RotationMatrix(GLfloat *matrix)
     matrix[15] = 1;
 }
 
-void GL_RotateForEntity(void)
+void GL_RotateForEntity(bool skies)
 {
     GL_RotationMatrix(glr.entmatrix);
+    if (skies) {
+        GL_MultMatrix(gls.u_block.msky[0], glr.skymatrix[0], glr.entmatrix);
+        GL_MultMatrix(gls.u_block.msky[1], glr.skymatrix[1], glr.entmatrix);
+    }
     GL_ForceMatrix(glr.entmatrix, glr.viewmatrix);
 }
 
@@ -340,7 +344,7 @@ static void GL_DrawSpriteModel(const model_t *model)
         bits |= GLS_BLEND_BLEND;
     }
 
-    GL_LoadMatrix(NULL, glr.viewmatrix);
+    GL_LoadMatrix(mat_identity, glr.viewmatrix);
     GL_LoadUniforms();
     GL_BindTexture(TMU_TEXTURE, image->texnum);
     GL_BindArrays(VA_SPRITE);
@@ -459,7 +463,7 @@ static void GL_OccludeFlares(void)
         }
 
         if (!set) {
-            GL_LoadMatrix(glr.entmatrix, glr.viewmatrix);
+            GL_LoadMatrix(mat_identity, glr.viewmatrix);
             GL_LoadUniforms();
             GL_BindTexture(TMU_TEXTURE, TEXNUM_WHITE);
             GL_BindArrays(VA_OCCLUDE);
@@ -523,8 +527,6 @@ static void GL_DrawEntities(int musthave, int canthave)
 
         // convert angles to axis
         GL_SetEntityAxis();
-
-        GL_RotateForEntity();
 
         // inline BSP model
         if (ent->model & BIT(31)) {
@@ -709,14 +711,12 @@ void R_RenderFrame(const refdef_t *fd)
     if (!(glr.fd.rdflags & RDF_NOWORLDMODEL))
         GL_DrawAlphaFaces();
 
-    GL_DrawEntities(RF_WEAPONMODEL, RF_TRANSLUCENT);
-
     GL_DrawEntities(RF_TRANSLUCENT | RF_WEAPONMODEL, 0);
+
+    GL_DrawDebugObjects();
 
     if (waterwarp)
         qglBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    GL_DrawDebugLines();
 
     // go back into 2D mode
     GL_Setup2D();
@@ -1058,7 +1058,7 @@ void GL_InitQueries(void)
         gl_static.samples_passed = GL_ANY_SAMPLES_PASSED;
 
     Q_assert(!gl_static.queries);
-    gl_static.queries = HashMap_Create(int, glquery_t, HashInt32, NULL);
+    gl_static.queries = HashMap_TagCreate(int, glquery_t, HashInt32, NULL, TAG_RENDERER);
 }
 
 void GL_DeleteQueries(void)
@@ -1115,11 +1115,11 @@ bool R_Init(bool total)
 
     GL_InitArrays();
 
-    GL_InitDebugDraw();
-
     GL_InitState();
 
     GL_InitTables();
+
+    GL_InitDebugDraw();
 
     GL_PostInit();
 

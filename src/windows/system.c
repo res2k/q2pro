@@ -955,8 +955,6 @@ void Sys_Init(void)
     if (dedicated->integer || sys_viewlog->integer)
 #endif
         Sys_ConsoleInit();
-#if USE_CLIENT
-#endif
 #endif // USE_SYSCON
 
 #if USE_DBGHELP

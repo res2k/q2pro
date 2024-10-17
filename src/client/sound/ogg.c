@@ -585,10 +585,8 @@ bool OGG_Load(sizebuf_t *sz)
 
     int64_t nb_samples = st->duration;
 
-    if (out->sample_rate != dec_ctx->sample_rate) {
+    if (out->sample_rate != dec_ctx->sample_rate)
         nb_samples = av_rescale_rnd(st->duration + 2, out->sample_rate, dec_ctx->sample_rate, AV_ROUND_UP) + 2;
-        Q_assert(nb_samples <= INT_MAX >> out->ch_layout.nb_channels);
-    }
 
     int bufsize = nb_samples << out->ch_layout.nb_channels;
     int offset = 0;
@@ -711,6 +709,7 @@ static void OGG_Cmd_c(genctx_t *ctx, int argnum)
         Prompt_AddMatch(ctx, "info");
         Prompt_AddMatch(ctx, "play");
         Prompt_AddMatch(ctx, "stop");
+        Prompt_AddMatch(ctx, "next");
         return;
     }
 
@@ -728,8 +727,10 @@ static void OGG_Cmd_f(void)
         OGG_Play_f();
     else if (!strcmp(cmd, "stop"))
         OGG_Stop();
+    else if (!strcmp(cmd, "next"))
+        OGG_Play();
     else
-        Com_Printf("Usage: %s <info|play|stop>\n", Cmd_Argv(0));
+        Com_Printf("Usage: %s <info|play|stop|next>\n", Cmd_Argv(0));
 }
 
 static void ogg_enable_changed(cvar_t *self)

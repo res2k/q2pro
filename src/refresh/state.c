@@ -58,6 +58,38 @@ void GL_BindTexture(glTmu_t tmu, GLuint texnum)
     c.texSwitches++;
 }
 
+void GL_ForceCubemap(GLuint texnum)
+{
+    GL_ActiveTexture(TMU_TEXTURE);
+
+    if (gls.texnumcube == texnum)
+        return;
+
+    qglBindTexture(GL_TEXTURE_CUBE_MAP, texnum);
+    gls.texnumcube = texnum;
+
+    c.texSwitches++;
+}
+
+void GL_BindCubemap(GLuint texnum)
+{
+    if (!gl_drawsky->integer)
+        texnum = TEXNUM_CUBEMAP_BLACK;
+
+    if (gls.texnumcube == texnum)
+        return;
+
+    if (qglBindTextureUnit) {
+        qglBindTextureUnit(TMU_TEXTURE, texnum);
+    } else {
+        GL_ActiveTexture(TMU_TEXTURE);
+        qglBindTexture(GL_TEXTURE_CUBE_MAP, texnum);
+    }
+    gls.texnumcube = texnum;
+
+    c.texSwitches++;
+}
+
 void GL_DeleteBuffer(GLuint buffer)
 {
     if (!buffer)
@@ -164,7 +196,7 @@ void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat zn
     matrix[11] = 0;
     matrix[15] = 1;
 
-    gl_backend->load_proj_matrix(matrix);
+    gl_backend->load_matrix(GL_PROJECTION, matrix, mat_identity);
 }
 
 void GL_Setup2D(void)
@@ -185,7 +217,7 @@ void GL_Setup2D(void)
     if (gl_backend->setup_2d)
         gl_backend->setup_2d();
 
-    gl_backend->load_view_matrix(NULL, NULL);
+    gl_backend->load_matrix(GL_MODELVIEW, mat_identity, mat_identity);
 }
 
 void GL_Frustum(GLfloat fov_x, GLfloat fov_y, GLfloat reflect_x)
@@ -200,7 +232,7 @@ void GL_Frustum(GLfloat fov_x, GLfloat fov_y, GLfloat reflect_x)
         zfar = gl_static.world.size * 2;
 
     Matrix_Frustum(fov_x, fov_y, reflect_x, znear, zfar, matrix);
-    gl_backend->load_proj_matrix(matrix);
+    gl_backend->load_matrix(GL_PROJECTION, matrix, NULL);
 }
 
 static void GL_RotateForViewer(void)

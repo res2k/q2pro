@@ -957,8 +957,7 @@ static void SCR_Sky_f(void)
     } else
         VectorSet(axis, 0, 0, 1);
     
-    if (!cl.bsp->classic_sky || !R_SetClassicSky(cl.bsp->classic_sky))
-        R_SetSky(name, rotate, true, axis);
+    R_SetSky(name, rotate, true, axis);
 }
 
 /*

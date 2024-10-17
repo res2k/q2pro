@@ -571,7 +571,7 @@ static const image_t *skin_for_mesh(image_t **skins, int num_skins)
     const entity_t *ent = glr.ent;
 
     if (ent->flags & RF_SHELL_MASK)
-        return &shell_texture;
+        return R_SHELLTEXTURE;
 
     if (ent->skin)
         return IMG_ForHandle(ent->skin);
@@ -891,6 +891,8 @@ void GL_DrawAliasModel(const model_t *model)
         tessfunc = newframenum == oldframenum ?
             tess_static_plain : tess_lerped_plain;
     }
+
+    GL_RotateForEntity(false);
 
     GL_BindArrays(dotshading ? VA_MESH_SHADE : VA_MESH_FLAT);
 

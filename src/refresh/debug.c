@@ -1,5 +1,4 @@
 /*
-Copyright (C) 2003-2006 Andrey Nazarov
 Copyright (C) 1997-2001 Id Software, Inc.
 
 This program is free software; you can redistribute it and/or modify
@@ -19,90 +18,12 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "gl.h"
 #include "shared/list.h"
-#include "client/client.h"
-#include "common/prompt.h"
-#include "debug_fonts/cursive.h"
-#include "debug_fonts/futural.h"
-#include "debug_fonts/futuram.h"
-#include "debug_fonts/gothgbt.h"
-#include "debug_fonts/gothgrt.h"
-#include "debug_fonts/gothiceng.h"
-#include "debug_fonts/gothicger.h"
-#include "debug_fonts/gothicita.h"
-#include "debug_fonts/gothitt.h"
-#include "debug_fonts/rowmand.h"
-#include "debug_fonts/rowmans.h"
-#include "debug_fonts/rowmant.h"
-#include "debug_fonts/scriptc.h"
-#include "debug_fonts/scripts.h"
-#include "debug_fonts/timesi.h"
-#include "debug_fonts/timesib.h"
-#include "debug_fonts/timesr.h"
-#include "debug_fonts/timesrb.h"
 #include <assert.h>
 
-typedef struct debug_font_s {
-    // Number of glyphs
-    int count;
-    // Font height
-    char height;
-    // Widths of the glyphs
-    const char* width;
-    // Real widths of the glyphs (calculated from data)
-    const char* realwidth;
-    // Number of chars in each glyph
-    const int* size;
-    // Pointers to glyph data
-    const char **glyph_data;
-} debug_font_t;
+#define MAX_DEBUG_LINES     TESS_MAX_VERTICES
+#define MAX_DEBUG_TEXTS     1024
 
-#define DEBUG_FONT(NAME)        \
-    {                           \
-        #NAME,                  \
-        {                       \
-            NAME##_count,       \
-            NAME##_height,      \
-            NAME##_width,       \
-            NAME##_realwidth,   \
-            NAME##_size,        \
-            NAME                \
-        }                       \
-    }
-
-static const struct {
-    const char *name;
-    debug_font_t font;
-} debug_fonts[] = {
-    DEBUG_FONT(futural),
-    DEBUG_FONT(cursive),
-    DEBUG_FONT(futuram),
-    DEBUG_FONT(gothgbt),
-    DEBUG_FONT(gothgrt),
-    DEBUG_FONT(gothiceng),
-    DEBUG_FONT(gothicger),
-    DEBUG_FONT(gothicita),
-    DEBUG_FONT(gothitt),
-    DEBUG_FONT(rowmand),
-    DEBUG_FONT(rowmans),
-    DEBUG_FONT(rowmant),
-    DEBUG_FONT(scriptc),
-    DEBUG_FONT(scripts),
-    DEBUG_FONT(timesi),
-    DEBUG_FONT(timesib),
-    DEBUG_FONT(timesr),
-    DEBUG_FONT(timesrb),
-};
-
-#undef DEBUG_FONT
-
-static const debug_font_t *dbg_font;
-
-static cvar_t *gl_debug_font;
-static cvar_t *gl_debug_linewidth;
-
-#define MAX_DEBUG_LINES		8192
-
-typedef struct debug_line_s {
+typedef struct {
     list_t          entry;
     vec3_t          start, end;
     uint32_t        color;
@@ -114,12 +35,30 @@ static debug_line_t debug_lines[MAX_DEBUG_LINES];
 static list_t debug_lines_free;
 static list_t debug_lines_active;
 
+typedef struct {
+    list_t          entry;
+    vec3_t          origin, angles;
+    float           size;
+    uint32_t        color;
+    uint32_t        time;
+    glStateBits_t   bits;
+    char            text[128];
+} debug_text_t;
+
+static debug_text_t debug_texts[MAX_DEBUG_TEXTS];
+static list_t debug_texts_free;
+static list_t debug_texts_active;
+
 static cvar_t *gl_debug_linewidth;
+static cvar_t *gl_debug_distfrac;
 
 void R_ClearDebugLines(void)
 {
     List_Init(&debug_lines_free);
     List_Init(&debug_lines_active);
+
+    List_Init(&debug_texts_free);
+    List_Init(&debug_texts_active);
 }
 
 void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32_t time, qboolean depth_test)
@@ -156,11 +95,9 @@ void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32
     l->time = com_localTime2 + time;
     if (l->time < com_localTime2)
         l->time = UINT32_MAX;
-    l->bits = GLS_DEPTHMASK_FALSE;
+    l->bits = GLS_DEPTHMASK_FALSE | GLS_BLEND_BLEND;
     if (!depth_test)
         l->bits |= GLS_DEPTHTEST_DISABLE;
-    if (gl_config.caps & QGL_CAP_LINE_SMOOTH)
-        l->bits |= GLS_BLEND_BLEND;
 }
 
 #define GL_DRAWLINE(sx, sy, sz, ex, ey, ez) \
@@ -329,7 +266,6 @@ void R_DrawArrowCap(const vec3_t apex, const vec3_t dir, float size,
 {
     vec3_t cap_end;
     VectorMA(apex, size, dir, cap_end);
-
     R_AddDebugLine(apex, cap_end, color, time, depth_test);
 
     vec3_t right, up;
@@ -389,87 +325,88 @@ void R_AddDebugCurveArrow(const vec3_t start, const vec3_t ctrl, const vec3_t en
     }
 }
 
-void R_AddDebugRay(const vec3_t start, const vec3_t dir, float length, float size, uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test)
+static void R_AddDebugTextInternal(const vec3_t origin, const vec3_t angles, const char *text,
+                                   size_t len, float size, uint32_t color, uint32_t time,
+                                   qboolean depth_test)
 {
-    if (length > size) {
-        vec3_t line_end;
-        VectorMA(start, length - size, dir, line_end);
+    if (!len)
+        return;
 
-        R_AddDebugLine(start, line_end, line_color, time, depth_test);
-        R_DrawArrowCap(line_end, dir, size, arrow_color, time, depth_test);
-    } else {
-        R_DrawArrowCap(start, dir, length, arrow_color, time, depth_test);
-    }
-}
+    debug_text_t *t = LIST_FIRST(debug_text_t, &debug_texts_free, entry);
 
-void R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text, float size, uint32_t color, uint32_t time, qboolean depth_test)
-{
-    int total_lines = 1;
-    float scale = (1.0f / dbg_font->height) * (size * 32);
-
-    int l = strlen(text);
-
-    for (int i = 0; i < l; i++) {
-        if (text[i] == '\n')
-            total_lines++;
-    }
-
-    if (!angles)
-    {
-        vec3_t d;
-        VectorSubtract(origin, glr.fd.vieworg, d);
-        VectorNormalize(d);
-        d[2] = 0.0f;
-        vectoangles2(d, d);
-        angles = (const vec_t *) &d;
-    }
-
-    vec3_t right, up;
-    AngleVectors(angles, NULL, right, up);
-
-    float y_offset = -((dbg_font->height * scale) * 0.5f) * total_lines;
-
-    const char *c = text;
-    for (int line = 0; line < total_lines; line++) {
-        const char *c_end = c;
-        float width = 0;
-
-        for (; *c_end && *c_end != '\n'; c_end++) {
-            width += dbg_font->width[*c_end - ' '] * scale;
-        }
-        
-        float x_offset = (width * 0.5f);
-
-        for (const char *rc = c; rc != c_end; rc++) {
-            char c = *rc - ' ';
-            const float char_width = dbg_font->width[(int)c] * scale;
-            const int char_size = dbg_font->size[(int)c];
-            const char *char_data = dbg_font->glyph_data[(int)c];
-
-            for (int i = 0; i < char_size; i += 4) {
-                vec3_t s;
-                float r = -char_data[i] * scale + x_offset;
-                float u = -(char_data[i + 1] * scale + y_offset);
-                VectorMA(origin, -r, right, s);
-                VectorMA(s, u, up, s);
-                vec3_t e;
-                r = -char_data[i + 2] * scale + x_offset;
-                u = -(char_data[i + 3] * scale + y_offset);
-                VectorMA(origin, -r, right, e);
-                VectorMA(e, u, up, e);
-                GL_DRAWLINEV(s, e);
+    if (LIST_EMPTY(&debug_texts_free)) {
+        if (LIST_EMPTY(&debug_texts_active)) {
+            for (int i = 0; i < MAX_DEBUG_TEXTS; i++)
+                List_Append(&debug_texts_free, &debug_texts[i].entry);
+        } else {
+            debug_text_t *next;
+            LIST_FOR_EACH_SAFE(debug_text_t, t, next, &debug_texts_active, entry) {
+                if (t->time <= com_localTime2) {
+                    List_Remove(&t->entry);
+                    List_Insert(&debug_texts_free, &t->entry);
+                }
             }
-
-            x_offset -= char_width;
         }
 
-        y_offset += dbg_font->height * scale;
+        if (LIST_EMPTY(&debug_texts_free))
+            t = LIST_FIRST(debug_text_t, &debug_texts_active, entry);
+        else
+            t = LIST_FIRST(debug_text_t, &debug_texts_free, entry);
+    }
 
-        c = c_end + 1;
+    // unlink from freelist
+    List_Remove(&t->entry);
+    List_Append(&debug_texts_active, &t->entry);
+
+    VectorCopy(origin, t->origin);
+    if (angles)
+        VectorCopy(angles, t->angles);
+    t->size = size * 8.0f;
+    t->color = color;
+    t->time = com_localTime2 + time;
+    if (t->time < com_localTime2)
+        t->time = UINT32_MAX;
+    t->bits = GLS_DEPTHMASK_FALSE | GLS_BLEND_BLEND;
+    if (!depth_test)
+        t->bits |= GLS_DEPTHTEST_DISABLE;
+    if (angles)
+        t->bits |= GLS_CULL_DISABLE;
+    len = min(len, sizeof(t->text) - 1);
+    memcpy(t->text, text, len);
+    t->text[len] = 0;
+}
+
+void R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text,
+                    float size, uint32_t color, uint32_t time, qboolean depth_test)
+{
+    vec3_t down, pos, up;
+    const char *s, *p;
+
+    if (!angles) {
+        R_AddDebugTextInternal(origin, angles, text, strlen(text), size, color, time, depth_test);
+        return;
+    }
+
+    AngleVectors(angles, NULL, NULL, up);
+    VectorScale(up, -size, down);
+
+    VectorCopy(origin, pos);
+
+    // break oriented text into lines to allow for longer text
+    s = text;
+    while (*s) {
+        p = strchr(s, '\n');
+        if (!p) {
+            R_AddDebugTextInternal(pos, angles, s, strlen(s), size, color, time, depth_test);
+            break;
+        }
+        R_AddDebugTextInternal(pos, angles, s, p - s, size, color, time, depth_test);
+        VectorAdd(pos, down, pos);
+        s = p + 1;
     }
 }
 
-void GL_DrawDebugLines(void)
+static void GL_DrawDebugLines(void)
 {
     glStateBits_t bits = -1;
     debug_line_t *l, *next;
@@ -479,7 +416,7 @@ void GL_DrawDebugLines(void)
     if (LIST_EMPTY(&debug_lines_active))
         return;
 
-    GL_LoadMatrix(NULL, glr.viewmatrix);
+    GL_LoadMatrix(mat_identity, glr.viewmatrix);
     GL_LoadUniforms();
     GL_BindTexture(TMU_TEXTURE, TEXNUM_WHITE);
     GL_BindArrays(VA_NULLMODEL);
@@ -538,27 +475,147 @@ void GL_DrawDebugLines(void)
         qglLineWidth(1.0f);
 }
 
-static void gl_debug_font_changed(cvar_t* cvar)
+static void GL_FlushDebugChars(void)
 {
-    int font_idx = -1;
-    for (int i = 0; i < q_countof(debug_fonts); i++) {
-        if (Q_strcasecmp(cvar->string, debug_fonts[i].name) == 0) {
-            font_idx = i;
-            break;
-        }
-    }
-    if (font_idx < 0) {
-        Com_WPrintf("unknown debug font: %s\n", cvar->string);
-        font_idx = 0;
-    }
-    dbg_font = &debug_fonts[font_idx].font;
+    if (!tess.numindices)
+        return;
+
+    GL_BindTexture(TMU_TEXTURE, IMG_ForHandle(r_charset)->texnum);
+    GL_StateBits(tess.flags);
+    GL_ArrayBits(GLA_VERTEX | GLA_TC | GLA_COLOR);
+    GL_DrawIndexed(SHOWTRIS_NONE);
+
+    tess.numverts = tess.numindices = 0;
+    tess.flags = 0;
 }
 
-static void gl_debug_font_generator(struct genctx_s *gen)
+static void GL_DrawDebugChar(const vec3_t pos, const vec3_t right, const vec3_t down,
+                             glStateBits_t bits, uint32_t color, int c)
 {
-    for (int i = 0; i < q_countof(debug_fonts); i++) {
-        Prompt_AddMatch(gen, debug_fonts[i].name);
+    GLfloat *dst_vert;
+    glIndex_t *dst_indices;
+    float s, t;
+
+    if ((c & 127) == 32)
+        return;
+
+    if (q_unlikely(tess.numverts + 4 > TESS_MAX_VERTICES ||
+                   tess.numindices + 6 > TESS_MAX_INDICES) ||
+        (tess.numindices && bits != tess.flags))
+        GL_FlushDebugChars();
+
+    dst_vert = tess.vertices + tess.numverts * 6;
+
+    VectorCopy(pos, dst_vert);
+    VectorAdd(dst_vert, right, dst_vert + 6);
+    VectorAdd(dst_vert + 6, down, dst_vert + 12);
+    VectorAdd(dst_vert, down, dst_vert + 18);
+
+    s = (c & 15) * 0.0625f;
+    t = (c >> 4) * 0.0625f;
+
+    dst_vert[ 3] = s;
+    dst_vert[ 4] = t;
+    dst_vert[ 9] = s + 0.0625f;
+    dst_vert[10] = t;
+    dst_vert[15] = s + 0.0625f;
+    dst_vert[16] = t + 0.0625f;
+    dst_vert[21] = s;
+    dst_vert[22] = t + 0.0625f;
+
+    WN32(dst_vert +  5, color);
+    WN32(dst_vert + 11, color);
+    WN32(dst_vert + 17, color);
+    WN32(dst_vert + 23, color);
+
+    dst_indices = tess.indices + tess.numindices;
+    dst_indices[0] = tess.numverts + 0;
+    dst_indices[1] = tess.numverts + 2;
+    dst_indices[2] = tess.numverts + 3;
+    dst_indices[3] = tess.numverts + 0;
+    dst_indices[4] = tess.numverts + 1;
+    dst_indices[5] = tess.numverts + 2;
+
+    tess.numverts += 4;
+    tess.numindices += 6;
+    tess.flags = bits;
+}
+
+static void GL_DrawDebugTextLine(const vec3_t origin, const vec3_t right, const vec3_t down,
+                                 const debug_text_t *text, const char *s, size_t len)
+{
+    // frustum cull
+    float radius = text->size * 0.5f * len;
+    for (int i = 0; i < 4; i++)
+        if (PlaneDiff(origin, &glr.frustumPlanes[i]) < -radius)
+            return;
+
+    // draw it
+    vec3_t pos;
+    VectorMA(origin, -0.5f * len, right, pos);
+    while (*s && len--) {
+        byte c = *s++;
+        GL_DrawDebugChar(pos, right, down, text->bits, text->color, c);
+        VectorAdd(pos, right, pos);
     }
+}
+
+static void GL_DrawDebugTexts(void)
+{
+    debug_text_t *text, *next;
+
+    if (LIST_EMPTY(&debug_texts_active))
+        return;
+
+    GL_LoadMatrix(mat_identity, glr.viewmatrix);
+    GL_BindArrays(VA_EFFECT);
+
+    LIST_FOR_EACH_SAFE(debug_text_t, text, next, &debug_texts_active, entry) {
+        vec3_t right, down, pos;
+        const char *s, *p;
+
+        if (text->time < com_localTime2) { // expired
+            List_Remove(&text->entry);
+            List_Insert(&debug_texts_free, &text->entry);
+            continue;
+        }
+
+        // distance cull
+        VectorSubtract(text->origin, glr.fd.vieworg, pos);
+        if (text->size < DotProduct(pos, glr.viewaxis[0]) * gl_debug_distfrac->value)
+            continue;
+
+        if (text->bits & GLS_CULL_DISABLE) { // oriented
+            vec3_t up;
+            AngleVectors(text->angles, NULL, right, up);
+            VectorScale(right, text->size, right);
+            VectorScale(up,   -text->size, down);
+        } else {
+            VectorScale(glr.viewaxis[1], -text->size, right);
+            VectorScale(glr.viewaxis[2], -text->size, down);
+        }
+        VectorCopy(text->origin, pos);
+
+        s = text->text;
+        while (*s) {
+            p = strchr(s, '\n');
+            if (!p) {
+                GL_DrawDebugTextLine(pos, right, down, text, s, strlen(s));
+                break;
+            }
+            GL_DrawDebugTextLine(pos, right, down, text, s, p - s);
+            VectorAdd(pos, down, pos);
+            s = p + 1;
+        }
+    }
+
+    GL_FlushDebugChars();
+}
+
+void GL_DrawDebugObjects(void)
+{
+    GL_DrawDebugLines();
+    GL_DrawDebugTexts();
 }
 
 void GL_InitDebugDraw(void)
@@ -566,10 +623,7 @@ void GL_InitDebugDraw(void)
     R_ClearDebugLines();
 
     gl_debug_linewidth = Cvar_Get("gl_debug_linewidth", "2", 0);
-    gl_debug_font = Cvar_Get("gl_debug_font", debug_fonts[0].name, 0);
-    gl_debug_font->changed = gl_debug_font_changed;
-    gl_debug_font->generator = gl_debug_font_generator;
-    gl_debug_font_changed(gl_debug_font);
+    gl_debug_distfrac = Cvar_Get("gl_debug_distfrac", "0.004", 0);
 
     Cmd_AddCommand("cleardebuglines", R_ClearDebugLines);
 }

@@ -57,7 +57,7 @@ void CL_CheckPredictionError(void)
         return;
     }
 
-    SHOWMISS("prediction miss on %i: %i (%d %d %d)\n",
+    SHOWMISS("prediction miss on %i: %i (%f %f %f)\n",
              cl.frame.number, len, delta[0], delta[1], delta[2]);
 
     VectorCopy(cl.frame.ps.pmove.origin, cl.predicted_origins[cmd & CMD_MASK]);

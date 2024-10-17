@@ -106,7 +106,7 @@ jobs:
           script: core.exportVariable('GITHUB_SHA_SHORT', context.sha.substring(0, 7))
 
       - name: Upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: q2pro-rr-windows-${{ matrix.arch }}-${{env.GITHUB_SHA_SHORT}}
           path: installdir/
@@ -148,7 +148,7 @@ jobs:
           script: core.exportVariable('GITHUB_SHA_SHORT', context.sha.substring(0, 7))
 
       - name: Upload
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: q2pro-rr-linux-${{ matrix.cc }}-x86_64-${{env.GITHUB_SHA_SHORT}}
           path: installdir/

@@ -1016,7 +1016,12 @@ static void CL_AddPacketEntities(void)
                 i = 200;
             } else {
                 static const uint16_t bfg_lightramp[6] = {300, 400, 600, 300, 150, 75};
-                i = bfg_lightramp[Q_clip(s1->frame, 0, 5)];
+
+                i = LERP(
+                    bfg_lightramp[Q_clip(ent.frame, 0, 5)],
+                    bfg_lightramp[Q_clip(ent.oldframe, 0, 5)],
+                    ent.backlerp
+                );
             }
             V_AddLight(ent.origin, i, 0, 1, 0);
         } else if (effects & EF_TRAP) {

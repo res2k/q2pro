@@ -31,6 +31,7 @@ static cvar_t       *al_reverb;
 static cvar_t       *al_reverb_lerp_time;
 
 static cvar_t       *al_timescale;
+static cvar_t       *al_merge_looping;
 
 static ALuint       s_srcnums[MAX_CHANNELS];
 static ALuint       s_stream;
@@ -754,6 +755,7 @@ static bool AL_Init(void)
     al_reverb_lerp_time = Cvar_Get("al_reverb_lerp_time", "3.0", 0);
 
     al_timescale = Cvar_Get("al_timescale", "1", 0);
+    al_merge_looping = Cvar_Get("al_merge_looping", "1", 0);
 
     SCR_RegisterStat("al_reverb", AL_Reverb_stat);
 
@@ -958,6 +960,10 @@ static void AL_PlayChannel(channel_t *ch)
     qalSourcePlay(ch->srcnum);
     if (qalGetError() != AL_NO_ERROR) {
         AL_StopChannel(ch);
+    } else {
+        if (ch->autosound) {
+            qalSourcef(ch->srcnum, AL_SEC_OFFSET, fmodf(cls.realtime / 1000.f, ch->sfx->cache->length / 1000.f));
+        }
     }
 }
 
@@ -1004,11 +1010,28 @@ static channel_t *AL_FindLoopingSound(int entnum, const sfx_t *sfx)
     return NULL;
 }
 
-static void AL_AddLoopSounds(void)
+static int al_loop_sounds[MAX_EDICTS];
+
+/*
+ * Paril: the existing AL driver handled looping sounds wrong (below)
+ * and simply added them to the world as-is. This lost the behavior in
+ * vanilla where looping noises were technically a single merged source
+ * and makes them way louder than they should be by causing them to
+ * stack.
+ *
+ * This is my attempt to fix this behavior by doing something
+ * closer to vanilla Q2.
+ * 
+ * TODO: this currently always uses the position of the entity
+ * that is best suited for the looping noise; this causes the
+ * audio to shift left/right if you go between two grenades for instance.
+ * In theory, we could shift the real position of the audio source to
+ * let AL then spatialize it better or something.
+ */
+static void AL_AddMergeLoopSounds(void)
 {
     int         i;
-    int         sounds[MAX_EDICTS];
-    channel_t   *ch, *ch2;
+    channel_t   *ch;
     sfx_t       *sfx;
     sfxcache_t  *sc;
     int         num;
@@ -1017,13 +1040,115 @@ static void AL_AddLoopSounds(void)
     if (cls.state != ca_active || sv_paused->integer || !s_ambient->integer)
         return;
 
-    S_BuildSoundList(sounds);
+    S_BuildSoundList(al_loop_sounds);
 
+    // for each unique sound, poll each source nearby
+    // and see which one contributes the most.
     for (i = 0; i < cl.frame.numEntities; i++) {
-        if (!sounds[i])
+        if (!al_loop_sounds[i])
             continue;
 
-        sfx = S_SfxForHandle(cl.sound_precache[sounds[i]]);
+        sfx = S_SfxForHandle(cl.sound_precache[al_loop_sounds[i]]);
+        if (!sfx)
+            continue;       // bad sound effect
+        sc = sfx->cache;
+        if (!sc)
+            continue;
+
+        num = (cl.frame.firstEntity + i) & PARSE_ENTITIES_MASK;
+        ent = &cl.entityStates[num];
+
+        // find a channel
+        bool is_new = false;
+
+        ch = AL_FindLoopingSound(0, sfx);
+        if (!ch) {
+            ch = S_PickChannel(0, 0);
+            if (!ch)
+                continue;
+
+            // allocate a channel
+            ch->autosound = true;   // remove next frame
+            ch->sfx = sfx;
+            is_new = true;
+        }
+
+        // find the entity that would contribute the most
+        entity_state_t *best = NULL;
+        float best_contrib = INFINITY;
+
+        // this is just set so S_IsFullVolume below works
+        ch->dist_mult = 1.0f;
+
+        for (int n = 0; n < cl.frame.numEntities; n++) {
+            if (al_loop_sounds[n] != al_loop_sounds[i]) {
+                continue;
+            }
+            
+            int num2 = (cl.frame.firstEntity + n) & PARSE_ENTITIES_MASK;
+            entity_state_t *ent2 = &cl.entityStates[num2];
+            
+            float dist_mult = S_GetEntityLoopDistMult(ent2);
+            float master_vol = S_GetEntityLoopVolume(ent2);
+
+            if (!dist_mult || ent2->number == listener_entnum) {
+                // always full volume
+                ch->master_vol = master_vol;
+                ch->dist_mult = dist_mult;
+                best = ent2;
+                break;
+            }
+
+            // calculate stereo separation and distance attenuation
+            vec3_t source_vec;
+            VectorSubtract(ent2->origin, listener_origin, source_vec);
+
+            float dist = VectorNormalize(source_vec);
+            dist -= SOUND_FULLVOLUME;
+            if (dist < 0)
+                dist = 0;           // close enough to be at full volume
+            dist *= dist_mult;      // different attenuation levels
+
+            float contrib = master_vol * dist;
+
+            if (!best || contrib < best_contrib) {
+                ch->master_vol = master_vol;
+                ch->dist_mult = dist_mult;
+                best = ent2;
+                best_contrib = contrib;
+            }
+        }
+
+        ch->entnum = best->number;
+
+        ch->autoframe = s_framecount;
+        ch->end = s_paintedtime + sc->length;
+
+        if (is_new) {
+            AL_PlayChannel(ch);
+        }
+    }
+}
+
+static void AL_AddLoopSounds(void)
+{
+    int         i;
+    channel_t   *ch;
+    sfx_t       *sfx;
+    sfxcache_t  *sc;
+    int         num;
+    entity_state_t *ent;
+
+    if (cls.state != ca_active || sv_paused->integer || !s_ambient->integer)
+        return;
+
+    S_BuildSoundList(al_loop_sounds);
+
+    for (i = 0; i < cl.frame.numEntities; i++) {
+        if (!al_loop_sounds[i])
+            continue;
+
+        sfx = S_SfxForHandle(cl.sound_precache[al_loop_sounds[i]]);
         if (!sfx)
             continue;       // bad sound effect
         sc = sfx->cache;
@@ -1044,14 +1169,6 @@ static void AL_AddLoopSounds(void)
         ch = S_PickChannel(0, 0);
         if (!ch)
             continue;
-
-        // attempt to synchronize with existing sounds of the same type
-        ch2 = AL_FindLoopingSound(0, sfx);
-        if (ch2) {
-            ALfloat offset = 0;
-            qalGetSourcef(ch2->srcnum, AL_SAMPLE_OFFSET, &offset);
-            qalSourcef(s_srcnums[ch - s_channels], AL_SAMPLE_OFFSET, offset);
-        }
 
         ch->autosound = true;   // remove next frame
         ch->autoframe = s_framecount;
@@ -1191,7 +1308,7 @@ static void AL_Update(void)
 #if USE_DEBUG
         if (s_show->integer) {
             ALfloat offset = 0;
-            qalGetSourcef(ch->srcnum, AL_SAMPLE_OFFSET, &offset);
+            qalGetSourcef(ch->srcnum, AL_SEC_OFFSET, &offset);
             Com_Printf("%d %.1f %.1f %s\n", i, ch->master_vol, offset, ch->sfx->name);
         }
 #endif
@@ -1202,7 +1319,11 @@ static void AL_Update(void)
     s_framecount++;
 
     // add loopsounds
-    AL_AddLoopSounds();
+    if (al_merge_looping->integer) {
+        AL_AddMergeLoopSounds();
+    } else {
+        AL_AddLoopSounds();
+    }
 
     AL_IssuePlaysounds();
 

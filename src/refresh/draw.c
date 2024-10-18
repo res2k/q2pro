@@ -593,9 +593,9 @@ void SCR_LoadKFont(kfont_t *font, const char *filename)
     FS_FreeFile(buffer);
 }
 
-#if USE_DEBUG
-
 qhandle_t r_charset;
+
+#if USE_DEBUG
 
 static void Draw_Stringf(int x, int y, const char *fmt, ...)
 {

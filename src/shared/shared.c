@@ -467,7 +467,7 @@ unsigned com_linenum;
 COM_ParseEscapeSequence
 =============
 */
-static bool COM_ParseEscapeSequence(char **data_p, int *c)
+static bool COM_ParseEscapeSequence(const char **data_p, int *c)
 {
     *c = *(*data_p)++;
 

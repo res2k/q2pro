@@ -26,9 +26,9 @@ CL_CheckPredictionError
 void CL_CheckPredictionError(void)
 {
     int         frame;
-    int         delta[3];
+    float       delta[3];
     unsigned    cmd;
-    int         len;
+    float       len;
 
     if (cls.demo.playback) {
         return;
@@ -50,14 +50,14 @@ void CL_CheckPredictionError(void)
     VectorSubtract(cl.frame.ps.pmove.origin, cl.predicted_origins[cmd & CMD_MASK], delta);
 
     // save the prediction error for interpolation
-    len = abs(delta[0]) + abs(delta[1]) + abs(delta[2]);
-    if (len < 1 || len > 640) {
+    len = fabsf(delta[0]) + fabsf(delta[1]) + fabsf(delta[2]);
+    if (len < 1 || len > 80) {
         // > 80 world units is a teleport or something
         VectorClear(cl.prediction_error);
         return;
     }
 
-    SHOWMISS("prediction miss on %i: %i (%d %d %d)\n",
+    SHOWMISS("prediction miss on %i: %f (%f %f %f)\n",
              cl.frame.number, len, delta[0], delta[1], delta[2]);
 
     VectorCopy(cl.frame.ps.pmove.origin, cl.predicted_origins[cmd & CMD_MASK]);

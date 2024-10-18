@@ -663,7 +663,7 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
         qglColorMask(1, 1, 1, 1);
     }
 
-    state = GLS_INTENSITY_ENABLE | GLS_FOG_ENABLE;
+    state = GLS_INTENSITY_ENABLE | GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS;
     if (!gls.currentva)
         state |= meshbits;
     else if (dotshading)
@@ -676,8 +676,6 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
     if (skin->texnum2)
         state |= GLS_GLOWMAP_ENABLE;
 
-    state |= GLS_DYNAMIC_LIGHTS;
-
     GL_StateBits(state);
 
     GL_BindTexture(TMU_TEXTURE, skin->texnum);
@@ -687,9 +685,9 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
 
     if (gls.currentva) {
         if (dotshading)
-        GL_ArrayBits(GLA_VERTEX | GLA_TC | GLA_COLOR);
+            GL_ArrayBits(GLA_VERTEX | GLA_TC | GLA_COLOR);
         else
-        GL_ArrayBits(GLA_VERTEX | GLA_TC | GLA_NORMAL);
+            GL_ArrayBits(GLA_VERTEX | GLA_TC | GLA_NORMAL);
         gl_backend->tex_coord_pointer((const GLfloat *)tcoords);
     }
 
@@ -1010,17 +1008,17 @@ void GL_DrawAliasModel(const model_t *model)
         GL_BindArrays(dotshading ? VA_MESH_SHADE : VA_MESH_FLAT);
         meshbits = 0;
 
-    // select proper tessfunc
-    if (ent->flags & RF_SHELL_MASK) {
-        tessfunc = newframenum == oldframenum ?
-            tess_static_shell : tess_lerped_shell;
-    } else if (dotshading) {
-        tessfunc = newframenum == oldframenum ?
-            tess_static_shade : tess_lerped_shade;
-    } else {
-        tessfunc = newframenum == oldframenum ?
-            tess_static_plain : tess_lerped_plain;
-    }
+        // select proper tessfunc
+        if (ent->flags & RF_SHELL_MASK) {
+            tessfunc = newframenum == oldframenum ?
+                tess_static_shell : tess_lerped_shell;
+        } else if (dotshading) {
+            tessfunc = newframenum == oldframenum ?
+                tess_static_shade : tess_lerped_shade;
+        } else {
+            tessfunc = newframenum == oldframenum ?
+                tess_static_plain : tess_lerped_plain;
+        }
     }
 
     GL_RotateForEntity(false);

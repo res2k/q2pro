@@ -98,6 +98,25 @@ static void write_block(sizebuf_t *buf, glStateBits_t bits)
     GLSF("};\n");
 }
 
+static void write_dynamic_light_block(sizebuf_t *buf)
+{
+    GLSL(
+        struct dlight_t
+        {
+            vec3    position;
+            float   radius;
+            vec4    color;
+        };
+    )
+    GLSF("#define DLIGHT_CUTOFF 64\n");
+    GLSF("layout(std140) uniform u_dlights {\n");
+    GLSF("#define MAX_DLIGHTS " STRINGIFY(MAX_DLIGHTS) "\n");
+    GLSL(
+        dlight_t        dlights[MAX_DLIGHTS];
+    )
+    GLSF("};\n");
+}
+
 static void write_shadedot(sizebuf_t *buf)
 {
     GLSL(
@@ -149,6 +168,14 @@ static void write_skel_shader(sizebuf_t *buf, glStateBits_t bits)
         out vec4 v_color;
     )
 
+    if (bits & GLS_FOG_ENABLE)
+        GLSL(out vec3 v_wpos;)
+    if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+        GLSL(out vec3 v_world_pos;)
+    if (bits & GLS_DYNAMIC_LIGHTS) {
+        GLSL(out vec3 v_norm;)
+    }
+
     if (bits & GLS_MESH_SHADE)
         write_shadedot(buf);
 
@@ -196,7 +223,13 @@ static void write_skel_shader(sizebuf_t *buf, glStateBits_t bits)
     if (bits & GLS_MESH_SHELL)
         GLSL(out_pos += out_norm * u_shellscale;)
 
-    GLSL(gl_Position = m_vp * vec4(out_pos, 1.0);)
+    GLSL(gl_Position = m_proj * m_view * m_model * vec4(out_pos, 1.0);)
+    if (bits & GLS_FOG_ENABLE)
+        GLSL(v_wpos = (m_view * m_model * vec4(out_pos, 1.0)).xyz;)
+    if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+        GLSL(v_world_pos = (m_model * vec4(out_pos, 1.0)).xyz;)
+    if (bits & GLS_DYNAMIC_LIGHTS)
+        GLSL(v_norm = normalize((mat3(m_model) * out_norm).xyz);)
     GLSF("}\n");
 }
 #endif
@@ -233,8 +266,16 @@ static void write_mesh_shader(sizebuf_t *buf, glStateBits_t bits)
         out vec4 v_color;
     )
 
-    if (bits & (GLS_MESH_SHELL | GLS_MESH_SHADE))
+    if (bits & (GLS_MESH_SHELL | GLS_MESH_SHADE | GLS_DYNAMIC_LIGHTS))
         write_getnormal(buf);
+
+    if (bits & GLS_FOG_ENABLE)
+        GLSL(out vec3 v_wpos;)
+    if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+        GLSL(out vec3 v_world_pos;)
+    if (bits & GLS_DYNAMIC_LIGHTS) {
+        GLSL(out vec3 v_norm;)
+    }
 
     if (bits & GLS_MESH_SHADE)
         write_shadedot(buf);
@@ -243,23 +284,27 @@ static void write_mesh_shader(sizebuf_t *buf, glStateBits_t bits)
     GLSL(v_tc = a_tc;)
 
     if (bits & GLS_MESH_LERP) {
-        if (bits & (GLS_MESH_SHELL | GLS_MESH_SHADE))
+        if (bits & (GLS_MESH_SHELL | GLS_MESH_SHADE | GLS_DYNAMIC_LIGHTS))
             GLSL(
                 vec3 old_norm = get_normal(a_old_pos.w);
                 vec3 new_norm = get_normal(a_new_pos.w);
+                vec3 norm = normalize(old_norm * u_backlerp + new_norm * u_frontlerp);
             )
 
         GLSL(vec3 pos = vec3(a_old_pos.xyz) * u_old_scale + vec3(a_new_pos.xyz) * u_new_scale + u_translate;)
 
         if (bits & GLS_MESH_SHELL)
-            GLSL(pos += normalize((old_norm * u_backlerp + new_norm * u_frontlerp)) * u_shellscale;)
+            GLSL(pos += norm * u_shellscale;)
 
         if (bits & GLS_MESH_SHADE)
             GLSL(v_color = vec4(u_color.rgb * (shadedot(old_norm) * u_backlerp + shadedot(new_norm) * u_frontlerp), u_color.a);)
         else
             GLSL(v_color = u_color;)
+
+        if (bits & GLS_DYNAMIC_LIGHTS)
+            GLSL(v_norm = normalize((mat3(m_model) * norm).xyz);)
     } else {
-        if (bits & (GLS_MESH_SHELL | GLS_MESH_SHADE))
+        if (bits & (GLS_MESH_SHELL | GLS_MESH_SHADE | GLS_DYNAMIC_LIGHTS))
             GLSL(vec3 norm = get_normal(a_new_pos.w);)
 
         GLSL(vec3 pos = vec3(a_new_pos.xyz) * u_new_scale + u_translate;)
@@ -271,29 +316,17 @@ static void write_mesh_shader(sizebuf_t *buf, glStateBits_t bits)
             GLSL(v_color = vec4(u_color.rgb * shadedot(norm), u_color.a);)
         else
             GLSL(v_color = u_color;)
+
+        if (bits & GLS_DYNAMIC_LIGHTS)
+            GLSL(v_norm = normalize((mat3(m_model) * norm).xyz);)
     }
 
-    GLSL(gl_Position = m_vp * vec4(pos, 1.0);)
+    GLSL(gl_Position = m_proj * m_view * m_model * vec4(pos, 1.0);)
+    if (bits & GLS_FOG_ENABLE)
+        GLSL(v_wpos = (m_view * m_model * vec4(pos, 1.0)).xyz;)
+    if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+        GLSL(v_world_pos = (m_model * vec4(pos, 1.0)).xyz;)
     GLSF("}\n");
-}
-
-static void write_dynamic_light_block(sizebuf_t *buf)
-{
-    GLSL(
-        struct dlight_t
-        {
-            vec3    position;
-            float   radius;
-            vec4    color;
-        };
-    )
-    GLSF("#define DLIGHT_CUTOFF 64\n");
-    GLSF("layout(std140) uniform u_dlights {\n");
-    GLSF("#define MAX_DLIGHTS " STRINGIFY(MAX_DLIGHTS) "\n");
-    GLSL(
-        dlight_t        dlights[MAX_DLIGHTS];
-    )
-    GLSF("};\n");
 }
 
 static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
@@ -336,9 +369,10 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
     if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
         GLSL(out vec3 v_world_pos;)
     if (bits & GLS_DYNAMIC_LIGHTS) {
-        GLSL(in vec3 a_normal;)
-        GLSL(out vec3 v_normal;)
+        GLSL(in vec3 a_norm;)
+        GLSL(out vec3 v_norm;)
     }
+
     GLSF("void main() {\n");
         if (bits & GLS_CLASSIC_SKY) {
             GLSL(v_dir = (m_sky[1] * a_pos).xyz;)
@@ -362,7 +396,7 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
         if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
             GLSL(v_world_pos = (m_model * a_pos).xyz;)
         if (bits & GLS_DYNAMIC_LIGHTS)
-            GLSL(v_normal = normalize((mat3(m_model) * a_normal).xyz);)
+            GLSL(v_norm = normalize((mat3(m_model) * a_norm).xyz);)
     GLSF("}\n");
 }
 
@@ -407,13 +441,13 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
         GLSL(in vec4 v_color;)
 
     if (bits & GLS_FOG_ENABLE)
-        GLSL(in vec3 v_wpos;);
+        GLSL(in vec3 v_wpos;)
 
     if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
         GLSL(in vec3 v_world_pos;)
 
     if (bits & GLS_DYNAMIC_LIGHTS)
-        GLSL(in vec3 v_normal;)
+        GLSL(in vec3 v_norm;)
 
     GLSL(out vec4 o_color;)
 
@@ -422,12 +456,12 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
             vec3 shade = vec3(0);
 
             for (int i = 0; i < num_dlights; i++) {
-                vec3 dir = (dlights[i].position + (v_normal * 16)) - v_world_pos;
+                vec3 dir = (dlights[i].position + (v_norm * 16)) - v_world_pos;
                 float len = length(dir);
                 float dist = max((dlights[i].radius - DLIGHT_CUTOFF - len), 0.0f);
 
                 dir /= max(len, 1.0f);
-                float lambert = max(0.0f, dot(dir, v_normal));
+                float lambert = max(0.0f, dot(dir, v_norm));
                 shade += dlights[i].color.rgb * dist * lambert;
             }
 
@@ -498,10 +532,10 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
 
         if (!(bits & GLS_LIGHTMAP_ENABLE) && (bits & GLS_GLOWMAP_ENABLE)) {
             GLSL(vec4 glowmap = texture(u_glowmap, tc);)
-            GLSL(float glow_a = glowmap.a;)
             if (bits & GLS_INTENSITY_ENABLE)
-                GLSL(glow_a *= u_intensity2;)
-            GLSL(diffuse.rgb += glowmap.rgb * glow_a;)
+                GLSL(diffuse.rgb += glowmap.rgb * glowmap.a * u_intensity2;)
+            else
+                GLSL(diffuse.rgb += glowmap.rgb * glowmap.a;)
         }
 
         if (bits & GLS_FOG_ENABLE) {
@@ -617,7 +651,7 @@ static GLuint create_and_use_program(glStateBits_t bits)
         if (!(bits & GLS_TEXTURE_REPLACE))
             qglBindAttribLocation(program, VERT_ATTR_COLOR, "a_color");
         if (bits & GLS_DYNAMIC_LIGHTS)
-            qglBindAttribLocation(program, VERT_ATTR_NORMAL, "a_normal");
+            qglBindAttribLocation(program, VERT_ATTR_NORMAL, "a_norm");
     }
 
     qglLinkProgram(program);

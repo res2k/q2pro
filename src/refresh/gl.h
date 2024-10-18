@@ -547,8 +547,8 @@ typedef enum {
     VERT_ATTR_MESH_OLD_POS = 2,
 
     // MD5
-    VERT_ATTR_MESH_NORM = 1,
-    VERT_ATTR_MESH_VERT = 2,
+    VERT_ATTR_MESH_NORM = VERT_ATTR_NORMAL,
+    VERT_ATTR_MESH_VERT = 1,
 } glVertexAttr_t;
 
 typedef enum {

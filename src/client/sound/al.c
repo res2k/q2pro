@@ -1035,7 +1035,6 @@ static void AL_AddMergeLoopSounds(void)
     sfx_t       *sfx;
     sfxcache_t  *sc;
     int         num;
-    entity_state_t *ent;
 
     if (cls.state != ca_active || sv_paused->integer || !s_ambient->integer)
         return;
@@ -1056,7 +1055,6 @@ static void AL_AddMergeLoopSounds(void)
             continue;
 
         num = (cl.frame.firstEntity + i) & PARSE_ENTITIES_MASK;
-        ent = &cl.entityStates[num];
 
         // find a channel
         bool is_new = false;

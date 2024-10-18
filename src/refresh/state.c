@@ -325,10 +325,8 @@ void GL_ClearState(void)
     qglEnable(GL_CULL_FACE);
 
     // unbind buffers
-    if (qglBindBuffer) {
-        qglBindBuffer(GL_ARRAY_BUFFER, 0);
-        qglBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    }
+    GL_BindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    GL_BindBuffer(GL_UNIFORM_BUFFER, 0);
 
     gl_backend->clear_state();
 

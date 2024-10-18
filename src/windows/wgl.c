@@ -167,6 +167,9 @@ static int wgl_setup_gl(r_opengl_config_t cfg)
         if (cfg.profile == QGL_PROFILE_ES) {
             attr[i++] = WGL_CONTEXT_PROFILE_MASK_ARB;
             attr[i++] = WGL_CONTEXT_ES_PROFILE_BIT_EXT;
+        } else if (cfg.profile == QGL_PROFILE_CORE) {
+            attr[i++] = WGL_CONTEXT_PROFILE_MASK_ARB;
+            attr[i++] = WGL_CONTEXT_CORE_PROFILE_BIT_ARB;
         }
         if (cfg.debug) {
             attr[i++] = WGL_CONTEXT_FLAGS_ARB;

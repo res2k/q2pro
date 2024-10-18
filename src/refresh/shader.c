@@ -172,9 +172,8 @@ static void write_skel_shader(sizebuf_t *buf, glStateBits_t bits)
         GLSL(out vec3 v_wpos;)
     if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
         GLSL(out vec3 v_world_pos;)
-    if (bits & GLS_DYNAMIC_LIGHTS) {
+    if (bits & GLS_DYNAMIC_LIGHTS)
         GLSL(out vec3 v_norm;)
-    }
 
     if (bits & GLS_MESH_SHADE)
         write_shadedot(buf);
@@ -273,9 +272,8 @@ static void write_mesh_shader(sizebuf_t *buf, glStateBits_t bits)
         GLSL(out vec3 v_wpos;)
     if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
         GLSL(out vec3 v_world_pos;)
-    if (bits & GLS_DYNAMIC_LIGHTS) {
+    if (bits & GLS_DYNAMIC_LIGHTS)
         GLSL(out vec3 v_norm;)
-    }
 
     if (bits & GLS_MESH_SHADE)
         write_shadedot(buf);
@@ -829,12 +827,12 @@ static void shader_color(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 static void shader_load_uniforms(void)
 {
     if (gls.u_block_dirtybits & GLU_BLOCK) {
-        qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffer);
+        GL_BindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffer);
         qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(gls.u_block), &gls.u_block);
         c.uniformUploads++;
     }
     if (gls.u_block_dirtybits & GLU_DLIGHT) {
-        qglBindBuffer(GL_UNIFORM_BUFFER, gl_static.dlight_buffer);
+        GL_BindBuffer(GL_UNIFORM_BUFFER, gl_static.dlight_buffer);
         qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(gls.u_dlights.lights[0]) * gls.u_block.num_dlights, &gls.u_dlights);
         c.uniformUploads++;
     }
@@ -997,7 +995,7 @@ static void shader_shutdown(void)
         gl_static.programs = NULL;
     }
 
-    qglBindBuffer(GL_UNIFORM_BUFFER, 0);
+    GL_BindBuffer(GL_UNIFORM_BUFFER, 0);
 
     if (gl_static.uniform_buffer) {
         qglDeleteBuffers(1, &gl_static.uniform_buffer);

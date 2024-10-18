@@ -648,8 +648,8 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
     // muzzle flashes are excluded by checking for RF_FULLBRIGHT bit
     if ((glr.ent->flags & (RF_TRANSLUCENT | RF_WEAPONMODEL | RF_FULLBRIGHT)) == (RF_TRANSLUCENT | RF_WEAPONMODEL)) {
         if (gls.currentva) {
-        GL_StateBits(GLS_DEFAULT);
-        GL_ArrayBits(GLA_VERTEX);
+            GL_StateBits(GLS_DEFAULT);
+            GL_ArrayBits(GLA_VERTEX);
         } else {
             GL_StateBits(meshbits & ~GLS_MESH_SHADE);
         }
@@ -825,7 +825,7 @@ static void bind_skel_arrays(const md5_mesh_t *mesh, const md5_joint_t *skel)
     qglVertexAttribPointer (VERT_ATTR_MESH_NORM, 3, GL_FLOAT, GL_FALSE, sizeof(mesh->vertices[0]), VBO_OFS(base));
     qglVertexAttribIPointer(VERT_ATTR_MESH_VERT, 2, GL_UNSIGNED_SHORT,  sizeof(mesh->vertices[0]), VBO_OFS(base + sizeof(vec3_t)));
 
-    GL_ArrayBits(GLA_MESH_LERP);
+    GL_ArrayBits(GLA_MESH_LERP | GLA_NORMAL);
 }
 
 static void draw_skeleton_mesh(const md5_model_t *model, const md5_mesh_t *mesh, const md5_joint_t *skel)

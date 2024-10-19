@@ -24,6 +24,8 @@ static void CL_LogoutEffect(const vec3_t org, int color);
 
 static vec3_t avelocities[NUMVERTEXNORMALS];
 
+static cvar_t *cl_lerp_lightstyles;
+
 /*
 ==============================================================
 
@@ -34,14 +36,21 @@ LIGHT STYLE MANAGEMENT
 
 typedef struct {
     int     length;
-    float   map[MAX_QPATH - 1];
+    float   map[CS_MAX_STRING_LENGTH];
+
+    // Paril: interpolation
+    float   from, to;
+    int     endtime;
 } clightstyle_t;
 
 static clightstyle_t    cl_lightstyles[MAX_LIGHTSTYLES];
+// Paril: interpolation
+static int              cl_lastlightstyleoffset = -1;
 
 static void CL_ClearLightStyles(void)
 {
     memset(cl_lightstyles, 0, sizeof(cl_lightstyles));
+    cl_lastlightstyleoffset = -1;
 }
 
 /*
@@ -56,7 +65,7 @@ void CL_SetLightStyle(int index, const char *s)
 
     ls = &cl_lightstyles[index];
     ls->length = strlen(s);
-    Q_assert(ls->length < MAX_QPATH);
+    Q_assert(ls->length <= CS_MAX_STRING_LENGTH);
 
     for (i = 0; i < ls->length; i++)
         ls->map[i] = (float)(s[i] - 'a') / (float)('m' - 'a');
@@ -71,11 +80,50 @@ void CL_AddLightStyles(void)
 {
     int     i, ofs = cl.time / 100;
     clightstyle_t   *ls;
+    bool update_from = ofs != cl_lastlightstyleoffset;
 
     for (i = 0, ls = cl_lightstyles; i < MAX_LIGHTSTYLES; i++, ls++) {
-        float value = ls->length ? ls->map[ofs % ls->length] : 1.0f;
+        float value;
+        
+        if (!ls->length)
+            value = 1.0f;
+        else if (cl_lerp_lightstyles->integer)
+        {
+            // Paril: lightstyle lerping - a bit uglier than I'd like
+            // but this should allow styles to change at 100 ms intervals
+            // like vanilla.
+            // TODO: check what happens if styles are changed on non-100ms
+            // intervals.. my intuition tells me that that will cause a jump.
+            if (update_from)
+            {
+                if (cl_lastlightstyleoffset != -1)
+                    ls->from = ls->to;
+
+                ls->to = ls->length ? ls->map[ofs % ls->length] : 1.0f;
+
+                if (cl_lastlightstyleoffset == -1)
+                    ls->from = ls->to;
+
+                if (ls->from != ls->to)
+                    ls->endtime = cl.time + 100;
+            }
+            
+            if (ls->endtime <= cl.time)
+                value = ls->to;
+            else
+            {
+                float frac = 1.0f - ((float) (ls->endtime - cl.time) / 100.f);
+                value = LERP(ls->from, ls->to, frac);
+            }
+        }
+        else
+            value = ls->length ? ls->map[ofs % ls->length] : 1.0f;
+
         V_AddLightStyle(i, value);
     }
+
+    if (update_from)
+        cl_lastlightstyleoffset = ofs;
 }
 
 /*
@@ -1789,4 +1837,6 @@ void CL_InitEffects(void)
     for (i = 0; i < NUMVERTEXNORMALS; i++)
         for (j = 0; j < 3; j++)
             avelocities[i][j] = (Q_rand() & 255) * 0.01f;
+
+    cl_lerp_lightstyles = Cvar_Get("cl_lerp_lightstyles", "1", 0);
 }

@@ -44,7 +44,7 @@ env:
 
 jobs:
   mingw:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         arch: ["i686", "x86_64"]
@@ -111,7 +111,7 @@ jobs:
           path: installdir/
 
   linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         include:
@@ -170,7 +170,7 @@ jobs:
           meson compile -C builddir
 
   freebsd:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

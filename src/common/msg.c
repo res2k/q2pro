@@ -1793,6 +1793,35 @@ int64_t MSG_ReadLong64(void)
     return c;
 }
 
+// Paril: uint versions
+uint32_t MSG_ReadULong(void)
+{
+    byte *buf = MSG_ReadData(4);
+    uint32_t c;
+
+    if (!buf) {
+        c = -1;
+    } else {
+        c = RL32(buf);
+    }
+
+    return c;
+}
+
+uint64_t MSG_ReadULong64(void)
+{
+    byte *buf = MSG_ReadData(8);
+    uint64_t c;
+
+    if (!buf) {
+        c = -1;
+    } else {
+        c = RL64(buf);
+    }
+
+    return c;
+}
+
 size_t MSG_ReadString(char *dest, size_t size)
 {
     int     c;
@@ -2154,14 +2183,14 @@ void MSG_ParseDeltaEntity(entity_state_t            *to,
         to->skinnum = MSG_ReadWord();
 
     if ((bits & U_EFFECTS32) == U_EFFECTS32)
-        to->effects = MSG_ReadLong();
+        to->effects = MSG_ReadULong();
     else if (bits & U_EFFECTS8)
         to->effects = MSG_ReadByte();
     else if (bits & U_EFFECTS16)
         to->effects = MSG_ReadWord();
 
     if ((bits & U_RENDERFX32) == U_RENDERFX32)
-        to->renderfx = MSG_ReadLong();
+        to->renderfx = MSG_ReadULong();
     else if (bits & U_RENDERFX8)
         to->renderfx = MSG_ReadByte();
     else if (bits & U_RENDERFX16)
@@ -2215,7 +2244,7 @@ void MSG_ParseDeltaEntity(entity_state_t            *to,
     if (flags & MSG_ES_EXTENSIONS) {
         uint32_t to_morefx = 0;
         if ((bits & U_MOREFX32) == U_MOREFX32)
-            to_morefx = MSG_ReadLong();
+            to_morefx = MSG_ReadULong();
         else if (bits & U_MOREFX8)
             to_morefx = MSG_ReadByte();
         else if (bits & U_MOREFX16)

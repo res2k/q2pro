@@ -154,6 +154,9 @@ int     MSG_ReadShort(void);
 int     MSG_ReadWord(void);
 int     MSG_ReadLong(void);
 int64_t MSG_ReadLong64(void);
+// Paril: these just prevent casts at the call site
+uint32_t MSG_ReadULong(void);
+uint64_t MSG_ReadULong64(void);
 size_t  MSG_ReadString(char *dest, size_t size);
 size_t  MSG_ReadStringLine(char *dest, size_t size);
 float   MSG_ReadFloat(void);

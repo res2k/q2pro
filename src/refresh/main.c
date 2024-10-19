@@ -318,8 +318,8 @@ void GL_RotateForEntity(bool skies)
 {
     GL_RotationMatrix(glr.entmatrix);
     if (skies) {
-        GL_MultMatrix(gls.u_block.msky[0], glr.skymatrix[0], glr.entmatrix);
-        GL_MultMatrix(gls.u_block.msky[1], glr.skymatrix[1], glr.entmatrix);
+        GL_MultMatrix(gls.u_block.m_sky[0], glr.skymatrix[0], glr.entmatrix);
+        GL_MultMatrix(gls.u_block.m_sky[1], glr.skymatrix[1], glr.entmatrix);
     }
     GL_ForceMatrix(glr.entmatrix, glr.viewmatrix);
 }

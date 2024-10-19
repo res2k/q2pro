@@ -170,7 +170,7 @@ void GL_ScrollPos(vec2_t scroll, glStateBits_t bits)
 void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat znear, GLfloat zfar)
 {
     GLfloat width, height, depth;
-    GLfloat matrix[16];
+    mat4_t matrix;
 
     width  = xmax - xmin;
     height = ymax - ymin;
@@ -222,7 +222,7 @@ void GL_Setup2D(void)
 
 void GL_Frustum(GLfloat fov_x, GLfloat fov_y, GLfloat reflect_x)
 {
-    GLfloat matrix[16];
+    mat4_t matrix;
 
     float znear = gl_znear->value, zfar;
 

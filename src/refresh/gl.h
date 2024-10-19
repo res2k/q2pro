@@ -113,7 +113,7 @@ typedef struct {
 typedef struct {
     refdef_t        fd;
     vec3_t          viewaxis[3];
-    GLfloat         viewmatrix[16];
+    mat4_t          viewmatrix;
     unsigned        visframe;
     unsigned        drawframe;
     unsigned        dlightframe;
@@ -127,8 +127,8 @@ typedef struct {
     bool            entrotated;
     float           entscale;
     vec3_t          entaxis[3];
-    GLfloat         entmatrix[16];
-    GLfloat         skymatrix[2][16];
+    mat4_t          entmatrix;
+    mat4_t          skymatrix[2];
     lightpoint_t    lightpoint;
     int             num_beams;
     int             num_flares;
@@ -626,11 +626,11 @@ typedef struct {
 } glMeshBlock_t;
 
 typedef struct {
-    GLfloat     model[16];
-    GLfloat     view[16];
-    GLfloat     proj[16];
+    mat4_t     model;
+    mat4_t     view;
+    mat4_t     proj;
     union {
-        GLfloat         msky[2][16];
+        mat4_t          m_sky[2];
         glMeshBlock_t   mesh;
     };
     GLfloat     time;
@@ -639,9 +639,9 @@ typedef struct {
     GLfloat     intensity;
     GLfloat     intensity2;
     GLfloat     fog_sky_factor;
-    GLfloat     w_amp[2];
-    GLfloat     w_phase[2];
-    GLfloat     scroll[2];
+    vec2_t      w_amp;
+    vec2_t      w_phase;
+    vec2_t      scroll;
     GLfloat     height_fog_falloff;
     GLfloat     height_fog_density;
     GLint       num_dlights;
@@ -670,8 +670,10 @@ typedef struct {
     glArrayBits_t       array_bits;
     GLuint              currentbuffer[GLB_COUNT];
     glVertexArray_t     currentva;
-    const GLfloat      *currentviewmatrix;
     const GLfloat      *currentmodelmatrix;
+    const GLfloat      *currentviewmatrix;
+    mat4_t              view_matrix;
+    mat4_t              proj_matrix;
     glUniformBlock_t    u_block;
     glUniformDlights_t  u_dlights;
     glUniformBlockDirtyBits_t   u_block_dirtybits;

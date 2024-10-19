@@ -886,7 +886,7 @@ static void shader_setup_3d(void)
 
     R_RotateForSky();
 
-    memcpy(gls.u_block.msky, glr.skymatrix, sizeof(glr.skymatrix));
+    memcpy(gls.u_block.m_sky, glr.skymatrix, sizeof(glr.skymatrix));
     
     gls.u_block.global_fog[0] = glr.fd.fog.global.r;
     gls.u_block.global_fog[1] = glr.fd.fog.global.g;

@@ -34,6 +34,10 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #define DLIGHT_CUTOFF       64
 
+// Paril: affected by tracker, so black out
+// any shading data
+#define REFFLAG_BLACK_OUT   1
+
 typedef struct entity_s {
     qhandle_t           model;          // opaque type outside refresh
     vec3_t              angles;
@@ -64,6 +68,8 @@ typedef struct entity_s {
     int         flags;
 
     float       scale;
+
+    int         rflags; // specific to refresh, not exposed
 } entity_t;
 
 typedef struct {

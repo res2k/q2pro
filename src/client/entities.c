@@ -845,10 +845,15 @@ static void CL_AddPacketEntities(void)
 
         ent.scale = s1->scale;
 
+        bool black_out = (effects & EF_TRACKERTRAIL) && !(effects & EF_TRACKER);
+
+        if (black_out)
+            ent.rflags |= REFFLAG_BLACK_OUT;
+
         // add to refresh list
         V_AddEntity(&ent);
 
-        // color shells generate a seperate entity for the main model
+        // color shells generate a separate entity for the main model
         if (effects & EF_COLOR_SHELL) {
             // PMM - at this point, all of the shells have been handled
             // if we're in the rogue pack, set up the custom mixing, otherwise just
@@ -881,7 +886,11 @@ static void CL_AddPacketEntities(void)
             }
             ent.flags = renderfx | RF_TRANSLUCENT;
             ent.alpha = 0.30f;
+            ent.rflags = 0;
             V_AddEntity(&ent);
+
+            if (black_out)
+                ent.rflags |= REFFLAG_BLACK_OUT;
         }
 
         ent.skin = 0;       // never use a custom skin on others
@@ -948,6 +957,7 @@ static void CL_AddPacketEntities(void)
             ent.frame = 0;
             ent.flags = RF_TRANSLUCENT;
             ent.alpha = 0.30f;
+            ent.rflags = 0;
 
             // remaster powerscreen is tiny and needs scaling
             if (cl.need_powerscreen_scale) {

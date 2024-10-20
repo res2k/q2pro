@@ -386,7 +386,10 @@ static void setup_color(void)
     } else if ((flags & RF_IR_VISIBLE) && (glr.fd.rdflags & RDF_IRGOGGLES)) {
         VectorSet(color, 1, 0, 0);
     } else {
-        GL_LightPoint(origin, color);
+        if (glr.ent->rflags & REFFLAG_BLACK_OUT)
+            VectorClear(color);
+        else
+            GL_LightPoint(origin, color);
 
         if (flags & RF_MINLIGHT) {
             f = VectorLength(color);

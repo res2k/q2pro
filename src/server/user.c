@@ -988,15 +988,54 @@ static void SV_SetLastFrame(int lastframe)
     sv_client->lastframe = lastframe;
 }
 
+static void apply_usercmd_delta(const q2proto_clc_move_delta_t *move_delta, const usercmd_t *from, usercmd_t *to)
+{
+    Q_assert(to);
+
+    if (from) {
+        memcpy(to, from, sizeof(*to));
+    } else {
+        memset(to, 0, sizeof(*to));
+    }
+
+    // current angles
+    if (move_delta->delta_bits & Q2P_CMD_ANGLE0)
+        to->angles[0] = q2proto_var_angles_get_short_comp(&move_delta->angles, 0);
+    if (move_delta->delta_bits & Q2P_CMD_ANGLE1)
+        to->angles[1] = q2proto_var_angles_get_short_comp(&move_delta->angles, 1);
+    if (move_delta->delta_bits & Q2P_CMD_ANGLE2)
+        to->angles[2] = q2proto_var_angles_get_short_comp(&move_delta->angles, 2);
+
+    // read movement
+    if (move_delta->delta_bits & Q2P_CMD_MOVE_FORWARD)
+        to->forwardmove = q2proto_var_coords_get_int_unscaled_comp(&move_delta->move, 0);
+    if (move_delta->delta_bits & Q2P_CMD_MOVE_SIDE)
+        to->sidemove = q2proto_var_coords_get_int_unscaled_comp(&move_delta->move, 1);
+    if (move_delta->delta_bits & Q2P_CMD_MOVE_UP)
+        to->upmove = q2proto_var_coords_get_int_unscaled_comp(&move_delta->move, 2);
+
+    // buttons
+    if (move_delta->delta_bits & Q2P_CMD_BUTTONS)
+        to->buttons = move_delta->buttons;
+
+    if (move_delta->delta_bits & Q2P_CMD_IMPULSE)
+        to->impulse = move_delta->impulse;
+
+    // time to run command
+    to->msec = move_delta->msec;
+
+    // light level
+    to->lightlevel = move_delta->lightlevel;
+}
+
 /*
 ==================
 SV_OldClientExecuteMove
 ==================
 */
-static void SV_OldClientExecuteMove(void)
+static void SV_OldClientExecuteMove(const q2proto_clc_move_t *move)
 {
     usercmd_t   oldest, oldcmd, newcmd;
-    int         lastframe;
     int         net_drop;
 
     if (moveIssued) {
@@ -1006,30 +1045,16 @@ static void SV_OldClientExecuteMove(void)
 
     moveIssued = true;
 
-    if (sv_client->protocol == PROTOCOL_VERSION_DEFAULT) {
-        MSG_ReadByte();    // skip over checksum
-    }
-
-    lastframe = MSG_ReadLong();
-
-    // read all cmds
-    if (sv_client->protocol == PROTOCOL_VERSION_R1Q2 &&
-        sv_client->version >= PROTOCOL_VERSION_R1Q2_UCMD) {
-        MSG_ReadDeltaUsercmd_Hacked(NULL, &oldest);
-        MSG_ReadDeltaUsercmd_Hacked(&oldest, &oldcmd);
-        MSG_ReadDeltaUsercmd_Hacked(&oldcmd, &newcmd);
-    } else {
-        MSG_ReadDeltaUsercmd(NULL, &oldest);
-        MSG_ReadDeltaUsercmd(&oldest, &oldcmd);
-        MSG_ReadDeltaUsercmd(&oldcmd, &newcmd);
-    }
+    apply_usercmd_delta(&move->moves[0], NULL, &oldest);
+    apply_usercmd_delta(&move->moves[1], &oldest, &oldcmd);
+    apply_usercmd_delta(&move->moves[2], &oldcmd, &newcmd);
 
     if (sv_client->state != cs_spawned) {
         SV_SetLastFrame(-1);
         return;
     }
 
-    SV_SetLastFrame(lastframe);
+    SV_SetLastFrame(move->lastframe);
 
     net_drop = sv_client->netchan.dropped;
     if (net_drop > 2) {
@@ -1061,13 +1086,13 @@ static void SV_OldClientExecuteMove(void)
 SV_NewClientExecuteMove
 ==================
 */
-static void SV_NewClientExecuteMove(int c)
+static void SV_NewClientExecuteMove(const q2proto_clc_batch_move_t *batch_move)
 {
     usercmd_t   cmds[MAX_PACKET_FRAMES][MAX_PACKET_USERCMDS];
     usercmd_t   *lastcmd, *cmd;
     int         lastframe;
     int         numCmds[MAX_PACKET_FRAMES], numDups;
-    int         i, j, lightlevel;
+    int         i, j;
     int         net_drop;
 
     if (moveIssued) {
@@ -1077,42 +1102,27 @@ static void SV_NewClientExecuteMove(int c)
 
     moveIssued = true;
 
-    numDups = c >> SVCMD_BITS;
-    c &= SVCMD_MASK;
+    numDups = batch_move->num_dups;
 
     if (numDups >= MAX_PACKET_FRAMES) {
         SV_DropClient(sv_client, "too many frames in packet");
         return;
     }
 
-    if (c == clc_move_nodelta) {
-        lastframe = -1;
-    } else {
-        lastframe = MSG_ReadLong();
-    }
-
-    lightlevel = MSG_ReadByte();
+    lastframe = batch_move->lastframe;
 
     // read all cmds
     lastcmd = NULL;
     for (i = 0; i <= numDups; i++) {
-        numCmds[i] = MSG_ReadBits(5);
-        if (msg_read.readcount > msg_read.cursize) {
-            SV_DropClient(sv_client, "read past end of message");
-            return;
-        }
+        const q2proto_clc_batch_move_frame_t *move_frame = &batch_move->batch_frames[i];
+        numCmds[i] = move_frame->num_cmds;
         if (numCmds[i] >= MAX_PACKET_USERCMDS) {
             SV_DropClient(sv_client, "too many usercmds in frame");
             return;
         }
         for (j = 0; j < numCmds[i]; j++) {
-            if (msg_read.readcount > msg_read.cursize) {
-                SV_DropClient(sv_client, "read past end of message");
-                return;
-            }
             cmd = &cmds[i][j];
-            MSG_ReadDeltaUsercmd_Enhanced(lastcmd, cmd);
-            cmd->lightlevel = lightlevel;
+            apply_usercmd_delta(&move_frame->moves[j], lastcmd, cmd);
             lastcmd = cmd;
         }
     }
@@ -1243,7 +1253,7 @@ static void SV_UpdateUserinfo(void)
     SV_UserinfoChanged(sv_client);
 }
 
-static void SV_ParseFullUserinfo(void)
+static void SV_ParseFullUserinfo(const q2proto_clc_userinfo_t *userinfo)
 {
     // malicious users may try sending too many userinfo updates
     if (userinfoUpdateCount >= MAX_PACKET_USERINFOS) {
@@ -1252,10 +1262,11 @@ static void SV_ParseFullUserinfo(void)
         return;
     }
 
-    if (MSG_ReadString(sv_client->userinfo, sizeof(sv_client->userinfo)) >= sizeof(sv_client->userinfo)) {
+    if (userinfo->str.len >= sizeof(sv_client->userinfo)) {
         SV_DropClient(sv_client, "oversize userinfo");
         return;
     }
+    q2pslcpy(sv_client->userinfo, sizeof(sv_client->userinfo), &userinfo->str);
 
     Com_DDPrintf("%s(%s): %s [%d]\n", __func__,
                  sv_client->name, Com_MakePrintable(sv_client->userinfo), userinfoUpdateCount);
@@ -1264,54 +1275,39 @@ static void SV_ParseFullUserinfo(void)
     userinfoUpdateCount++;
 }
 
-static void SV_ParseDeltaUserinfo(void)
+static void SV_ParseDeltaUserinfo(const q2proto_clc_userinfo_delta_t *userinfo_delta)
 {
     char key[MAX_INFO_KEY], value[MAX_INFO_VALUE];
 
     // malicious users may try sending too many userinfo updates
     if (userinfoUpdateCount >= MAX_PACKET_USERINFOS) {
         Com_DPrintf("Too many userinfos from %s\n", sv_client->name);
-        MSG_ReadString(NULL, 0);
-        MSG_ReadString(NULL, 0);
         return;
     }
 
-    // optimize by combining multiple delta updates into one (hack)
-    while (1) {
-        if (MSG_ReadString(key, sizeof(key)) >= sizeof(key)) {
-            SV_DropClient(sv_client, "oversize userinfo key");
-            return;
-        }
-
-        if (MSG_ReadString(value, sizeof(value)) >= sizeof(value)) {
-            SV_DropClient(sv_client, "oversize userinfo value");
-            return;
-        }
-
-        if (userinfoUpdateCount < MAX_PACKET_USERINFOS) {
-            if (!Info_SetValueForKey(sv_client->userinfo, key, value)) {
-                SV_DropClient(sv_client, "malformed userinfo");
-                return;
-            }
-
-            Com_DDPrintf("%s(%s): %s %s [%d]\n", __func__,
-                         sv_client->name, key, value, userinfoUpdateCount);
-
-            userinfoUpdateCount++;
-        } else {
-            Com_DPrintf("Too many userinfos from %s\n", sv_client->name);
-        }
-
-        if (msg_read.readcount >= msg_read.cursize)
-            break; // end of message
-
-        if (msg_read.data[msg_read.readcount] != clc_userinfo_delta)
-            break; // not delta userinfo
-
-        msg_read.readcount++;
+    if (q2pslcpy(key, sizeof(key), &userinfo_delta->name) >= sizeof(key)) {
+        SV_DropClient(sv_client, "oversize userinfo key");
+        return;
     }
 
-    SV_UpdateUserinfo();
+    if (q2pslcpy(value, sizeof(value), &userinfo_delta->value) >= sizeof(value)) {
+        SV_DropClient(sv_client, "oversize userinfo value");
+        return;
+    }
+
+    if (userinfoUpdateCount < MAX_PACKET_USERINFOS) {
+        if (!Info_SetValueForKey(sv_client->userinfo, key, value)) {
+            SV_DropClient(sv_client, "malformed userinfo");
+            return;
+        }
+
+        Com_DDPrintf("%s(%s): %s %s [%d]\n", __func__,
+                        sv_client->name, key, value, userinfoUpdateCount);
+
+        userinfoUpdateCount++;
+    } else {
+        Com_DPrintf("Too many userinfos from %s\n", sv_client->name);
+    }
 }
 
 #if USE_FPS
@@ -1358,12 +1354,12 @@ static void set_client_fps(int value)
 }
 #endif
 
-static void SV_ParseClientSetting(void)
+static void SV_ParseClientSetting(const q2proto_clc_setting_t *setting)
 {
     int idx, value;
 
-    idx = MSG_ReadShort();
-    value = MSG_ReadShort();
+    idx = setting->index;
+    value = setting->value;
 
     Com_DDPrintf("%s(%s): [%d] = %d\n", __func__, sv_client->name, idx, value);
 
@@ -1378,14 +1374,15 @@ static void SV_ParseClientSetting(void)
 #endif
 }
 
-static void SV_ParseClientCommand(void)
+static void SV_ParseClientCommand(const q2proto_clc_stringcmd_t *stringcmd)
 {
     char buffer[MAX_STRING_CHARS];
 
-    if (MSG_ReadString(buffer, sizeof(buffer)) >= sizeof(buffer)) {
+    if (stringcmd->cmd.len >= sizeof(buffer)) {
         SV_DropClient(sv_client, "oversize stringcmd");
         return;
     }
+    q2pslcpy(buffer, sizeof(buffer), &stringcmd->cmd);
 
     // malicious users may try using too many string commands
     if (stringCmdCount >= MAX_PACKET_STRINGCMDS) {
@@ -1408,8 +1405,6 @@ The current net_message is parsed for the given client
 */
 void SV_ExecuteClientMessage(client_t *client)
 {
-    int c;
-
     sv_client = client;
     sv_player = sv_client->edict;
 
@@ -1417,6 +1412,7 @@ void SV_ExecuteClientMessage(client_t *client)
     moveIssued = false;
     stringCmdCount = 0;
     userinfoUpdateCount = 0;
+    int prevUserinfoUpdateCount = 0;
 
     while (1) {
         if (msg_read.readcount > msg_read.cursize) {
@@ -1424,59 +1420,59 @@ void SV_ExecuteClientMessage(client_t *client)
             break;
         }
 
-        c = MSG_ReadByte();
-        if (c == -1)
+        q2proto_clc_message_t message;
+        q2proto_error_t err = q2proto_server_read(&client->q2proto_ctx, Q2PROTO_IOARG_SERVER_READ, &message);
+        if (err == Q2P_ERR_NO_MORE_INPUT)
             break;
 
-        if (client->protocol == PROTOCOL_VERSION_Q2PRO) {
-            switch (c & SVCMD_MASK) {
-            case clc_move_nodelta:
-            case clc_move_batched:
-                SV_NewClientExecuteMove(c);
-                goto nextcmd;
-            }
+        // Handle batched userinfo deltas
+        if (message.type != Q2P_CLC_USERINFO_DELTA && prevUserinfoUpdateCount != userinfoUpdateCount) {
+            SV_UpdateUserinfo();
+            prevUserinfoUpdateCount = userinfoUpdateCount;
         }
 
-        switch (c) {
+        switch(message.type)
+        {
         default:
-badbyte:
-            SV_DropClient(client, "unknown command byte");
+            SV_DropClient(client, "unknown message type");
             break;
 
-        case clc_nop:
+        case Q2P_CLC_NOP:
             break;
 
-        case clc_userinfo:
-            SV_ParseFullUserinfo();
+        case Q2P_CLC_USERINFO:
+            SV_ParseFullUserinfo(&message.userinfo);
             break;
 
-        case clc_move:
-            SV_OldClientExecuteMove();
+        case Q2P_CLC_MOVE:
+            SV_OldClientExecuteMove(&message.move);
             break;
 
-        case clc_stringcmd:
-            SV_ParseClientCommand();
+        case Q2P_CLC_BATCH_MOVE:
+            SV_NewClientExecuteMove(&message.batch_move);
             break;
 
-        case clc_setting:
-            if (client->protocol < PROTOCOL_VERSION_R1Q2)
-                goto badbyte;
-
-            SV_ParseClientSetting();
+        case Q2P_CLC_STRINGCMD:
+            SV_ParseClientCommand(&message.stringcmd);
             break;
 
-        case clc_userinfo_delta:
-            if (client->protocol != PROTOCOL_VERSION_Q2PRO)
-                goto badbyte;
-
-            SV_ParseDeltaUserinfo();
+        case Q2P_CLC_SETTING:
+            SV_ParseClientSetting(&message.setting);
             break;
+
+        case Q2P_CLC_USERINFO_DELTA:
+            SV_ParseDeltaUserinfo(&message.userinfo_delta);
+            break;
+
         }
 
-nextcmd:
         if (client->state <= cs_zombie)
             break;    // disconnect command
     }
+
+    // Handle batched userinfo deltas
+    if (prevUserinfoUpdateCount != userinfoUpdateCount)
+        SV_UpdateUserinfo();
 
     sv_client = NULL;
     sv_player = NULL;

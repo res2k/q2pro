@@ -37,6 +37,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/pmove.h"
 #include "common/prompt.h"
 #include "common/protocol.h"
+#include "common/q2proto_shared.h"
 #include "common/sizebuf.h"
 #include "common/zone.h"
 
@@ -50,6 +51,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "client/sound/sound.h"
 #include "client/ui.h"
 #include "client/video.h"
+
+#include "q2proto/q2proto.h"
 
 #if USE_ZLIB
 #include <zlib.h>
@@ -432,6 +435,7 @@ typedef struct {
     netchan_t   netchan;
     int         serverProtocol;     // in case we are doing some kind of version hack
     int         protocolVersion;    // minor version
+    q2proto_clientcontext_t q2proto_ctx;
 
     int         challenge;          // from the server to use for connecting
 
@@ -455,9 +459,6 @@ typedef struct {
         int64_t     position;           // how much downloaded (in bytes)
         qhandle_t   file;               // UDP file transfer from server
         char        temp[MAX_QPATH + 4];// account 4 bytes for .tmp suffix
-#if USE_ZLIB
-        z_stream    z;                  // UDP download zlib stream
-#endif
         string_entry_t  *ignores;       // list of ignored paths
     } download;
 
@@ -666,7 +667,7 @@ bool CL_IgnoreDownload(const char *path);
 void CL_FinishDownload(dlqueue_t *q);
 void CL_CleanupDownloads(void);
 void CL_LoadDownloadIgnores(void);
-void CL_HandleDownload(const byte *data, int size, int percent, int decompressed_size);
+void CL_HandleDownload(const byte *data, int size, int percent);
 bool CL_CheckDownloadExtension(const char *ext);
 void CL_StartNextDownload(void);
 void CL_RequestNextDownload(void);

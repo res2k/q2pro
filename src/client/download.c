@@ -163,9 +163,7 @@ void CL_CleanupDownloads(void)
 
     cls.download.temp[0] = 0;
 
-#if USE_ZLIB
-    inflateEnd(&cls.download.z);
-#endif
+    q2proto_client_download_reset(&cls.q2proto_ctx);
 }
 
 /*
@@ -276,9 +274,7 @@ static void finish_udp_download(const char *msg)
 
     cls.download.temp[0] = 0;
 
-#if USE_ZLIB
-    inflateReset(&cls.download.z);
-#endif
+    q2proto_client_download_reset(&cls.q2proto_ctx);
 
     if (msg) {
         Com_Printf("[UDP] %s [%s] [%d remaining file%s]\n",
@@ -306,55 +302,6 @@ static bool write_udp_download(const byte *data, int size)
     return true;
 }
 
-#if USE_ZLIB
-// handles both continuous deflate stream for entire download and chunked
-// per-packet streams for compatibility.
-static bool inflate_udp_download(const byte *data, int size, int decompressed_size)
-{
-    z_streamp   z = &cls.download.z;
-    byte        buffer[0x10000];
-    int         ret;
-
-    // initialize stream if not done yet
-    Q_assert(z->state || inflateInit2(z, -MAX_WBITS) == Z_OK);
-
-    if (!size)
-        return true;
-
-    // run inflate() until output buffer not full
-    z->next_in = (Bytef *)data;
-    z->avail_in = size;
-    do {
-        z->next_out = buffer;
-        z->avail_out = sizeof(buffer);
-
-        ret = inflate(z, Z_SYNC_FLUSH);
-        if (ret != Z_OK && ret != Z_STREAM_END && ret != Z_BUF_ERROR) {
-            Com_EPrintf("[UDP] Error %d decompressing download\n", ret);
-            finish_udp_download(NULL);
-            return false;
-        }
-
-        if (!write_udp_download(buffer, sizeof(buffer) - z->avail_out))
-            return false;
-    } while (z->avail_out == 0);
-
-    // check decompressed size if known
-    if (decompressed_size > 0 && decompressed_size != z->total_out) {
-        Com_WPrintf("[UDP] Decompressed size mismatch: expected %d, got %lu\n",
-                    decompressed_size, z->total_out);
-    }
-
-    // prepare for the next stream if done
-    if (ret == Z_STREAM_END)
-        inflateReset(z);
-
-    return true;
-}
-#else
-#define inflate_udp_download(data, size, decompressed_size)   false
-#endif
-
 /*
 =====================
 CL_HandleDownload
@@ -362,7 +309,7 @@ CL_HandleDownload
 An UDP download data has been received from the server.
 =====================
 */
-void CL_HandleDownload(const byte *data, int size, int percent, int decompressed_size)
+void CL_HandleDownload(const byte *data, int size, int percent)
 {
     dlqueue_t *q = cls.download.current;
     int ret;
@@ -392,15 +339,8 @@ void CL_HandleDownload(const byte *data, int size, int percent, int decompressed
         }
     }
 
-    // non-zero decompressed_size means deflated download
-    // can be -1 if streaming from .pkz
-    if (decompressed_size) {
-        if (!inflate_udp_download(data, size, decompressed_size))
-            return;
-    } else {
-        if (!write_udp_download(data, size))
-            return;
-    }
+    if (!write_udp_download(data, size))
+        return;
 
     if (percent != 100) {
         // request next block

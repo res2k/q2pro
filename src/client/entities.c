@@ -150,13 +150,7 @@ static void parse_entity_update(const centity_state_t *state)
         cl.solidEntities[cl.numSolidEntities++] = ent;
 
     if (state->solid && state->solid != PACKED_BSP) {
-        // encoded bbox
-        if (cl.csr.extended)
-            MSG_UnpackSolid32_Ver2(state->solid, ent->mins, ent->maxs);
-        else if (cl.esFlags & MSG_ES_LONGSOLID)
-            MSG_UnpackSolid32_Ver1(state->solid, ent->mins, ent->maxs);
-        else
-            MSG_UnpackSolid16(state->solid, ent->mins, ent->maxs);
+        q2proto_client_unpack_solid(&cls.q2proto_ctx, state->solid, ent->mins, ent->maxs);
         ent->radius = Distance(ent->maxs, ent->mins) * 0.5f;
     } else {
         VectorClear(ent->mins);
@@ -1410,7 +1404,7 @@ void CL_CalcViewValues(void)
     Vector4Copy(ps->damage_blend, cl.refdef.damage_blend);
 
     // interpolate fog
-    if (cl.psFlags & MSG_PS_MOREBITS) {
+    if (cls.q2proto_ctx.features.has_playerfog) {
         lerp_values(&ops->fog, &ps->fog, lerp,
                     &cl.refdef.fog, sizeof(cl.refdef.fog) / sizeof(float));
         // no lerping if moved too far

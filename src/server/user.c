@@ -129,7 +129,7 @@ static void write_gamestate(void)
             if (base->number) {
                 q2proto_svc_spawnbaseline_t *baseline = &spawnbaselines[gamestate.num_spawnbaselines++];
                 baseline->entnum = base->number;
-                SV_MakeEntityDelta(sv_client, &baseline->delta_state, NULL, base, baseline_flags);
+                Q2PROTO_MakeEntityDelta(&sv_client->q2proto_ctx, &baseline->delta_state, NULL, &base->e, baseline_flags);
             }
             base++;
         }

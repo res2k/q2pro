@@ -18,6 +18,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #pragma once
 
+#include "common/msg.h"
 #include "common/sizebuf.h"
 
 #include "q2proto/q2proto.h"
@@ -71,3 +72,5 @@ Q2PROTO_DECLARE_ENTITY_PACKING_FUNCTION(PackEntity, struct entity_state_packing_
 
 Q2PROTO_DECLARE_PLAYER_PACKING_FUNCTION(PackPlayerstateNew, player_state_new_t *);
 Q2PROTO_DECLARE_PLAYER_PACKING_FUNCTION(PackPlayerstateOld, player_state_old_t *);
+
+bool Q2PROTO_MakeEntityDelta(q2proto_servercontext_t *context, q2proto_entity_state_delta_t *delta, const q2proto_packed_entity_state_t *from, const q2proto_packed_entity_state_t *to, msgEsFlags_t flags);

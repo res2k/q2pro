@@ -769,7 +769,6 @@ static inline void SV_CheckEntityNumber(edict_t *ent, int e, const char *func)
 void SV_BuildClientFrame(client_t *client);
 bool SV_WriteFrameToClient_Default(client_t *client, unsigned maxsize);
 bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize);
-bool SV_MakeEntityDelta(client_t *client, q2proto_entity_state_delta_t *delta, const server_entity_packed_t *from, const server_entity_packed_t *to, msgEsFlags_t flags);
 
 //
 // sv_game.c

@@ -641,20 +641,11 @@ typedef struct {
 #define reject(...) reject_printf(__VA_ARGS__), false
 #define reject_ptr(...) reject_printf(__VA_ARGS__), NULL
 
-static bool parse_basic_params(conn_params_t *p)
+static bool parse_basic_params(const q2proto_connect_t *parsed_connect, conn_params_t *p)
 {
-    p->protocol = Q_atoi(Cmd_Argv(1));
-    p->qport = Q_atoi(Cmd_Argv(2)) ;
-    p->challenge = Q_atoi(Cmd_Argv(3));
-
-    // check for invalid protocol version
-    if (p->protocol < PROTOCOL_VERSION_OLD ||
-        p->protocol > PROTOCOL_VERSION_Q2PRO)
-        return reject("Unsupported protocol version %d.\n", p->protocol);
-
-    // check for valid, but outdated protocol version
-    if (p->protocol < PROTOCOL_VERSION_DEFAULT)
-        return reject("You need Quake 2 version 3.19 or higher.\n");
+    p->protocol = q2proto_get_protocol_netver(parsed_connect->protocol);
+    p->qport = parsed_connect->qport;
+    p->challenge = parsed_connect->challenge;
 
     return true;
 }
@@ -734,24 +725,15 @@ static bool permit_connection(conn_params_t *p)
     return true;
 }
 
-static bool parse_packet_length(conn_params_t *p)
+static bool parse_packet_length(const q2proto_connect_t *parsed_connect, conn_params_t *p)
 {
-    char *s;
+    p->maxlength = parsed_connect->packet_length;
+    if (p->maxlength < 0 || p->maxlength > MAX_PACKETLEN_WRITABLE)
+        return reject("Invalid maximum message length.\n");
 
-    // set maximum packet length
-    p->maxlength = MAX_PACKETLEN_WRITABLE_DEFAULT;
-    if (p->protocol >= PROTOCOL_VERSION_R1Q2) {
-        s = Cmd_Argv(5);
-        if (*s) {
-            p->maxlength = Q_atoi(s);
-            if (p->maxlength < 0 || p->maxlength > MAX_PACKETLEN_WRITABLE)
-                return reject("Invalid maximum message length.\n");
-
-            // 0 means highest available
-            if (!p->maxlength)
-                p->maxlength = MAX_PACKETLEN_WRITABLE;
-        }
-    }
+    // 0 means highest available
+    if (!p->maxlength)
+        p->maxlength = MAX_PACKETLEN_WRITABLE;
 
     if (!NET_IsLocalAddress(&net_from) && net_maxmsglen->integer > 0) {
         // cap to server defined maximum value
@@ -766,50 +748,14 @@ static bool parse_packet_length(conn_params_t *p)
     return true;
 }
 
-static bool parse_enhanced_params(conn_params_t *p)
+static bool parse_enhanced_params(const q2proto_connect_t *parsed_connect, conn_params_t *p)
 {
-    char *s;
+    p->version = parsed_connect->version;
+    p->has_zlib = parsed_connect->has_zlib;
+    p->nctype = parsed_connect->q2pro_nctype;
 
-    if (p->protocol == PROTOCOL_VERSION_R1Q2) {
-        // set minor protocol version
-        s = Cmd_Argv(6);
-        if (*s) {
-            p->version = Q_clip(Q_atoi(s),
-                PROTOCOL_VERSION_R1Q2_MINIMUM,
-                PROTOCOL_VERSION_R1Q2_CURRENT);
-        } else {
-            p->version = PROTOCOL_VERSION_R1Q2_MINIMUM;
-        }
-        p->nctype = NETCHAN_OLD;
-        p->has_zlib = true;
-    } else if (p->protocol == PROTOCOL_VERSION_Q2PRO) {
-        // set netchan type
-        s = Cmd_Argv(6);
-        if (*s) {
-            p->nctype = Q_atoi(s);
-            if (p->nctype < NETCHAN_OLD || p->nctype > NETCHAN_NEW)
-                return reject("Invalid netchan type.\n");
-        } else {
-            p->nctype = NETCHAN_NEW;
-        }
-
-        // set zlib
-        s = Cmd_Argv(7);
-        p->has_zlib = !*s || Q_atoi(s);
-
-        // set minor protocol version
-        s = Cmd_Argv(8);
-        if (*s) {
-            p->version = Q_clip(Q_atoi(s),
-                PROTOCOL_VERSION_Q2PRO_MINIMUM,
-                PROTOCOL_VERSION_Q2PRO_CURRENT);
-            if (p->version == PROTOCOL_VERSION_Q2PRO_RESERVED) {
-                p->version--; // never use this version
-            }
-        } else {
-            p->version = PROTOCOL_VERSION_Q2PRO_MINIMUM;
-        }
-    }
+    if (p->nctype < NETCHAN_OLD || p->nctype > NETCHAN_NEW)
+        return reject("Invalid netchan type.\n");
 
     // verify protocol extensions compatibility
     if (svs.csr.extended) {
@@ -847,26 +793,28 @@ static const char *userinfo_ip_string(void)
     return NET_AdrToString(&net_from);
 }
 
-static bool parse_userinfo(conn_params_t *params, char *userinfo)
+static bool parse_userinfo(const q2proto_connect_t *parsed_connect, conn_params_t *params, char *userinfo)
 {
-    char *info, *s;
+    char *s;
     cvarban_t *ban;
 
     // validate userinfo
-    info = Cmd_Argv(4);
-    if (!info[0])
+    if (parsed_connect->userinfo.len == 0)
         return reject("Empty userinfo string.\n");
 
-    if (!Info_Validate(info))
+    // copy userinfo off
+    q2pslcpy(userinfo, MAX_INFO_STRING, &parsed_connect->userinfo);
+
+    if (!Info_Validate(userinfo))
         return reject("Malformed userinfo string.\n");
 
-    s = Info_ValueForKey(info, "name");
+    s = Info_ValueForKey(userinfo, "name");
     s[MAX_CLIENT_NAME - 1] = 0;
     if (COM_IsWhite(s))
         return reject("Please set your name before connecting.\n");
 
     // check password
-    s = Info_ValueForKey(info, "password");
+    s = Info_ValueForKey(userinfo, "password");
     if (sv_password->string[0]) {
         if (!s[0])
             return reject("Please set your password before connecting.\n");
@@ -887,9 +835,6 @@ static bool parse_userinfo(conn_params_t *params, char *userinfo)
         // anyone to access reserved slots at all
         params->reserved = sv_reserved_slots->integer;
     }
-
-    // copy userinfo off
-    Q_strlcpy(userinfo, info, MAX_INFO_STRING);
 
     // mvdspec, ip, etc are passed in extra userinfo if supported
     if (!(g_features->integer & GMF_EXTRA_USERINFO)) {
@@ -1090,18 +1035,34 @@ static void SVC_DirectConnect(void)
     qboolean        allow;
     char            *reason;
 
+    q2proto_server_info_t server_info;
+    server_info.game_type = Q2PROTO_GAME_VANILLA; // TODO
+    server_info.default_packet_length = MAX_PACKETLEN_WRITABLE_DEFAULT;
+
+    q2proto_connect_t parsed_connect;
+    q2proto_error_t parse_err = q2proto_parse_connect(Cmd_Args(), q2proto_vanilla_protocols, q2proto_num_vanilla_protocols, &server_info, &parsed_connect);
+    if (parse_err != Q2P_ERR_SUCCESS) {
+        if (parse_err == Q2P_ERR_PROTOCOL_NOT_SUPPORTED) {
+            reject_printf("Unsupported protocol %d.\n", parsed_connect.protocol);
+            return;
+        } else {
+            reject_printf("'connect' parse error %d.\n", parse_err);
+            return;
+        }
+    }
+
     memset(&params, 0, sizeof(params));
 
     // parse and validate parameters
-    if (!parse_basic_params(&params))
+    if (!parse_basic_params(&parsed_connect, &params))
         return;
     if (!permit_connection(&params))
         return;
-    if (!parse_packet_length(&params))
+    if (!parse_packet_length(&parsed_connect, &params))
         return;
-    if (!parse_enhanced_params(&params))
+    if (!parse_enhanced_params(&parsed_connect, &params))
         return;
-    if (!parse_userinfo(&params, userinfo))
+    if (!parse_userinfo(&parsed_connect, &params, userinfo))
         return;
 
     // find a free client slot

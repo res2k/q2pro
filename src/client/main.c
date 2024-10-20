@@ -2295,7 +2295,7 @@ static size_t CL_Armor_m(char *buffer, size_t size)
 
 static size_t CL_WeaponModel_m(char *buffer, size_t size)
 {
-    int i = cl.csr.models + (cl.frame.ps.gunindex & GUNINDEX_MASK);
+    int i = cl.csr.models + cl.frame.ps.gunindex;
     return Q_strlcpy(buffer, cl.configstrings[i], size);
 }
 

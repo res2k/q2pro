@@ -1162,8 +1162,8 @@ static void CL_AddViewWeapon(void)
     if (gun_model) {
         gun.model = gun_model;  // development tool
     } else {
-        gun.model = cl.model_draw[ps->gunindex & GUNINDEX_MASK];
-        gun.skinnum = ps->gunindex >> GUNINDEX_BITS;
+        gun.model = cl.model_draw[ps->gunindex];
+        gun.skinnum = ps->gunskin;
     }
     if (!gun.model) {
         return;

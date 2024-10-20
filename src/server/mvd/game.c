@@ -459,6 +459,7 @@ static void MVD_FollowStop(mvd_client_t *client)
     client->ps.pmove.pm_type = mvd->pm_type;
     client->ps.rdflags = 0;
     client->ps.gunindex = 0;
+    client->ps.gunskin = 0;
     client->ps.fov = client->fov;
 
     // send delta configstrings

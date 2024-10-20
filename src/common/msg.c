@@ -882,7 +882,7 @@ void MSG_PackPlayer(player_packed_t *out, const player_state_t *in, msgPsFlags_t
         PACK_OFFSET(out->gunangles, in->gunangles);
     }
 
-    out->gunindex = in->gunindex;
+    out->gunindex = in->gunindex | in->gunskin << GUNINDEX_BITS;
     out->gunframe = in->gunframe;
     PACK_BLEND(out->screen_blend, in->screen_blend);
     PACK_BLEND(out->damage_blend, in->damage_blend);
@@ -2423,6 +2423,8 @@ void MSG_ParseDeltaPlayerstate_Default(const player_state_t *from,
             to->gunindex = MSG_ReadWord();
         else
             to->gunindex = MSG_ReadByte();
+        to->gunskin = to->gunindex >> GUNINDEX_BITS;
+        to->gunindex &= GUNINDEX_MASK;
     }
 
     if (flags & PS_WEAPONFRAME) {
@@ -2569,6 +2571,8 @@ void MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t    *from,
             to->gunindex = MSG_ReadWord();
         else
             to->gunindex = MSG_ReadByte();
+        to->gunskin = to->gunindex >> GUNINDEX_BITS;
+        to->gunindex &= GUNINDEX_MASK;
     }
 
     if (flags & PS_WEAPONFRAME) {
@@ -2699,6 +2703,8 @@ void MSG_ParseDeltaPlayerstate_Packet(player_state_t        *to,
             to->gunindex = MSG_ReadWord();
         else
             to->gunindex = MSG_ReadByte();
+        to->gunskin = to->gunindex >> GUNINDEX_BITS;
+        to->gunindex &= GUNINDEX_MASK;
     }
 
     if (flags & PPS_WEAPONFRAME) {

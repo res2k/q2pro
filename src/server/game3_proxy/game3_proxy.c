@@ -477,7 +477,8 @@ static void game_client_old_to_server(struct gclient_s *server_client, const str
     VectorCopy(game_client->ps.kick_angles, server_client->ps.kick_angles);
     VectorCopy(game_client->ps.gunangles, server_client->ps.gunangles);
     VectorCopy(game_client->ps.gunoffset, server_client->ps.gunoffset);
-    server_client->ps.gunindex = game_client->ps.gunindex;
+    server_client->ps.gunindex = game_client->ps.gunindex & GUNINDEX_MASK;
+    server_client->ps.gunskin = game_client->ps.gunindex >> GUNINDEX_BITS;
     server_client->ps.gunframe = game_client->ps.gunframe;
     Vector4Copy(game_client->ps.blend, server_client->ps.screen_blend);
     server_client->ps.fov = game_client->ps.fov;
@@ -499,7 +500,8 @@ static void game_client_new_to_server(struct gclient_s *server_client, const str
     VectorCopy(game_client->ps.kick_angles, server_client->ps.kick_angles);
     VectorCopy(game_client->ps.gunangles, server_client->ps.gunangles);
     VectorCopy(game_client->ps.gunoffset, server_client->ps.gunoffset);
-    server_client->ps.gunindex = game_client->ps.gunindex;
+    server_client->ps.gunindex = game_client->ps.gunindex & GUNINDEX_MASK;
+    server_client->ps.gunskin = game_client->ps.gunindex >> GUNINDEX_BITS;
     server_client->ps.gunframe = game_client->ps.gunframe;
     Vector4Copy(game_client->ps.blend, server_client->ps.screen_blend);
     server_client->ps.fov = game_client->ps.fov;

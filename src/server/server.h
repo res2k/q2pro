@@ -48,6 +48,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "server/mvd/client.h"
 #endif
 
+#include "q2proto/q2proto.h"
+
 #if USE_ZLIB
 #include <zlib.h>
 #endif
@@ -223,15 +225,7 @@ typedef struct {
     uint16_t            cursize;    // zero means sound packet
     union {
         uint8_t         data[MSG_TRESHOLD];
-        struct {
-            uint16_t    index;
-            uint16_t    sendchan;
-            uint8_t     flags;
-            uint8_t     volume;
-            uint8_t     attenuation;
-            uint8_t     timeofs;
-            int32_t     pos[3];     // saved in case entity is freed
-        };
+        q2proto_svc_sound_t sound;
     };
 } message_packet_t;
 

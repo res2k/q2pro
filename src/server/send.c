@@ -535,8 +535,9 @@ static bool check_entity(const client_t *client, int entnum)
 // sounds relative to entities are handled specially
 static void emit_snd(const client_t *client, const message_packet_t *msg)
 {
-    int entnum = msg->sendchan >> 3;
-    int flags = msg->flags;
+    int entnum = msg->sound.entity;
+    int flags = msg->sound.flags;
+    int sendchan = (entnum << 3) | (msg->sound.channel & 7);
 
     // check if position needs to be explicitly sent
     if (!(flags & SND_POS) && !check_entity(client, entnum)) {
@@ -548,21 +549,24 @@ static void emit_snd(const client_t *client, const message_packet_t *msg)
     MSG_WriteByte(svc_sound);
     MSG_WriteByte(flags);
     if (client->csr->extended && flags & SND_INDEX16)
-        MSG_WriteShort(msg->index);
+        MSG_WriteShort(msg->sound.index);
     else
-        MSG_WriteByte(msg->index);
+        MSG_WriteByte(msg->sound.index);
 
     if (flags & SND_VOLUME)
-        MSG_WriteByte(msg->volume);
+        MSG_WriteByte(msg->sound.volume);
     if (flags & SND_ATTENUATION)
-        MSG_WriteByte(msg->attenuation);
+        MSG_WriteByte(msg->sound.attenuation);
     if (flags & SND_OFFSET)
-        MSG_WriteByte(msg->timeofs);
+        MSG_WriteByte(msg->sound.timeofs);
 
-    MSG_WriteShort(msg->sendchan);
+    MSG_WriteShort(sendchan);
 
-    if (flags & SND_POS)
-        MSG_WriteIntPos(msg->pos, client->esFlags & MSG_ES_EXTENSIONS_2);
+    if (flags & SND_POS) {
+        int32_t pos[3];
+        q2proto_var_coords_get_int(&msg->sound.pos, pos);
+        MSG_WriteIntPos(pos, client->esFlags & MSG_ES_EXTENSIONS_2);
+    }
 }
 
 static inline void write_snd(client_t *client, message_packet_t *msg, unsigned maxsize)

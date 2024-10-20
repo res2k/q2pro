@@ -432,7 +432,6 @@ static void MVD_ParseSound(mvd_t *mvd, int extrabits)
     const mleaf_t       *leaf1, *leaf2;
     message_packet_t    *msg;
     edict_t     *entity;
-    int         i;
 
     flags = MSG_ReadByte();
     if (mvd->csr->extended && flags & SND_INDEX16)
@@ -538,15 +537,14 @@ static void MVD_ParseSound(mvd_t *mvd, int extrabits)
         msg = LIST_FIRST(message_packet_t, &cl->msg_free_list, entry);
 
         msg->cursize = SOUND_PACKET;
-        msg->flags = flags;
-        msg->index = index;
-        msg->volume = volume;
-        msg->attenuation = attenuation;
-        msg->timeofs = offset;
-        msg->sendchan = sendchan;
-        for (i = 0; i < 3; i++) {
-            msg->pos[i] = COORD2SHORT(origin[i]);
-        }
+        msg->sound.flags = flags;
+        msg->sound.index = index;
+        msg->sound.volume = volume;
+        msg->sound.attenuation = attenuation;
+        msg->sound.timeofs = offset;
+        msg->sound.entity = entnum;
+        msg->sound.channel = sendchan & 0x7;
+        q2proto_var_coords_set_float(&msg->sound.pos, origin);
 
         List_Remove(&msg->entry);
         List_Append(&cl->msg_unreliable_list, &msg->entry);

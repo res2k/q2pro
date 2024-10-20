@@ -168,9 +168,11 @@ static void PF_bprintf(int level, const char *fmt, ...)
 
     SV_MvdBroadcastPrint(level, string);
 
-    MSG_WriteByte(svc_print);
-    MSG_WriteByte(level);
-    MSG_WriteData(string, len + 1);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_PRINT, .print = {0}};
+    message.print.level = level;
+    message.print.string.str = string;
+    message.print.string.len = len;
+    q2proto_server_multicast_write(&svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &message);
 
     // echo to console
     if (COM_DEDICATED) {
@@ -261,9 +263,11 @@ static void PF_cprintf(edict_t *ent, int level, const char *fmt, ...)
         return;
     }
 
-    MSG_WriteByte(svc_print);
-    MSG_WriteByte(level);
-    MSG_WriteData(msg, len + 1);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_PRINT, .print = {0}};
+    message.print.level = level;
+    message.print.string.str = msg;
+    message.print.string.len = len;
+    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
 
     if (level >= client->messagelevel) {
         SV_ClientAddMessage(client, MSG_RELIABLE);
@@ -308,8 +312,16 @@ static void PF_centerprintf(edict_t *ent, const char *fmt, ...)
         return;
     }
 
-    MSG_WriteByte(svc_centerprint);
-    MSG_WriteData(msg, len + 1);
+    client_t* client = svs.client_pool + n - 1;
+    if (client->state <= cs_zombie) {
+        Com_WPrintf("%s to a free/zombie client %d\n", __func__, n - 1);
+        return;
+    }
+
+    q2proto_svc_message_t message = {.type = Q2P_SVC_CENTERPRINT, .centerprint = {{0}}};
+    message.centerprint.message.str = msg;
+    message.centerprint.message.len = len;
+    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
 
     PF_Unicast(ent, true);
 }
@@ -415,10 +427,11 @@ static void PF_configstring(int index, const char *val)
     SV_MvdConfigstring(index, val, len);
 
     // send the update to everyone
-    MSG_WriteByte(svc_configstring);
-    MSG_WriteShort(index);
-    MSG_WriteData(val, len);
-    MSG_WriteByte(0);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_CONFIGSTRING, .configstring = {0}};
+    message.configstring.index = index;
+    message.configstring.value.str = val;
+    message.configstring.value.len = len;
+    q2proto_server_multicast_write(&svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &message);
 
     FOR_EACH_CLIENT(client) {
         if (client->state < cs_primed) {
@@ -445,7 +458,7 @@ static void PF_WriteFloat(float f)
 
 static void PF_WritePos(const vec3_t pos)
 {
-    MSG_WritePos(pos, svs.csr.extended && IS_NEW_GAME_API);
+    q2proto_server_write_pos(&svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, pos);
 }
 
 static qboolean PF_inVIS(const vec3_t p1, const vec3_t p2, vis_t vis)
@@ -522,7 +535,7 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
                           int channel, int soundindex, float volume,
                           float attenuation, float timeofs)
 {
-    int         ent, vol, att, ofs, flags, sendchan;
+    int         ent, vol, att, ofs, flags;
     vec3_t      origin_v;
     client_t    *client;
     byte        mask[VIS_MAX_BYTES];
@@ -549,8 +562,6 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
     att = min(att, 255);
 
     ent = NUM_FOR_EDICT(edict);
-
-    sendchan = (ent << 3) | (channel & 7);
 
     // always send the entity number for channel overrides
     flags = SND_ENT;
@@ -579,22 +590,17 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
     }
 
     // prepare multicast message
-    MSG_WriteByte(svc_sound);
-    MSG_WriteByte(flags | SND_POS);
-    if (flags & SND_INDEX16)
-        MSG_WriteShort(soundindex);
-    else
-        MSG_WriteByte(soundindex);
+    q2proto_svc_message_t sound_msg = {.type = Q2P_SVC_SOUND, .sound = {0}};
+    sound_msg.sound.flags = flags | SND_POS;
+    sound_msg.sound.index = soundindex;
+    sound_msg.sound.volume = vol;
+    sound_msg.sound.attenuation = att;
+    sound_msg.sound.timeofs = ofs;
+    sound_msg.sound.entity = ent;
+    sound_msg.sound.channel = channel;
+    q2proto_var_coords_set_float(&sound_msg.sound.pos, origin);
 
-    if (flags & SND_VOLUME)
-        MSG_WriteByte(vol);
-    if (flags & SND_ATTENUATION)
-        MSG_WriteByte(att);
-    if (flags & SND_OFFSET)
-        MSG_WriteByte(ofs);
-
-    MSG_WriteShort(sendchan);
-    PF_WritePos(origin);
+    q2proto_server_multicast_write(&svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &sound_msg);
 
     // if the sound doesn't attenuate, send it to everyone
     // (global radio chatter, voiceovers, etc)
@@ -658,14 +664,8 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
         msg = LIST_FIRST(message_packet_t, &client->msg_free_list, entry);
 
         msg->cursize = SOUND_PACKET;
-        msg->sound.flags = flags;
-        msg->sound.index = soundindex;
-        msg->sound.volume = vol;
-        msg->sound.attenuation = att;
-        msg->sound.timeofs = ofs;
-        msg->sound.entity = ent;
-        msg->sound.channel = channel;
-        q2proto_var_coords_set_float(&msg->sound.pos, origin);
+        msg->sound = sound_msg.sound;
+        msg->sound.flags = flags; // lacks SND_POS, which will be set, if necessary, by emit_snd()
 
         List_Remove(&msg->entry);
         List_Append(&client->msg_unreliable_list, &msg->entry);
@@ -694,19 +694,25 @@ static void PF_LocalSound(edict_t *target, const vec3_t origin,
                           float attenuation, float timeofs)
 {
     int entnum = NUM_FOR_EDICT(target);
-    int sendchan = (entnum << 3) | (channel & 7);
-    int flags = SND_ENT;
+    q2proto_svc_message_t message = {.type = Q2P_SVC_SOUND, .sound = {0}};
+    // always send the entity number for channel overrides
+    message.sound.flags = SND_ENT;
+    message.sound.entity = entnum;
+    message.sound.channel = channel;
 
-    if (svs.csr.extended && soundindex > 255)
-        flags |= SND_INDEX16;
+    int clientNum = entnum - 1;
+    if (clientNum < 0 || clientNum >= sv_maxclients->integer) {
+        Com_WPrintf("%s to a non-client %d\n", __func__, clientNum);
+        return;
+    }
 
-    MSG_WriteByte(svc_sound);
-    MSG_WriteByte(flags);
-    if (flags & SND_INDEX16)
-        MSG_WriteShort(soundindex);
-    else
-        MSG_WriteByte(soundindex);
-    MSG_WriteShort(sendchan);
+    client_t *client = svs.client_pool + clientNum;
+    if (client->state <= cs_zombie) {
+        Com_WPrintf("%s to a free/zombie client %d\n", __func__, clientNum);
+        return;
+    }
+
+    q2proto_server_write(&client->q2proto_ctx, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &message);
 
     PF_Unicast(target, !!(channel & CHAN_RELIABLE));
 }
@@ -1048,4 +1054,10 @@ void SV_InitGameProgs(void)
     if (ge->max_edicts <= sv_maxclients->integer || ge->max_edicts > svs.csr.max_edicts) {
         Com_Error(ERR_DROP, "Game library returned bad number of max_edicts");
     }
+
+    if (svs.csr.extended)
+        svs.server_info.game_type = IS_NEW_GAME_API ? Q2PROTO_GAME_Q2PRO_EXTENDED_V2 : Q2PROTO_GAME_Q2PRO_EXTENDED;
+    else
+        svs.server_info.game_type = Q2PROTO_GAME_VANILLA;
+    svs.server_info.default_packet_length = MAX_PACKETLEN_WRITABLE_DEFAULT;
 }

@@ -99,175 +99,45 @@ static void SV_CreateBaselines(void)
     }
 }
 
-static void maybe_flush_msg(size_t size)
-{
-    size += msg_write.cursize;
-#if USE_ZLIB
-    if (sv_client->has_zlib)
-        size = ZPACKET_HEADER + deflateBound(&svs.z, size);
-#endif
-    if (size > sv_client->netchan.maxpacketlen)
-        SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
-}
-
-static void write_configstrings(void)
-{
-    int     i;
-    char    *string;
-    size_t  length;
-
-    // write a packet full of data
-    for (i = 0; i < sv_client->csr->end; i++) {
-        string = sv_client->configstrings[i];
-        if (!string[0]) {
-            continue;
-        }
-        length = Q_strnlen(string, MAX_QPATH);
-
-        // check if this configstring will overflow
-        maybe_flush_msg(length + 4);
-
-        MSG_WriteByte(svc_configstring);
-        MSG_WriteShort(i);
-        MSG_WriteData(string, length);
-        MSG_WriteByte(0);
-    }
-
-    SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
-}
-
-static void write_baseline(const entity_packed_t *base)
-{
-    MSG_WriteDeltaEntity(NULL, base, sv_client->esFlags | MSG_ES_FORCE);
-}
-
-static void write_baselines(void)
-{
-    int i, j;
-    entity_packed_t *base;
-
-    // write a packet full of data
-    for (i = 0; i < SV_BASELINES_CHUNKS; i++) {
-        base = sv_client->baselines[i];
-        if (!base) {
-            continue;
-        }
-        for (j = 0; j < SV_BASELINES_PER_CHUNK; j++) {
-            if (base->number) {
-                // check if this baseline will overflow
-                maybe_flush_msg(MAX_PACKETENTITY_BYTES);
-
-                MSG_WriteByte(svc_spawnbaseline);
-                write_baseline(base);
-            }
-            base++;
-        }
-    }
-
-    SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
-}
-
-static void write_configstring_stream(void)
-{
-    int     i;
-    char    *string;
-    size_t  length;
-
-    MSG_WriteByte(svc_configstringstream);
-
-    // write a packet full of data
-    for (i = 0; i < sv_client->csr->end; i++) {
-        string = sv_client->configstrings[i];
-        if (!string[0]) {
-            continue;
-        }
-        length = Q_strnlen(string, MAX_QPATH);
-
-        // check if this configstring will overflow
-        if (msg_write.cursize + length + 5 > msg_write.maxsize) {
-            MSG_WriteShort(sv_client->csr->end);
-            SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
-            MSG_WriteByte(svc_configstringstream);
-        }
-
-        MSG_WriteShort(i);
-        MSG_WriteData(string, length);
-        MSG_WriteByte(0);
-    }
-
-    MSG_WriteShort(sv_client->csr->end);
-    SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
-}
-
-static void write_baseline_stream(void)
-{
-    int i, j;
-    entity_packed_t *base;
-
-    MSG_WriteByte(svc_baselinestream);
-
-    // write a packet full of data
-    for (i = 0; i < SV_BASELINES_CHUNKS; i++) {
-        base = sv_client->baselines[i];
-        if (!base) {
-            continue;
-        }
-        for (j = 0; j < SV_BASELINES_PER_CHUNK; j++, base++) {
-            if (!base->number) {
-                continue;
-            }
-            // check if this baseline will overflow
-            if (msg_write.cursize + MAX_PACKETENTITY_BYTES > msg_write.maxsize) {
-                MSG_WriteShort(0);
-                SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
-                MSG_WriteByte(svc_baselinestream);
-            }
-            write_baseline(base);
-        }
-    }
-
-    MSG_WriteShort(0);
-    SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
-}
-
 static void write_gamestate(void)
 {
-    entity_packed_t  *base;
-    int         i, j;
-    size_t      length;
-    char        *string;
+    msgEsFlags_t baseline_flags = sv_client->q2proto_ctx.features.has_beam_old_origin_fix ? MSG_ES_BEAMORIGIN : 0;
+    q2proto_svc_configstring_t configstrings[MAX_CONFIGSTRINGS];
+    q2proto_svc_spawnbaseline_t spawnbaselines[MAX_PACKET_ENTITIES];
+    q2proto_gamestate_t gamestate = {.num_configstrings = 0, .configstrings = configstrings, .num_spawnbaselines = 0, .spawnbaselines = spawnbaselines};
+    memset(spawnbaselines, 0, sizeof(spawnbaselines));
 
-    MSG_WriteByte(svc_gamestate);
-
-    // write configstrings
-    for (i = 0; i < sv_client->csr->end; i++) {
-        string = sv_client->configstrings[i];
+    for (int i = 0; i < sv_client->csr->end; i++) {
+        char* string = sv_client->configstrings[i];
         if (!string[0]) {
             continue;
         }
-        length = Q_strnlen(string, MAX_QPATH);
-        MSG_WriteShort(i);
-        MSG_WriteData(string, length);
-        MSG_WriteByte(0);
+        q2proto_svc_configstring_t *cfgstr = &configstrings[gamestate.num_configstrings++];
+        cfgstr->index = i;
+        cfgstr->value.str = string;
+        cfgstr->value.len = Q_strnlen(string, MAX_QPATH);
     }
-    MSG_WriteShort(i);      // end of configstrings
 
-    // write baselines
-    for (i = 0; i < SV_BASELINES_CHUNKS; i++) {
-        base = sv_client->baselines[i];
+    for (int i = 0; i < SV_BASELINES_CHUNKS; i++) {
+        entity_packed_t *base = sv_client->baselines[i];
         if (!base) {
             continue;
         }
-        for (j = 0; j < SV_BASELINES_PER_CHUNK; j++) {
+        for (int j = 0; j < SV_BASELINES_PER_CHUNK; j++) {
             if (base->number) {
-                write_baseline(base);
+                q2proto_svc_spawnbaseline_t *baseline = &spawnbaselines[gamestate.num_spawnbaselines++];
+                baseline->entnum = base->number;
+                SV_MakeEntityDelta(&baseline->delta_state, NULL, base, baseline_flags);
             }
             base++;
         }
     }
-    MSG_WriteShort(0);   // end of baselines
 
-    SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
+    int write_result;
+    do {
+        write_result = q2proto_server_write_gamestate(&sv_client->q2proto_ctx, NULL, (uintptr_t)&sv_client->io_data, &gamestate);
+        SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
+    } while (write_result == Q2P_ERR_NOT_ENOUGH_PACKET_SPACE);
 }
 
 static void stuff_cmds(const list_t *list)
@@ -275,10 +145,9 @@ static void stuff_cmds(const list_t *list)
     stuffcmd_t *stuff;
 
     LIST_FOR_EACH(stuffcmd_t, stuff, list, entry) {
-        MSG_WriteByte(svc_stufftext);
-        MSG_WriteData(stuff->string, strlen(stuff->string));
-        MSG_WriteByte('\n');
-        MSG_WriteByte(0);
+        q2proto_svc_message_t message = {.type = Q2P_SVC_STUFFTEXT};
+        message.stufftext.string = q2proto_make_string(va("%s\n", stuff->string));
+        q2proto_server_write(&sv_client->q2proto_ctx, (uintptr_t)&sv_client->io_data, &message);
         SV_ClientAddMessage(sv_client, MSG_RELIABLE | MSG_CLEAR);
     }
 }
@@ -325,28 +194,6 @@ static void stuff_junk(void)
     SV_ClientCommand(sv_client, "$%s $%s\n", junk[1], junk[4]);
 }
 
-static int q2pro_protocol_flags(void)
-{
-    int flags = 0;
-
-    if (sv_client->pmp.strafehack)
-        flags |= Q2PRO_PF_STRAFEJUMP_HACK;
-
-    if (sv_client->pmp.qwmode)
-        flags |= Q2PRO_PF_QW_MODE;
-
-    if (sv_client->pmp.waterhack)
-        flags |= Q2PRO_PF_WATERJUMP_HACK;
-
-    if (sv_client->csr->extended)
-        flags |= Q2PRO_PF_EXTENSIONS;
-
-    if (sv_client->esFlags & MSG_ES_EXTENSIONS_2)
-        flags |= Q2PRO_PF_EXTENSIONS_2;
-
-    return flags;
-}
-
 /*
 ================
 SV_New_f
@@ -391,41 +238,24 @@ void SV_New_f(void)
     // create baselines for this client
     SV_CreateBaselines();
 
-    // send the serverdata
-    MSG_WriteByte(svc_serverdata);
-    MSG_WriteLong(sv_client->protocol);
-    MSG_WriteLong(sv_client->spawncount);
-    MSG_WriteByte(0);   // no attract loop
-    MSG_WriteString(sv_client->gamedir);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_SERVERDATA, .serverdata = {0}};
+    q2proto_server_fill_serverdata(&sv_client->q2proto_ctx, &message.serverdata);
+    message.serverdata.servercount = sv_client->spawncount;
+    message.serverdata.attractloop = false;
+    message.serverdata.gamedir = q2proto_make_string(sv_client->gamedir);
     if (sv.state == ss_pic || sv.state == ss_cinematic)
-        MSG_WriteShort(-1);
+        message.serverdata.clientnum = -1;
     else
-        MSG_WriteShort(sv_client->infonum);
-    MSG_WriteString(sv_client->configstrings[CS_NAME]);
+        message.serverdata.clientnum = sv_client->infonum;
+    message.serverdata.levelname = q2proto_make_string(sv_client->configstrings[CS_NAME]);
 
-    // send protocol specific stuff
-    switch (sv_client->protocol) {
-    case PROTOCOL_VERSION_R1Q2:
-        MSG_WriteByte(0);   // not enhanced
-        MSG_WriteShort(sv_client->version);
-        MSG_WriteByte(0);   // no advanced deltas
-        MSG_WriteByte(sv_client->pmp.strafehack);
-        break;
-    case PROTOCOL_VERSION_Q2PRO:
-        MSG_WriteShort(sv_client->version);
-        if (sv.state == ss_cinematic && sv_client->version < PROTOCOL_VERSION_Q2PRO_CINEMATICS)
-            MSG_WriteByte(ss_pic);
-        else
-            MSG_WriteByte(sv.state);
-        if (sv_client->version >= PROTOCOL_VERSION_Q2PRO_EXTENDED_LIMITS) {
-            MSG_WriteShort(q2pro_protocol_flags());
-        } else {
-            MSG_WriteByte(sv_client->pmp.strafehack);
-            MSG_WriteByte(sv_client->pmp.qwmode);
-            MSG_WriteByte(sv_client->pmp.waterhack);
-        }
-        break;
-    }
+    message.serverdata.strafejump_hack = sv_client->pmp.strafehack;
+
+    message.serverdata.q2pro.server_state = sv.state;
+    message.serverdata.q2pro.qw_mode = sv_client->pmp.qwmode;
+    message.serverdata.q2pro.waterjump_hack = sv_client->pmp.waterhack;
+
+    q2proto_server_write(&sv_client->q2proto_ctx, (uintptr_t)&sv_client->io_data, &message);
 
     SV_ClientAddMessage(sv_client, MSG_RELIABLE | MSG_CLEAR);
 
@@ -472,15 +302,7 @@ void SV_New_f(void)
         return;
 
     // send gamestate
-    if (sv_client->netchan.type == NETCHAN_OLD) {
-        write_configstrings();
-        write_baselines();
-    } else if (sv_client->version >= PROTOCOL_VERSION_Q2PRO_EXTENDED_LIMITS) {
-        write_configstring_stream();
-        write_baseline_stream();
-    } else {
-        write_gamestate();
-    }
+    write_gamestate();
 
     // send next command
     SV_ClientCommand(sv_client, "precache %i\n", sv_client->spawncount);
@@ -556,10 +378,8 @@ void SV_CloseDownload(client_t *client)
 {
     Z_Freep(&client->download);
     Z_Freep(&client->downloadname);
-    client->downloadsize = 0;
-    client->downloadcount = 0;
-    client->downloadcmd = 0;
     client->downloadpending = false;
+    q2proto_server_download_end(&client->download_state);
 }
 
 /*
@@ -584,7 +404,6 @@ static void SV_BeginDownload_f(void)
 {
     char    name[MAX_QPATH];
     byte    *download;
-    int     downloadcmd;
     int64_t downloadsize;
     int     maxdownloadsize, result, offset = 0;
     cvar_t  *allow;
@@ -654,9 +473,8 @@ static void SV_BeginDownload_f(void)
     }
 
     f = 0;
-    downloadcmd = svc_download;
 
-#if USE_ZLIB
+#if 0 // USE_ZLIB
     // prefer raw deflate stream from .pkz if supported
     if (sv_client->protocol == PROTOCOL_VERSION_Q2PRO &&
         sv_client->version >= PROTOCOL_VERSION_Q2PRO_ZLIB_DOWNLOADS &&
@@ -675,6 +493,12 @@ static void SV_BeginDownload_f(void)
             Com_DPrintf("Couldn't download %s to %s\n", name, sv_client->name);
             goto fail1;
         }
+    }
+
+    int err = q2proto_server_download_begin(&sv_client->q2proto_ctx, downloadsize, Q2PROTO_DOWNLOAD_COMPRESS_NEVER, NULL, &sv_client->download_state);
+    if (err != Q2P_ERR_SUCCESS) {
+        Com_DPrintf("Couldn't download %s to %s: q2proto error %d\n", name, sv_client->name, err);
+        goto fail1;
     }
 
     maxdownloadsize = MAX_LOADFILE;
@@ -704,10 +528,11 @@ static void SV_BeginDownload_f(void)
         Com_DPrintf("Refusing download, %s already has %s (%d bytes)\n",
                     sv_client->name, name, offset);
         FS_CloseFile(f);
-        MSG_WriteByte(svc_download);
-        MSG_WriteShort(0);
-        MSG_WriteByte(100);
+        q2proto_svc_message_t message = {.type = Q2P_SVC_DOWNLOAD};
+        q2proto_server_download_finish(&sv_client->download_state, &message.download);
+        q2proto_server_write(&sv_client->q2proto_ctx, (uintptr_t)&sv_client->io_data, &message);
         SV_ClientAddMessage(sv_client, MSG_RELIABLE | MSG_CLEAR);
+        q2proto_server_download_end(&sv_client->download_state);
         return;
     }
 
@@ -721,10 +546,8 @@ static void SV_BeginDownload_f(void)
     FS_CloseFile(f);
 
     sv_client->download = download;
-    sv_client->downloadsize = downloadsize;
-    sv_client->downloadcount = offset;
+    sv_client->download_ptr = (uint8_t *)download + offset;
     sv_client->downloadname = SV_CopyString(name);
-    sv_client->downloadcmd = downloadcmd;
     sv_client->downloadpending = true;
 
     Com_DPrintf("Downloading %s to %s\n", name, sv_client->name);
@@ -735,24 +558,21 @@ fail3:
 fail2:
     FS_CloseFile(f);
 fail1:
-    MSG_WriteByte(svc_download);
-    MSG_WriteShort(-1);
-    MSG_WriteByte(0);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_DOWNLOAD};
+    q2proto_server_download_abort(&sv_client->download_state, &message.download);
+    q2proto_server_write(&sv_client->q2proto_ctx, (uintptr_t)&sv_client->io_data, &message);
     SV_ClientAddMessage(sv_client, MSG_RELIABLE | MSG_CLEAR);
+    q2proto_server_download_end(&sv_client->download_state);
 }
 
 static void SV_StopDownload_f(void)
 {
-    int percent;
-
     if (!sv_client->download)
         return;
 
-    percent = sv_client->downloadcount * 100 / sv_client->downloadsize;
-
-    MSG_WriteByte(svc_download);
-    MSG_WriteShort(-1);
-    MSG_WriteByte(percent);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_DOWNLOAD};
+    q2proto_server_download_abort(&sv_client->download_state, &message.download);
+    q2proto_server_write(&sv_client->q2proto_ctx, (uintptr_t)&sv_client->io_data, &message);
     SV_ClientAddMessage(sv_client, MSG_RELIABLE | MSG_CLEAR);
 
     Com_DPrintf("Download of %s to %s stopped by user request\n",
@@ -915,15 +735,16 @@ static bool handle_cvar_ban(const cvarban_t *ban, const char *v)
         return false;
 
     if (ban->comment) {
+        q2proto_svc_message_t message;
         if (ban->action == FA_STUFF) {
-            MSG_WriteByte(svc_stufftext);
+            message.type = Q2P_SVC_STUFFTEXT;
+            message.stufftext.string = q2proto_make_string(va("%s\n", ban->comment));
         } else {
-            MSG_WriteByte(svc_print);
-            MSG_WriteByte(PRINT_HIGH);
+            message.type = Q2P_SVC_PRINT;
+            message.print.level = PRINT_HIGH;
+            message.print.string = q2proto_make_string(va("%s\n", ban->comment));
         }
-        MSG_WriteData(ban->comment, strlen(ban->comment));
-        MSG_WriteByte('\n');
-        MSG_WriteByte(0);
+        q2proto_server_write(&sv_client->q2proto_ctx, (uintptr_t)&sv_client->io_data, &message);
         SV_ClientAddMessage(sv_client, MSG_RELIABLE | MSG_CLEAR);
     }
 
@@ -1032,15 +853,16 @@ static void handle_filtercmd(const filtercmd_t *filter)
         return;
 
     if (filter->comment) {
+        q2proto_svc_message_t message;
         if (filter->action == FA_STUFF) {
-            MSG_WriteByte(svc_stufftext);
+            message.type = Q2P_SVC_STUFFTEXT;
+            message.stufftext.string = q2proto_make_string(va("%s\n", filter->comment));
         } else {
-            MSG_WriteByte(svc_print);
-            MSG_WriteByte(PRINT_HIGH);
+            message.type = Q2P_SVC_PRINT;
+            message.print.level = PRINT_HIGH;
+            message.print.string = q2proto_make_string(va("%s\n", filter->comment));
         }
-        MSG_WriteData(filter->comment, strlen(filter->comment));
-        MSG_WriteByte('\n');
-        MSG_WriteByte(0);
+        q2proto_server_write(&sv_client->q2proto_ctx, (uintptr_t)&sv_client->io_data, &message);
         SV_ClientAddMessage(sv_client, MSG_RELIABLE | MSG_CLEAR);
     }
 

@@ -30,6 +30,10 @@ extern q2protoio_ioarg_t default_q2protoio_ioarg;
 
 #define _Q2PROTO_IOARG_DEFAULT      ((uintptr_t)&default_q2protoio_ioarg)
 
+#if USE_CLIENT || USE_SERVER
+#define Q2PROTO_IOARG_SERVER_WRITE_MULTICAST    _Q2PROTO_IOARG_DEFAULT
+#endif
+
 #if USE_CLIENT
 #define Q2PROTO_IOARG_CLIENT_READ   _Q2PROTO_IOARG_DEFAULT
 #endif

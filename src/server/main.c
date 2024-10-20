@@ -228,7 +228,8 @@ void SV_DropClient(client_t *client, const char *reason)
         print_drop_reason(client, reason, oldstate);
 
     // add the disconnect
-    MSG_WriteByte(svc_disconnect);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_DISCONNECT};
+    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
     SV_ClientAddMessage(client, MSG_RELIABLE | MSG_CLEAR);
 
     if (oldstate == cs_spawned || (g_features->integer & GMF_WANT_ALL_DISCONNECTS)) {
@@ -1035,12 +1036,8 @@ static void SVC_DirectConnect(void)
     qboolean        allow;
     char            *reason;
 
-    q2proto_server_info_t server_info;
-    server_info.game_type = Q2PROTO_GAME_VANILLA; // TODO
-    server_info.default_packet_length = MAX_PACKETLEN_WRITABLE_DEFAULT;
-
     q2proto_connect_t parsed_connect;
-    q2proto_error_t parse_err = q2proto_parse_connect(Cmd_Args(), q2proto_vanilla_protocols, q2proto_num_vanilla_protocols, &server_info, &parsed_connect);
+    q2proto_error_t parse_err = q2proto_parse_connect(Cmd_Args(), q2proto_vanilla_protocols, q2proto_num_vanilla_protocols, &svs.server_info, &parsed_connect);
     if (parse_err != Q2P_ERR_SUCCESS) {
         if (parse_err == Q2P_ERR_PROTOCOL_NOT_SUPPORTED) {
             reject_printf("Unsupported protocol %d.\n", parsed_connect.protocol);
@@ -1097,6 +1094,12 @@ static void SVC_DirectConnect(void)
     newcl->settings[CLS_FPS] = BASE_FRAMERATE;
 #endif
 
+    q2proto_error_t err = q2proto_init_servercontext(&newcl->q2proto_ctx, &svs.server_info, &parsed_connect);
+    if (err != Q2P_ERR_SUCCESS) {
+        Com_EPrintf("failed to initialize connection context: %d\n", err);
+        return;
+    }
+
     init_pmove_and_es_flags(newcl);
 
     append_extra_userinfo(&params, userinfo);
@@ -1121,6 +1124,10 @@ static void SVC_DirectConnect(void)
     Netchan_Setup(&newcl->netchan, NS_SERVER, params.nctype, &net_from,
                   params.qport, params.maxlength, params.protocol);
     newcl->numpackets = 1;
+
+    newcl->io_data.sz_read = &msg_read;
+    newcl->io_data.sz_write = &msg_write;
+    newcl->io_data.max_msg_len = newcl->netchan.maxpacketlen;
 
     // parse some info from the info strings
     Q_strlcpy(newcl->userinfo, userinfo, sizeof(newcl->userinfo));
@@ -2292,15 +2299,14 @@ static void SV_FinalMessage(const char *message, error_type_t type)
         return;
 
     if (message) {
-        MSG_WriteByte(svc_print);
-        MSG_WriteByte(PRINT_HIGH);
-        MSG_WriteString(message);
+        q2proto_svc_message_t print_msg = {.type = Q2P_SVC_PRINT, .print = {0}};
+        print_msg.print.level = PRINT_HIGH;
+        print_msg.print.string = q2proto_make_string(message);
+        q2proto_server_multicast_write(&svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &print_msg);
     }
 
-    if (type == ERR_RECONNECT)
-        MSG_WriteByte(svc_reconnect);
-    else
-        MSG_WriteByte(svc_disconnect);
+    q2proto_svc_message_t goodbye_msg = {.type = type == ERR_RECONNECT ? Q2P_SVC_RECONNECT : Q2P_SVC_DISCONNECT};
+    q2proto_server_multicast_write(&svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &goodbye_msg);
 
     // send it twice
     // stagger the packets to crutch operating system limited buffers

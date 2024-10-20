@@ -125,20 +125,191 @@ static bool SV_TruncPacketEntities(client_t *client, const client_frame_t *from,
     return ret;
 }
 
-/*
-=============
-SV_EmitPacketEntities
+static client_frame_t *get_last_frame(client_t *client)
+{
+    client_frame_t *frame;
 
-Writes a delta update of an entity_packed_t list to the message.
-=============
-*/
-static bool SV_EmitPacketEntities(client_t *client, const client_frame_t *from,
-                                  client_frame_t *to, int clientEntityNum, unsigned maxsize)
+    if (client->lastframe <= 0) {
+        // client is asking for a retransmit
+        client->frames_nodelta++;
+        return NULL;
+    }
+
+    client->frames_nodelta = 0;
+
+    if (client->framenum - client->lastframe >= UPDATE_BACKUP) {
+        // client hasn't gotten a good message through in a long time
+        Com_DPrintf("%s: delta request from out-of-date packet.\n", client->name);
+        return NULL;
+    }
+
+    // we have a valid message to delta from
+    frame = &client->frames[client->lastframe & UPDATE_MASK];
+    if (frame->number != client->lastframe) {
+        // but it got never sent
+        Com_DPrintf("%s: delta request from dropped frame.\n", client->name);
+        return NULL;
+    }
+
+    if (client->next_entity - frame->first_entity > client->num_entities) {
+        // but entities are too old
+        Com_DPrintf("%s: delta request from out-of-date entities.\n", client->name);
+        return NULL;
+    }
+
+    return frame;
+}
+
+static inline void make_blend_delta(const uint8_t from[4], const uint8_t to[4], q2proto_color_delta_t *blend)
+{
+    int bits = 0;
+    for (int i = 0; i < 4; i++) {
+        if (from[i] != to[i])
+            bits |= BIT(i);
+    }
+
+    q2proto_var_color_set_byte(&blend->values, to);
+    blend->delta_bits = bits;
+}
+
+static void make_playerstate_delta(const player_packed_t *from, const player_packed_t *to, q2proto_svc_playerstate_t *playerstate, msgPsFlags_t flags)
+{
+    int     i;
+
+    Q_assert(to);
+
+    if (!from)
+        from = &nullPlayerState;
+
+    memset(playerstate, 0, sizeof(*playerstate));
+
+    if (to->pmove.pm_type != from->pmove.pm_type) {
+        playerstate->delta_bits |= Q2P_PSD_PM_TYPE;
+        playerstate->pm_type = to->pmove.pm_type;
+    }
+
+    q2proto_var_coords_set_int(&playerstate->pm_origin.write.prev, from->pmove.origin);
+    q2proto_var_coords_set_int(&playerstate->pm_origin.write.current, to->pmove.origin);
+
+    if (!(flags & MSG_PS_IGNORE_PREDICTION)) {
+        q2proto_var_coords_set_int(&playerstate->pm_velocity.write.prev, from->pmove.velocity);
+        q2proto_var_coords_set_int(&playerstate->pm_velocity.write.current, to->pmove.velocity);
+
+        if (to->pmove.pm_time != from->pmove.pm_time) {
+            playerstate->delta_bits |= Q2P_PSD_PM_TIME;
+            playerstate->pm_time = to->pmove.pm_time;
+        }
+
+        if (to->pmove.pm_flags != from->pmove.pm_flags) {
+            playerstate->delta_bits |= Q2P_PSD_PM_FLAGS;
+            playerstate->pm_flags = to->pmove.pm_flags;
+        }
+
+        if (to->pmove.gravity != from->pmove.gravity) {
+            playerstate->delta_bits |= Q2P_PSD_PM_GRAVITY;
+            playerstate->pm_gravity = to->pmove.gravity;
+        }
+    }
+
+    if (!(flags & MSG_PS_IGNORE_DELTAANGLES)) {
+        if (!VectorCompare(to->pmove.delta_angles, from->pmove.delta_angles)) {
+            playerstate->delta_bits |= Q2P_PSD_PM_DELTA_ANGLES;
+            q2proto_var_angles_set_short(&playerstate->pm_delta_angles, to->pmove.delta_angles);
+        }
+    }
+
+    if (!VectorCompare(to->viewoffset, from->viewoffset)) {
+        playerstate->delta_bits |= Q2P_PSD_VIEWOFFSET;
+        q2proto_var_small_offsets_set_char(&playerstate->viewoffset, to->viewoffset);
+    }
+
+    if (!(flags & MSG_PS_IGNORE_VIEWANGLES))
+        Q2PROTO_SET_ANGLES_DELTA(playerstate->viewangles, to->viewangles, from->viewangles, short);
+
+    if (!VectorCompare(to->kick_angles, from->kick_angles)) {
+        playerstate->delta_bits |= Q2P_PSD_KICKANGLES;
+        q2proto_var_small_angles_set_char(&playerstate->kick_angles, to->kick_angles);
+    }
+
+    if (!(flags & MSG_PS_IGNORE_BLEND)) {
+        make_blend_delta(from->blend, to->blend, &playerstate->blend);
+        make_blend_delta(from->damage_blend, to->damage_blend, &playerstate->damage_blend);
+    }
+
+    if (to->fov != from->fov) {
+        playerstate->delta_bits |= Q2P_PSD_FOV;
+        playerstate->fov = to->fov;
+    }
+
+    if (to->rdflags != from->rdflags) {
+        playerstate->delta_bits |= Q2P_PSD_RDFLAGS;
+        playerstate->rdflags = to->rdflags;
+    }
+
+    if (!(flags & MSG_PS_IGNORE_GUNFRAMES)) {
+        if (to->gunframe != from->gunframe)
+            playerstate->delta_bits |= Q2P_PSD_GUNFRAME;
+        if (!VectorCompare(to->gunoffset, from->gunoffset))
+            playerstate->delta_bits |= Q2P_PSD_GUNOFFSET;
+        if (!VectorCompare(to->gunangles, from->gunangles))
+            playerstate->delta_bits |= Q2P_PSD_GUNANGLES;
+        if (playerstate->delta_bits & (Q2P_PSD_GUNFRAME | Q2P_PSD_GUNOFFSET | Q2P_PSD_GUNANGLES)) {
+            playerstate->gunframe = to->gunframe;
+            q2proto_var_small_offsets_set_char(&playerstate->gunoffset, to->gunoffset);
+            q2proto_var_small_angles_set_char(&playerstate->gunangles, to->gunangles);
+        }
+    }
+
+    if (!(flags & MSG_PS_IGNORE_GUNINDEX)) {
+        if (to->gunindex != from->gunindex) {
+            playerstate->delta_bits |= Q2P_PSD_GUNINDEX;
+            playerstate->gunindex = to->gunindex;
+        }
+    }
+
+
+    for (i = 0; i < MAX_STATS; i++)
+        if (to->stats[i] != from->stats[i]) {
+            playerstate->statbits |= BIT_ULL(i);
+            playerstate->stats[i] = to->stats[i];
+        }
+}
+
+static void write_entity_delta(client_t *client, const entity_packed_t *from, const entity_packed_t *to, msgEsFlags_t flags)
+{
+    q2proto_svc_message_t message = {.type = Q2P_SVC_FRAME_ENTITY_DELTA, .frame_entity_delta = {0}};
+
+    if (!to) {
+        Q_assert(from);
+        Q_assert(from->number > 0 && from->number < MAX_EDICTS);
+
+        message.frame_entity_delta.remove = true;
+        message.frame_entity_delta.newnum = from->number;
+        q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
+
+        return; // remove entity
+    }
+
+    Q_assert(to->number > 0 && to->number < MAX_EDICTS);
+    message.frame_entity_delta.newnum = to->number;
+
+    if (client->q2proto_ctx.features.has_beam_old_origin_fix)
+        flags |= MSG_ES_BEAMORIGIN;
+    bool entity_differs = SV_MakeEntityDelta(&message.frame_entity_delta.entity_delta, from, to, flags);
+    if (!(flags & MSG_ES_FORCE) && !entity_differs)
+        return;
+    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
+}
+
+static bool emit_packet_entities(client_t               *client,
+                                 const client_frame_t   *from,
+                                 client_frame_t         *to,
+                                 int                    clientEntityNum,
+                                 unsigned               maxsize)
 {
     entity_packed_t *newent;
     const entity_packed_t *oldent;
     int i, oldnum, newnum, oldindex, newindex, from_num_entities;
-    msgEsFlags_t flags;
     bool ret = true;
 
     if (msg_write.cursize + 2 > maxsize)
@@ -180,7 +351,7 @@ static bool SV_EmitPacketEntities(client_t *client, const client_frame_t *from,
             // not changed at all. Note that players are always 'newentities',
             // this updates their old_origin always and prevents warping in case
             // of packet loss.
-            flags = client->esFlags;
+            int flags = 0;
             if (newnum <= client->maxclients) {
                 flags |= MSG_ES_NEWENTITY;
             }
@@ -189,7 +360,7 @@ static bool SV_EmitPacketEntities(client_t *client, const client_frame_t *from,
                 VectorCopy(oldent->origin, newent->origin);
                 VectorCopy(oldent->angles, newent->angles);
             }
-            MSG_WriteDeltaEntity(oldent, newent, flags);
+            write_entity_delta(client, oldent, newent, flags);
             oldindex++;
             newindex++;
             continue;
@@ -197,69 +368,31 @@ static bool SV_EmitPacketEntities(client_t *client, const client_frame_t *from,
 
         if (newnum < oldnum) {
             // this is a new entity, send it from the baseline
-            flags = client->esFlags | MSG_ES_FORCE | MSG_ES_NEWENTITY;
             oldent = client->baselines[newnum >> SV_BASELINES_SHIFT];
             if (oldent) {
                 oldent += (newnum & SV_BASELINES_MASK);
             } else {
                 oldent = &nullEntityState;
             }
-            if (newnum == clientEntityNum) {
-                flags |= MSG_ES_FIRSTPERSON;
-                VectorCopy(oldent->origin, newent->origin);
-                VectorCopy(oldent->angles, newent->angles);
-            }
-            MSG_WriteDeltaEntity(oldent, newent, flags);
+            write_entity_delta(client, oldent, newent, MSG_ES_NEWENTITY | MSG_ES_FORCE);
             newindex++;
             continue;
         }
 
         if (newnum > oldnum) {
             // the old entity isn't present in the new message
-            MSG_WriteDeltaEntity(oldent, NULL, MSG_ES_FORCE);
+            write_entity_delta(client, oldent, NULL, 0);
             oldindex++;
             continue;
         }
     }
 
-    MSG_WriteShort(0);      // end of packetentities
+    // end of packetentities
+    q2proto_svc_message_t message = {.type = Q2P_SVC_FRAME_ENTITY_DELTA, .frame_entity_delta = {0}};
+    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
     return ret;
 }
 
-static client_frame_t *get_last_frame(client_t *client)
-{
-    client_frame_t *frame;
-
-    if (client->lastframe <= 0) {
-        // client is asking for a retransmit
-        client->frames_nodelta++;
-        return NULL;
-    }
-
-    client->frames_nodelta = 0;
-
-    if (client->framenum - client->lastframe >= UPDATE_BACKUP) {
-        // client hasn't gotten a good message through in a long time
-        Com_DPrintf("%s: delta request from out-of-date packet.\n", client->name);
-        return NULL;
-    }
-
-    // we have a valid message to delta from
-    frame = &client->frames[client->lastframe & UPDATE_MASK];
-    if (frame->number != client->lastframe) {
-        // but it got never sent
-        Com_DPrintf("%s: delta request from dropped frame.\n", client->name);
-        return NULL;
-    }
-
-    if (client->next_entity - frame->first_entity > client->num_entities) {
-        // but entities are too old
-        Com_DPrintf("%s: delta request from out-of-date entities.\n", client->name);
-        return NULL;
-    }
-
-    return frame;
-}
 
 /*
 ==================
@@ -285,24 +418,28 @@ bool SV_WriteFrameToClient_Default(client_t *client, unsigned maxsize)
         lastframe = -1;
     }
 
-    MSG_WriteByte(svc_frame);
-    MSG_WriteLong(client->framenum);
-    MSG_WriteLong(lastframe);   // what we are delta'ing from
-    MSG_WriteByte(client->suppress_count);  // rate dropped packets
+    q2proto_svc_message_t message = {.type = Q2P_SVC_FRAME, .frame = {0}};
+    message.frame.serverframe = client->framenum;
+    message.frame.deltaframe = lastframe;
+    message.frame.suppress_count = client->suppress_count;
+    message.frame.q2pro_frame_flags = client->frameflags;
+
+    message.frame.areabits_len = frame->areabytes;
+    message.frame.areabits = frame->areabits;
+
+    make_playerstate_delta(oldstate, &frame->ps, &message.frame.playerstate, 0);
+    if ((oldframe ? oldframe->clientNum : 0) != frame->clientNum) {
+        message.frame.playerstate.clientnum = frame->clientNum;
+        message.frame.playerstate.delta_bits |= Q2P_PSD_CLIENTNUM;
+    }
+
+    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
+
+    bool ret = emit_packet_entities(client, oldframe, frame, 0, maxsize);
+
     client->suppress_count = 0;
     client->frameflags = 0;
-
-    // send over the areabits
-    MSG_WriteByte(frame->areabytes);
-    MSG_WriteData(frame->areabits, frame->areabytes);
-
-    // delta encode the playerstate
-    MSG_WriteByte(svc_playerinfo);
-    MSG_WriteDeltaPlayerstate_Default(oldstate, &frame->ps, 0);
-
-    // delta encode the entities
-    MSG_WriteByte(svc_packetentities);
-    return SV_EmitPacketEntities(client, oldframe, frame, 0, maxsize);
+    return ret;
 }
 
 /*
@@ -314,9 +451,6 @@ bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
 {
     client_frame_t  *frame, *oldframe;
     player_packed_t *oldstate;
-    uint32_t        extraflags, delta;
-    int             suppressed;
-    byte            *b1, *b2;
     msgPsFlags_t    psFlags;
     int             clientEntityNum;
 
@@ -325,25 +459,23 @@ bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
 
     // this is the frame we are delta'ing from
     oldframe = get_last_frame(client);
+    int lastframe;
     if (oldframe) {
         oldstate = &oldframe->ps;
-        delta = client->framenum - client->lastframe;
+        lastframe = client->lastframe;
     } else {
         oldstate = NULL;
-        delta = 31;
+        lastframe = -1;
     }
 
-    // first byte to be patched
-    b1 = SZ_GetSpace(&msg_write, 1);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_FRAME, .frame = {0}};
+    message.frame.serverframe = client->framenum;
+    message.frame.deltaframe = lastframe;
+    message.frame.suppress_count = client->suppress_count;
+    message.frame.q2pro_frame_flags = client->frameflags;
 
-    MSG_WriteLong((client->framenum & FRAMENUM_MASK) | (delta << FRAMENUM_BITS));
-
-    // second byte to be patched
-    b2 = SZ_GetSpace(&msg_write, 1);
-
-    // send over the areabits
-    MSG_WriteByte(frame->areabytes);
-    MSG_WriteData(frame->areabits, frame->areabytes);
+    message.frame.areabits_len = frame->areabytes;
+    message.frame.areabits = frame->areabits;
 
     // ignore some parts of playerstate if not recording demo
     psFlags = client->psFlags;
@@ -375,38 +507,113 @@ bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize)
         if (client->settings[CLS_NOPREDICT]) {
             psFlags |= MSG_PS_IGNORE_PREDICTION;
         }
-        suppressed = client->frameflags;
-    } else {
-        suppressed = client->suppress_count;
     }
 
     // delta encode the playerstate
-    extraflags = MSG_WriteDeltaPlayerstate_Enhanced(oldstate, &frame->ps, psFlags);
+    make_playerstate_delta(oldstate, &frame->ps, &message.frame.playerstate, psFlags);
 
-    if (client->protocol == PROTOCOL_VERSION_Q2PRO) {
-        // delta encode the clientNum
-        if ((oldframe ? oldframe->clientNum : 0) != frame->clientNum) {
-            extraflags |= EPS_CLIENTNUM;
-            if (client->version < PROTOCOL_VERSION_Q2PRO_CLIENTNUM_SHORT) {
-                MSG_WriteByte(frame->clientNum);
-            } else {
-                MSG_WriteShort(frame->clientNum);
-            }
-        }
+    if ((oldframe ? oldframe->clientNum : 0) != frame->clientNum) {
+        message.frame.playerstate.clientnum = frame->clientNum;
+        message.frame.playerstate.delta_bits |= Q2P_PSD_CLIENTNUM;
     }
-
-    // save 3 high bits of extraflags
-    *b1 = svc_frame | (((extraflags & 0x70) << 1));
-
-    // save 4 low bits of extraflags
-    *b2 = (suppressed & SUPPRESSCOUNT_MASK) |
-          ((extraflags & 0x0F) << SUPPRESSCOUNT_BITS);
 
     client->suppress_count = 0;
     client->frameflags = 0;
 
+    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
+
     // delta encode the entities
-    return SV_EmitPacketEntities(client, oldframe, frame, clientEntityNum, maxsize);
+    return emit_packet_entities(client, oldframe, frame, clientEntityNum, maxsize);
+}
+
+bool SV_MakeEntityDelta(q2proto_entity_state_delta_t *delta, const entity_packed_t *from, const entity_packed_t *to, msgEsFlags_t flags)
+{
+    if (!from)
+        from = &nullEntityState;
+
+// send an update
+    if (!(flags & MSG_ES_FIRSTPERSON)) {
+        q2proto_var_coords_set_int(&delta->origin.write.prev, from->origin);
+        q2proto_var_coords_set_int(&delta->origin.write.current, to->origin);
+
+        if (to->angles[0] != from->angles[0]) {
+            delta->angle.delta_bits |= BIT(0);
+            q2proto_var_angles_set_short_comp(&delta->angle.values, 0, to->angles[0]);
+        }
+        if (to->angles[1] != from->angles[1]) {
+            delta->angle.delta_bits |= BIT(1);
+            q2proto_var_angles_set_short_comp(&delta->angle.values, 1, to->angles[1]);
+        }
+        if (to->angles[2] != from->angles[2]) {
+            delta->angle.delta_bits |= BIT(2);
+            q2proto_var_angles_set_short_comp(&delta->angle.values, 2, to->angles[2]);
+        }
+
+        bool write_old_origin =
+            ((flags & MSG_ES_NEWENTITY) && !VectorCompare(to->old_origin, from->origin))
+            || ((to->renderfx & RF_FRAMELERP) && !VectorCompare(to->old_origin, from->origin))
+            || ((to->renderfx & RF_BEAM) && (!(flags & MSG_ES_BEAMORIGIN) || !VectorCompare(to->old_origin, from->old_origin)));
+        if (write_old_origin)
+        {
+            delta->delta_bits |= Q2P_ESD_OLD_ORIGIN;
+            q2proto_var_coords_set_int(&delta->old_origin, to->old_origin);
+        }
+    }
+
+    if (to->skinnum != from->skinnum) {
+        delta->delta_bits |= Q2P_ESD_SKINNUM;
+        delta->skinnum = to->skinnum;
+    }
+
+    if (to->frame != from->frame) {
+        delta->delta_bits |= Q2P_ESD_FRAME;
+        delta->frame = to->frame;
+    }
+
+    if (to->effects != from->effects) {
+        delta->delta_bits |= Q2P_ESD_EFFECTS;
+        delta->effects = to->effects;
+    }
+
+    if (to->renderfx != from->renderfx) {
+        delta->delta_bits |= Q2P_ESD_RENDERFX;
+        delta->renderfx = to->renderfx;
+    }
+
+    if (to->solid != from->solid) {
+        delta->delta_bits |= Q2P_ESD_SOLID;
+        delta->solid = to->solid;
+    }
+
+    // event is not delta compressed, just 0 compressed
+    if (to->event) {
+        delta->delta_bits |= Q2P_ESD_EVENT;
+        delta->event = to->event;
+    }
+
+    if (to->modelindex != from->modelindex) {
+        delta->delta_bits |= Q2P_ESD_MODELINDEX;
+        delta->modelindex = to->modelindex;
+    }
+    if (to->modelindex2 != from->modelindex2) {
+        delta->delta_bits |= Q2P_ESD_MODELINDEX2;
+        delta->modelindex2 = to->modelindex2;
+    }
+    if (to->modelindex3 != from->modelindex3) {
+        delta->delta_bits |= Q2P_ESD_MODELINDEX3;
+        delta->modelindex3 = to->modelindex3;
+    }
+    if (to->modelindex4 != from->modelindex4) {
+        delta->delta_bits |= Q2P_ESD_MODELINDEX4;
+        delta->modelindex4 = to->modelindex4;
+    }
+
+    if (to->sound != from->sound) {
+        delta->delta_bits |= Q2P_ESD_SOUND;
+        delta->sound = to->sound;
+    }
+
+    return (delta->delta_bits != 0) || (to->origin[0] != from->origin[0]) || (to->origin[1] != from->origin[1]) || (to->origin[2] != from->origin[2]) || (delta->angle.delta_bits != 0);
 }
 
 /*

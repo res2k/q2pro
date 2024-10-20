@@ -55,6 +55,7 @@ common_src = [
   'q2proto/src/q2proto_string.c',
 
   'src/common/q2proto-glue.c',
+  'src/common/q2proto-packing.c',
 ]
 
 client_src = [

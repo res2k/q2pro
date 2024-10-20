@@ -310,8 +310,8 @@ static void apply_playerstate(const q2proto_svc_playerstate_t *playerstate,
     if (playerstate->delta_bits & Q2P_PSD_KICKANGLES)
         q2proto_var_small_angles_get_float(&playerstate->kick_angles, to->kick_angles);
 
-    if (playerstate->delta_bits & Q2P_PSD_GUNINDEX)
-        to->gunindex = playerstate->gunindex;
+    if (playerstate->delta_bits & (Q2P_PSD_GUNINDEX | Q2P_PSD_GUNSKIN))
+        to->gunindex = playerstate->gunindex | (playerstate->gunskin << GUNINDEX_BITS);
 
     if (playerstate->delta_bits & Q2P_PSD_GUNFRAME)
         to->gunframe = playerstate->gunframe;

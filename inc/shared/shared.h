@@ -1485,7 +1485,7 @@ typedef enum {
 // entity_state_t is the information conveyed from the server
 // in an update message about entities that the client will
 // need to render in some way
-typedef struct {
+typedef struct entity_state_s {
     int     number;         // edict index
 
     vec3_t  origin;
@@ -1512,7 +1512,7 @@ typedef struct {
 // to rendered a view.  There will only be 10 player_state_t sent each second,
 // but the number of pmove_state_t changes will be reletive to client
 // frame rates
-typedef struct {
+typedef struct player_state_old_s {
     pmove_state_old_t   pmove;  // for prediction
 
     // these fields do not need to be communicated bit-precise
@@ -1552,7 +1552,7 @@ typedef struct {
     float falloff;
 } player_heightfog_t;
 
-typedef struct {
+typedef struct player_state_new_s {
     pmove_state_new_t   pmove;  // for prediction
 
     // these fields do not need to be communicated bit-precise
@@ -1596,7 +1596,7 @@ typedef struct {
 #define GUNINDEX_BITS       13  // upper 3 bits are skinnum
 #define GUNINDEX_MASK       MASK(GUNINDEX_BITS)
 
-typedef struct {
+typedef struct entity_state_extension_s {
     int         morefx;
     float       alpha;
     float       scale;

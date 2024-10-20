@@ -18,6 +18,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #pragma once
 
+#include "common/sizebuf.h"
+
 #include "q2proto/q2proto.h"
 
 #if USE_ZLIB
@@ -54,3 +56,18 @@ extern q2protoio_ioarg_t default_q2protoio_ioarg;
 #define Q2PROTO_IOARG_CLIENT_READ   _Q2PROTO_IOARG_DEFAULT
 #define Q2PROTO_IOARG_CLIENT_WRITE  _Q2PROTO_IOARG_DEFAULT
 #endif
+
+typedef struct entity_state_s entity_state_t;
+typedef struct entity_state_extension_s entity_state_extension_t;
+
+// Type passed into entity state packing functions
+struct entity_state_packing_type
+{
+    const entity_state_t *in;
+    const entity_state_extension_t *ext;
+};
+
+Q2PROTO_DECLARE_ENTITY_PACKING_FUNCTION(PackEntity, struct entity_state_packing_type);
+
+Q2PROTO_DECLARE_PLAYER_PACKING_FUNCTION(PackPlayerstateNew, player_state_new_t *);
+Q2PROTO_DECLARE_PLAYER_PACKING_FUNCTION(PackPlayerstateOld, player_state_old_t *);

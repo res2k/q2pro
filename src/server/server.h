@@ -213,8 +213,7 @@ typedef enum {
 
 #define MSG_RELIABLE        BIT(0)
 #define MSG_CLEAR           BIT(1)
-#define MSG_COMPRESS        BIT(2)
-#define MSG_COMPRESS_AUTO   BIT(3)
+#define MSG_COMPRESS_AUTO   BIT(2)
 
 #define ZPACKET_HEADER      5
 

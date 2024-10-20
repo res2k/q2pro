@@ -58,6 +58,8 @@ extern q2protoio_ioarg_t default_q2protoio_ioarg;
 #define Q2PROTO_IOARG_CLIENT_WRITE  _Q2PROTO_IOARG_DEFAULT
 #endif
 
+extern bool nonfatal_client_read_errors;
+
 typedef struct entity_state_s entity_state_t;
 typedef struct entity_state_extension_s entity_state_extension_t;
 

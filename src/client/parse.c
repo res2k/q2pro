@@ -595,10 +595,7 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
                       cls.serverProtocol, protocol);
         }
         // BIG HACK to let demos from release work with the 3.0x patch!!!
-        if (EXTENDED_SUPPORTED(protocol)) {
-            cl.csr = cs_remap_new;
-            cls.serverProtocol = PROTOCOL_VERSION_DEFAULT;
-        } else if (protocol < PROTOCOL_VERSION_OLD || protocol > PROTOCOL_VERSION_DEFAULT) {
+        if (!EXTENDED_SUPPORTED(protocol) && (protocol < PROTOCOL_VERSION_OLD || protocol > PROTOCOL_VERSION_DEFAULT)) {
             Com_Error(ERR_DROP, "Demo uses unsupported protocol version %d.", protocol);
         } else {
             cls.serverProtocol = protocol;
@@ -720,7 +717,10 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
         cl.pmp.flyhack = true; // fly hack is unconditionally enabled
         cl.pmp.flyfriction = 4;
     } else {
-        cls.protocolVersion = 0;
+        // Demo protocol, or vanilla
+        if (serverdata->q2pro.extensions)
+            cl.csr = cs_remap_new;
+        cls.protocolVersion = serverdata->protocol_version;
     }
 
     if (cl.csr.extended) {

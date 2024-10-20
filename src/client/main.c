@@ -196,9 +196,10 @@ static void CL_UpdateGunSetting(void)
         nogun = 0;
     }
 
-    MSG_WriteByte(clc_setting);
-    MSG_WriteShort(CLS_NOGUN);
-    MSG_WriteShort(nogun);
+    q2proto_clc_message_t message = {.type = Q2P_CLC_SETTING, .setting = {0}};
+    message.setting.index = CLS_NOGUN;
+    message.setting.value = nogun;
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
     MSG_FlushTo(&cls.netchan.message);
 }
 
@@ -208,9 +209,10 @@ static void CL_UpdateGibSetting(void)
         return;
     }
 
-    MSG_WriteByte(clc_setting);
-    MSG_WriteShort(CLS_NOGIBS);
-    MSG_WriteShort(!cl_gibs->integer);
+    q2proto_clc_message_t message = {.type = Q2P_CLC_SETTING, .setting = {0}};
+    message.setting.index = CLS_NOGIBS;
+    message.setting.value = !cl_gibs->integer;
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
     MSG_FlushTo(&cls.netchan.message);
 }
 
@@ -220,9 +222,10 @@ static void CL_UpdateFootstepsSetting(void)
         return;
     }
 
-    MSG_WriteByte(clc_setting);
-    MSG_WriteShort(CLS_NOFOOTSTEPS);
-    MSG_WriteShort(!cl_footsteps->integer);
+    q2proto_clc_message_t message = {.type = Q2P_CLC_SETTING, .setting = {0}};
+    message.setting.index = CLS_NOFOOTSTEPS;
+    message.setting.value = !cl_footsteps->integer;
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
     MSG_FlushTo(&cls.netchan.message);
 }
 
@@ -232,9 +235,10 @@ static void CL_UpdatePredictSetting(void)
         return;
     }
 
-    MSG_WriteByte(clc_setting);
-    MSG_WriteShort(CLS_NOPREDICT);
-    MSG_WriteShort(!cl_predict->integer);
+    q2proto_clc_message_t message = {.type = Q2P_CLC_SETTING, .setting = {0}};
+    message.setting.index = CLS_NOPREDICT;
+    message.setting.value = !cl_predict->integer;
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
     MSG_FlushTo(&cls.netchan.message);
 }
 
@@ -245,9 +249,10 @@ static void CL_UpdateRateSetting(void)
         return;
     }
 
-    MSG_WriteByte(clc_setting);
-    MSG_WriteShort(CLS_FPS);
-    MSG_WriteShort(cl_updaterate->integer);
+    q2proto_clc_message_t message = {.type = Q2P_CLC_SETTING, .setting = {0}};
+    message.setting.index = CLS_FPS;
+    message.setting.value = cl_updaterate->integer;
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
     MSG_FlushTo(&cls.netchan.message);
 }
 #endif
@@ -272,9 +277,10 @@ void CL_UpdateRecordingSetting(void)
     }
 #endif
 
-    MSG_WriteByte(clc_setting);
-    MSG_WriteShort(CLS_RECORDING);
-    MSG_WriteShort(rec);
+    q2proto_clc_message_t message = {.type = Q2P_CLC_SETTING, .setting = {0}};
+    message.setting.index = CLS_RECORDING;
+    message.setting.value = rec;
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
     MSG_FlushTo(&cls.netchan.message);
 }
 
@@ -287,9 +293,10 @@ static void CL_UpdateFlaresSetting(void)
         return;
     }
 
-    MSG_WriteByte(clc_setting);
-    MSG_WriteShort(CLS_NOFLARES);
-    MSG_WriteShort(!cl_flares->integer);
+    q2proto_clc_message_t message = {.type = Q2P_CLC_SETTING, .setting = {0}};
+    message.setting.index = CLS_NOFLARES;
+    message.setting.value = !cl_flares->integer;
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
     MSG_FlushTo(&cls.netchan.message);
 }
 
@@ -306,8 +313,9 @@ void CL_ClientCommand(const char *string)
 
     Com_DDPrintf("%s: %s\n", __func__, string);
 
-    MSG_WriteByte(clc_stringcmd);
-    MSG_WriteString(string);
+    q2proto_clc_message_t message = {.type = Q2P_CLC_STRINGCMD};
+    message.stringcmd.cmd = q2proto_make_string(string);
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
     MSG_FlushTo(&cls.netchan.message);
 }
 
@@ -728,8 +736,9 @@ void CL_Disconnect(error_type_t type)
 
     if (cls.netchan.protocol) {
         // send a disconnect message to the server
-        MSG_WriteByte(clc_stringcmd);
-        MSG_WriteData("disconnect", 11);
+        q2proto_clc_message_t message = {.type = Q2P_CLC_STRINGCMD};
+        message.stringcmd.cmd = q2proto_make_string("disconnect");
+        q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
 
         Netchan_Transmit(&cls.netchan, msg_write.cursize, msg_write.data, 3);
 
@@ -1351,7 +1360,10 @@ static void CL_ConnectionlessPacket(void)
 
 #if USE_AC_CLIENT
         if (anticheat) {
-            MSG_WriteByte(clc_nop);
+            q2proto_clc_message_t nop_message;
+            memset(&nop_message, 0, sizeof(nop_message));
+            nop_message.type = Q2P_CLC_NOP;
+            q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &nop_message);
             MSG_FlushTo(&cls.netchan.message);
             Netchan_Transmit(&cls.netchan, 0, NULL, 3);
             S_StopAllSounds();

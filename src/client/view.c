@@ -247,9 +247,10 @@ void CL_UpdateBlendSetting(void)
         return;
     }
 
-    MSG_WriteByte(clc_setting);
-    MSG_WriteShort(CLS_NOBLEND);
-    MSG_WriteShort(!cl_add_blend->integer);
+    q2proto_clc_message_t message = {.type = Q2P_CLC_SETTING, .setting = {0}};
+    message.setting.index = CLS_NOBLEND;
+    message.setting.value = !cl_add_blend->integer;
+    q2proto_client_write(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_WRITE, &message);
     MSG_FlushTo(&cls.netchan.message);
 }
 

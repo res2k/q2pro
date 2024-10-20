@@ -19,7 +19,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "server.h"
 
-#define MSG_GAMESTATE   (MSG_RELIABLE | MSG_CLEAR | MSG_COMPRESS)
+#define MSG_GAMESTATE   (MSG_RELIABLE | MSG_CLEAR)
 
 /*
 ============================================================
@@ -135,7 +135,7 @@ static void write_gamestate(void)
 
     int write_result;
     do {
-        write_result = q2proto_server_write_gamestate(&sv_client->q2proto_ctx, NULL, (uintptr_t)&sv_client->io_data, &gamestate);
+        write_result = q2proto_server_write_gamestate(&sv_client->q2proto_ctx, &sv_client->q2proto_deflate, (uintptr_t)&sv_client->io_data, &gamestate);
         SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
     } while (write_result == Q2P_ERR_NOT_ENOUGH_PACKET_SPACE);
 }

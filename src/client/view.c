@@ -379,7 +379,7 @@ V_RenderView
 
 ==================
 */
-void V_FogParamsChanged(fog_bits_t bits, const fog_params_t *params, int time)
+void V_FogParamsChanged(fog_bits_t bits, const cl_fog_params_t *params, int time)
 {
     if (time != 0) {
         // shift the current fog values back to start
@@ -391,39 +391,39 @@ void V_FogParamsChanged(fog_bits_t bits, const fog_params_t *params, int time)
         cl.fog.lerp_time = 0;
     }
 
-    fog_params_t *cur = &cl.fog.end;
+    cl_fog_params_t *cur = &cl.fog.end;
 
     // fill in updated values in end
     if (bits & FOG_BIT_DENSITY) {
-        cur->global.density = params->global.density / 64.f; // Kex divides the density by 64, prob because of exp2
-        cur->global.sky_factor = params->global.sky_factor;
+        cur->linear.density = params->linear.density; // Kex divides the density later by 64, prob because of exp2
+        cur->linear.sky_factor = params->linear.sky_factor;
     }
 
     if (bits & FOG_BIT_R)
-        cur->global.r = params->global.r;
+        cur->linear.color[0] = params->linear.color[0];
     if (bits & FOG_BIT_G)
-        cur->global.g = params->global.g;
+        cur->linear.color[1] = params->linear.color[1];
     if (bits & FOG_BIT_B)
-        cur->global.b = params->global.b;
+        cur->linear.color[2] = params->linear.color[2];
     
     if (bits & FOG_BIT_HEIGHTFOG_FALLOFF)
         cur->height.falloff = params->height.falloff;
     if (bits & FOG_BIT_HEIGHTFOG_DENSITY)
         cur->height.density = params->height.density;
     if (bits & FOG_BIT_HEIGHTFOG_START_R)
-        cur->height.start.r = params->height.start.r;
+        cur->height.start.color[0] = params->height.start.color[0];
     if (bits & FOG_BIT_HEIGHTFOG_START_G)
-        cur->height.start.g = params->height.start.g;
+        cur->height.start.color[1] = params->height.start.color[1];
     if (bits & FOG_BIT_HEIGHTFOG_START_B)
-        cur->height.start.b = params->height.start.b;
+        cur->height.start.color[2] = params->height.start.color[2];
     if (bits & FOG_BIT_HEIGHTFOG_START_DIST)
         cur->height.start.dist = params->height.start.dist;
     if (bits & FOG_BIT_HEIGHTFOG_END_R)
-        cur->height.end.r = params->height.end.r;
+        cur->height.end.color[0] = params->height.end.color[0];
     if (bits & FOG_BIT_HEIGHTFOG_END_G)
-        cur->height.end.g = params->height.end.g;
+        cur->height.end.color[1] = params->height.end.color[1];
     if (bits & FOG_BIT_HEIGHTFOG_END_B)
-        cur->height.end.b = params->height.end.b;
+        cur->height.end.color[2] = params->height.end.color[2];
     if (bits & FOG_BIT_HEIGHTFOG_END_DIST)
         cur->height.end.dist = params->height.end.dist;
 }
@@ -513,32 +513,36 @@ void V_RenderView(void)
         qsort(cl.refdef.entities, cl.refdef.num_entities, sizeof(cl.refdef.entities[0]), entitycmpfnc);
 
         if (cl.fog.lerp_time == 0 || cl.time > cl.fog.lerp_time_start + cl.fog.lerp_time) {
-            cl.refdef.fog = cl.fog.end;
+            cl.refdef.fog = cl.fog.end.linear;
+            cl.refdef.heightfog = cl.fog.end.height;
         } else {
             float fog_frontlerp = (cl.time - cl.fog.lerp_time_start) / (float) cl.fog.lerp_time;
             float fog_backlerp = 1.0f - fog_frontlerp;
-
-#define Q_FP(p) \
-                cl.refdef.fog.p = LERP2(cl.fog.start.p, cl.fog.end.p, fog_backlerp, fog_frontlerp)
-
-            Q_FP(global.r);
-            Q_FP(global.g);
-            Q_FP(global.b);
-            Q_FP(global.density);
-            Q_FP(global.sky_factor);
-
-            Q_FP(height.start.r);
-            Q_FP(height.start.g);
-            Q_FP(height.start.b);
-            Q_FP(height.start.dist);
-
-            Q_FP(height.end.r);
-            Q_FP(height.end.g);
-            Q_FP(height.end.b);
-            Q_FP(height.end.dist);
             
-            Q_FP(height.density);
-            Q_FP(height.falloff);
+#define Q_FP(p) \
+                cl.refdef.fog.p = LERP2(cl.fog.start.linear.p, cl.fog.end.linear.p, fog_backlerp, fog_frontlerp)
+#define Q_HFP(p) \
+                cl.refdef.heightfog.p = LERP2(cl.fog.start.height.p, cl.fog.end.height.p, fog_backlerp, fog_frontlerp)
+
+            Q_FP(color[0]);
+            Q_FP(color[1]);
+            Q_FP(color[2]);
+            Q_FP(density);
+            Q_FP(sky_factor);
+
+            Q_HFP(start.color[0]);
+            Q_HFP(start.color[1]);
+            Q_HFP(start.color[2]);
+            Q_HFP(start.dist);
+
+            Q_HFP(end.color[0]);
+            Q_HFP(end.color[1]);
+            Q_HFP(end.color[2]);
+            Q_HFP(end.dist);
+            
+            Q_HFP(density);
+            Q_HFP(falloff);
+
 #undef Q_FP
         }
     }
@@ -565,12 +569,12 @@ static void V_Viewpos_f(void)
 
 static void V_Fog_f(void)
 {
-    fog_params_t p;
-    p.global.r = atof(Cmd_Argv(1));
-    p.global.g = atof(Cmd_Argv(2));
-    p.global.b = atof(Cmd_Argv(3));
-    p.global.density = atof(Cmd_Argv(4));
-    p.global.sky_factor = atof(Cmd_Argv(5));
+    cl_fog_params_t p;
+    p.linear.color[0] = atof(Cmd_Argv(1));
+    p.linear.color[1] = atof(Cmd_Argv(2));
+    p.linear.color[2] = atof(Cmd_Argv(3));
+    p.linear.density = atof(Cmd_Argv(4));
+    p.linear.sky_factor = atof(Cmd_Argv(5));
     int time = atoi(Cmd_Argv(6));
 
     V_FogParamsChanged(FOG_BIT_R | FOG_BIT_G | FOG_BIT_B | FOG_BIT_DENSITY, &p, time);

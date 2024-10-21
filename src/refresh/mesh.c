@@ -442,7 +442,7 @@ static void draw_celshading(const uint16_t *indices, int num_indices)
         return;
 
     GL_BindTexture(TMU_TEXTURE, TEXNUM_BLACK);
-    GL_StateBits(GLS_BLEND_BLEND | (meshbits & ~GLS_MESH_SHADE) | GLS_FOG_ENABLE);
+    GL_StateBits(GLS_BLEND_BLEND | (meshbits & ~GLS_MESH_SHADE));
     if (gls.currentva)
         GL_ArrayBits(GLA_VERTEX);
 
@@ -564,7 +564,7 @@ static void draw_shadow(const uint16_t *indices, int num_indices)
     }
 
     GL_BindTexture(TMU_TEXTURE, TEXNUM_WHITE);
-    GL_StateBits(GLS_BLEND_BLEND | (meshbits & ~GLS_MESH_SHADE) | GLS_FOG_ENABLE);
+    GL_StateBits(GLS_BLEND_BLEND | (meshbits & ~GLS_MESH_SHADE));
     if (gls.currentva)
     GL_ArrayBits(GLA_VERTEX);
 
@@ -666,7 +666,7 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
         qglColorMask(1, 1, 1, 1);
     }
 
-    state = GLS_INTENSITY_ENABLE | GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS;
+    state = GLS_INTENSITY_ENABLE | glr.fog_bits | GLS_DYNAMIC_LIGHTS;
     if (!gls.currentva)
         state |= meshbits;
     else if (dotshading)

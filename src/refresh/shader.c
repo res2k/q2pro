@@ -82,18 +82,18 @@ static void write_block(sizebuf_t *buf, glStateBits_t bits)
         float u_add;
         float u_intensity;
         float u_intensity2;
-        float fog_sky_factor;
+        float u_fog_sky_factor;
         vec2 w_amp;
         vec2 w_phase;
         vec2 u_scroll;
-        float height_fog_falloff;
-        float height_fog_density;
+        vec4 u_fog_color;
+        vec4 u_heightfog_start;
+        vec4 u_heightfog_end;
+        float u_heightfog_density;
+        float u_heightfog_falloff;
         int num_dlights;
-        float pad;
-        vec4 u_vieworg;
-        vec4 global_fog;
-        vec4 height_fog_start;
-        vec4 height_fog_end;
+        float pad_4;
+        vec3 u_vieworg;
     )
     GLSF("};\n");
 }
@@ -168,9 +168,7 @@ static void write_skel_shader(sizebuf_t *buf, glStateBits_t bits)
         out vec4 v_color;
     )
 
-    if (bits & GLS_FOG_ENABLE)
-        GLSL(out vec3 v_wpos;)
-    if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+    if (bits & (GLS_FOG_HEIGHT | GLS_DYNAMIC_LIGHTS))
         GLSL(out vec3 v_world_pos;)
     if (bits & GLS_DYNAMIC_LIGHTS)
         GLSL(out vec3 v_norm;)
@@ -222,13 +220,11 @@ static void write_skel_shader(sizebuf_t *buf, glStateBits_t bits)
     if (bits & GLS_MESH_SHELL)
         GLSL(out_pos += out_norm * u_shellscale;)
 
-    GLSL(gl_Position = m_proj * m_view * m_model * vec4(out_pos, 1.0);)
-    if (bits & GLS_FOG_ENABLE)
-        GLSL(v_wpos = (m_view * m_model * vec4(out_pos, 1.0)).xyz;)
-    if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+    if (bits & (GLS_FOG_HEIGHT | GLS_DYNAMIC_LIGHTS))
         GLSL(v_world_pos = (m_model * vec4(out_pos, 1.0)).xyz;)
     if (bits & GLS_DYNAMIC_LIGHTS)
         GLSL(v_norm = normalize((mat3(m_model) * out_norm).xyz);)
+    GLSL(gl_Position = m_proj * m_view * m_model * vec4(out_pos, 1.0);)
     GLSF("}\n");
 }
 #endif
@@ -265,15 +261,13 @@ static void write_mesh_shader(sizebuf_t *buf, glStateBits_t bits)
         out vec4 v_color;
     )
 
-    if (bits & (GLS_MESH_SHELL | GLS_MESH_SHADE | GLS_DYNAMIC_LIGHTS))
-        write_getnormal(buf);
-
-    if (bits & GLS_FOG_ENABLE)
-        GLSL(out vec3 v_wpos;)
-    if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+    if (bits & (GLS_FOG_HEIGHT | GLS_DYNAMIC_LIGHTS))
         GLSL(out vec3 v_world_pos;)
     if (bits & GLS_DYNAMIC_LIGHTS)
         GLSL(out vec3 v_norm;)
+
+    if (bits & (GLS_MESH_SHELL | GLS_MESH_SHADE | GLS_DYNAMIC_LIGHTS))
+        write_getnormal(buf);
 
     if (bits & GLS_MESH_SHADE)
         write_shadedot(buf);
@@ -319,11 +313,10 @@ static void write_mesh_shader(sizebuf_t *buf, glStateBits_t bits)
             GLSL(v_norm = normalize((mat3(m_model) * norm).xyz);)
     }
 
-    GLSL(gl_Position = m_proj * m_view * m_model * vec4(pos, 1.0);)
-    if (bits & GLS_FOG_ENABLE)
-        GLSL(v_wpos = (m_view * m_model * vec4(pos, 1.0)).xyz;)
-    if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+    if (bits & (GLS_FOG_HEIGHT | GLS_DYNAMIC_LIGHTS))
         GLSL(v_world_pos = (m_model * vec4(pos, 1.0)).xyz;)
+
+    GLSL(gl_Position = m_proj * m_view * m_model * vec4(pos, 1.0);)
     GLSF("}\n");
 }
 
@@ -362,9 +355,7 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
         GLSL(out vec4 v_color;)
     }
 
-    if (bits & GLS_FOG_ENABLE)
-        GLSL(out vec3 v_wpos;)
-    if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+    if (bits & (GLS_FOG_HEIGHT | GLS_DYNAMIC_LIGHTS))
         GLSL(out vec3 v_world_pos;)
     if (bits & GLS_DYNAMIC_LIGHTS) {
         GLSL(in vec3 a_norm;)
@@ -388,14 +379,29 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
         if (!(bits & GLS_TEXTURE_REPLACE))
             GLSL(v_color = a_color;)
 
-        GLSL(gl_Position = m_proj * m_view * m_model * a_pos;)
-        if (bits & GLS_FOG_ENABLE)
-            GLSL(v_wpos = (m_view * m_model * a_pos).xyz;)
-        if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+        if (bits & (GLS_FOG_HEIGHT | GLS_DYNAMIC_LIGHTS))
             GLSL(v_world_pos = (m_model * a_pos).xyz;)
         if (bits & GLS_DYNAMIC_LIGHTS)
             GLSL(v_norm = normalize((mat3(m_model) * a_norm).xyz);)
+        GLSL(gl_Position = m_proj * m_view * m_model * a_pos;)
     GLSF("}\n");
+}
+
+// XXX: this is very broken. but that's how it is in re-release.
+static void write_height_fog(sizebuf_t *buf)
+{
+    GLSL({
+        float dir_z = normalize(v_world_pos - u_vieworg).z;
+        float eye = u_vieworg.z - u_heightfog_start.w;
+        float pos = v_world_pos.z - u_heightfog_start.w;
+        float density = (exp(-u_heightfog_falloff * eye) -
+                         exp(-u_heightfog_falloff * pos)) / (u_heightfog_falloff * dir_z);
+        float extinction = 1.0 - clamp(exp(-density), 0.0, 1.0);
+        float fraction = clamp((pos - u_heightfog_start.w) / (u_heightfog_end.w - u_heightfog_start.w), 0.0, 1.0);
+        vec3 fog_color = mix(u_heightfog_start.rgb, u_heightfog_end.rgb, fraction) * extinction;
+        float fog = (1.0 - exp(-(u_heightfog_density * frag_depth))) * extinction;
+        diffuse.rgb = mix(diffuse.rgb, fog_color.rgb, fog);
+    })
 }
 
 static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
@@ -405,7 +411,7 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
     if (gl_config.ver_es)
         GLSL(precision mediump float;)
 
-    if (bits & (GLS_WARP_ENABLE | GLS_LIGHTMAP_ENABLE | GLS_INTENSITY_ENABLE | GLS_SKY_MASK | GLS_UBLOCK_MASK | GLS_DYNAMIC_LIGHTS))
+    if (bits & GLS_UNIFORM_MASK)
         write_block(buf, bits);
 
     if (bits & GLS_DYNAMIC_LIGHTS)
@@ -438,10 +444,7 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
     if (!(bits & GLS_TEXTURE_REPLACE))
         GLSL(in vec4 v_color;)
 
-    if (bits & GLS_FOG_ENABLE)
-        GLSL(in vec3 v_wpos;)
-
-    if (bits & (GLS_FOG_ENABLE | GLS_DYNAMIC_LIGHTS))
+    if (bits & (GLS_FOG_HEIGHT | GLS_DYNAMIC_LIGHTS))
         GLSL(in vec3 v_world_pos;)
 
     if (bits & GLS_DYNAMIC_LIGHTS)
@@ -536,32 +539,21 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
                 GLSL(diffuse.rgb += glowmap.rgb * glowmap.a;)
         }
 
-        if (bits & GLS_FOG_ENABLE) {
-            // global fog
-            GLSL(float dist_to_camera = length(v_wpos);)
-            GLSL(float fog = 1.0f - exp(-pow(global_fog.w * dist_to_camera, 2.0f)););
-            GLSL(diffuse.rgb = mix(diffuse.rgb, global_fog.rgb, fog);)
+        if (bits & (GLS_FOG_GLOBAL | GLS_FOG_HEIGHT))
+            GLSL(float frag_depth = gl_FragCoord.z / gl_FragCoord.w;)
 
-            // height fog
-            GLSL(if (height_fog_density > 0.0f) {)
-                GLSL(float altitude = u_vieworg.z - height_fog_start.w - 64.f;);
-                GLSL(vec3 view_dir = -normalize(v_wpos - v_world_pos);)
-                GLSL(float view_sign = step(0.1f, sign(view_dir.z)) * 2.0f - 1.0f;);
-                GLSL(float dy = view_dir.z + (0.00001f * view_sign););
-                GLSL(float frag_depth = gl_FragCoord.z / gl_FragCoord.w;);
-                GLSL(float altitude_dist = altitude + frag_depth * dy;);
-                GLSL(float density = (exp(-height_fog_falloff * altitude) - exp(-height_fog_falloff * altitude_dist)) / (height_fog_falloff * dy););
-                GLSL(float extinction = 1.0f - clamp(exp(-density), 0.0f, 1.0f););
-                GLSL(float normalized_height = clamp((altitude_dist - height_fog_start.w) / (height_fog_end.w - height_fog_start.w), 0.0f, 1.0f););
-                GLSL(vec3 color = (extinction * mix(height_fog_start.rgb, height_fog_end.rgb, normalized_height)););
-                GLSL(float alpha = extinction * (1.0f - exp(-(height_fog_density * frag_depth))););
-                GLSL(diffuse.rgb = mix(diffuse.rgb, color, alpha););
-            GLSL(})
-        }
-        
-        if (bits & GLS_SKY_FOG) {
-            GLSL(diffuse.rgb = mix(diffuse.rgb, global_fog.rgb, fog_sky_factor);)
-        }
+        if (bits & GLS_FOG_GLOBAL)
+            GLSL({
+                float d = u_fog_color.a * frag_depth;
+                float fog = 1.0f - exp(-(d * d));
+                diffuse.rgb = mix(diffuse.rgb, u_fog_color.rgb, fog);
+            })
+
+        if (bits & GLS_FOG_HEIGHT)
+            write_height_fog(buf);
+
+        if (bits & GLS_FOG_SKY)
+            GLSL(diffuse.rgb = mix(diffuse.rgb, u_fog_color.rgb, u_fog_sky_factor);)
 
         GLSL(o_color = diffuse;)
     GLSF("}\n");
@@ -756,19 +748,6 @@ static void shader_state_bits(glStateBits_t bits)
         bits &= ~GLS_DYNAMIC_LIGHTS;
     }
 
-    // check if we actually need fog
-    if (bits & GLS_FOG_ENABLE) {
-        if (!gl_fog->integer ||
-            !glr.fd.fog.global.density) {
-            bits &= ~GLS_FOG_ENABLE;
-        }
-    } else if (bits & GLS_SKY_FOG) {
-        if (!gl_fog->integer ||
-            !glr.fd.fog.global.sky_factor) {
-            bits &= ~GLS_SKY_FOG;
-        }
-    }
-
     glStateBits_t diff = bits ^ gls.state_bits;
 
     if (diff & GLS_COMMON_MASK)
@@ -842,11 +821,11 @@ static void shader_load_matrix(GLenum mode, const GLfloat *matrix, const GLfloat
 {
     switch (mode) {
     case GL_MODELVIEW:
-    	memcpy(gls.u_block.model, matrix, sizeof(gls.u_block.model));
-    	memcpy(gls.u_block.view, view, sizeof(gls.u_block.view));
+    	memcpy(gls.u_block.m_model, matrix, sizeof(gls.u_block.m_model));
+    	memcpy(gls.u_block.m_view, view, sizeof(gls.u_block.m_view));
         break;
     case GL_PROJECTION:
-    	memcpy(gls.u_block.proj, matrix, sizeof(gls.u_block.proj));
+    	memcpy(gls.u_block.m_proj, matrix, sizeof(gls.u_block.m_proj));
         break;
     default:
         Q_assert(!"bad mode");
@@ -867,8 +846,25 @@ static void shader_setup_2d(void)
     gls.u_block.w_amp[1] = 0.0025f;
     gls.u_block.w_phase[0] = M_PIf * 10;
     gls.u_block.w_phase[1] = M_PIf * 10;
+}
 
-    VectorClear(gls.u_block.vieworg);
+static void shader_setup_fog(void)
+{
+    if (!glr.fog_bits)
+        return;
+
+    VectorCopy(glr.fd.fog.color, gls.u_block.fog_color);
+    gls.u_block.fog_color[3] = glr.fd.fog.density / 64;
+    gls.u_block.fog_sky_factor = glr.fd.fog.sky_factor;
+
+    VectorCopy(glr.fd.heightfog.start.color, gls.u_block.heightfog_start);
+    gls.u_block.heightfog_start[3] = glr.fd.heightfog.start.dist;
+
+    VectorCopy(glr.fd.heightfog.end.color, gls.u_block.heightfog_end);
+    gls.u_block.heightfog_end[3] = glr.fd.heightfog.end.dist;
+
+    gls.u_block.heightfog_density = glr.fd.heightfog.density;
+    gls.u_block.heightfog_falloff = glr.fd.heightfog.falloff;
 }
 
 static void shader_setup_3d(void)
@@ -884,31 +880,14 @@ static void shader_setup_3d(void)
     gls.u_block.w_phase[0] = 4;
     gls.u_block.w_phase[1] = 4;
 
+    shader_setup_fog();
+
     R_RotateForSky();
 
+    // setup default matrices for world
     memcpy(gls.u_block.m_sky, glr.skymatrix, sizeof(glr.skymatrix));
+    memcpy(gls.u_block.m_model, gl_identity, sizeof(gls.u_block.m_model));
     
-    gls.u_block.global_fog[0] = glr.fd.fog.global.r;
-    gls.u_block.global_fog[1] = glr.fd.fog.global.g;
-    gls.u_block.global_fog[2] = glr.fd.fog.global.b;
-    gls.u_block.global_fog[3] = glr.fd.fog.global.density;
-
-    // FIXME I can't match the exact color as Kex but this is close...?
-    gls.u_block.fog_sky_factor = glr.fd.fog.global.sky_factor * 1.5f;
-    
-    gls.u_block.height_fog_start[0] = glr.fd.fog.height.start.r;
-    gls.u_block.height_fog_start[1] = glr.fd.fog.height.start.g;
-    gls.u_block.height_fog_start[2] = glr.fd.fog.height.start.b;
-    gls.u_block.height_fog_start[3] = glr.fd.fog.height.start.dist;
-    
-    gls.u_block.height_fog_end[0] = glr.fd.fog.height.end.r;
-    gls.u_block.height_fog_end[1] = glr.fd.fog.height.end.g;
-    gls.u_block.height_fog_end[2] = glr.fd.fog.height.end.b;
-    gls.u_block.height_fog_end[3] = glr.fd.fog.height.end.dist;
-    
-    gls.u_block.height_fog_falloff = glr.fd.fog.height.falloff;
-    gls.u_block.height_fog_density = glr.fd.fog.height.density;
-
     VectorCopy(glr.fd.vieworg, gls.u_block.vieworg);
 
     if (gl_per_pixel_lighting->integer) {

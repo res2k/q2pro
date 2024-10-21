@@ -201,6 +201,11 @@ typedef struct {
     float   dot;
 } cl_wheel_slot_t;
 
+typedef struct {
+    player_fog_t linear;
+    player_heightfog_t height;
+} cl_fog_params_t;
+
 //
 // the client_state_t structure is wiped completely at every
 // server map change
@@ -370,7 +375,7 @@ typedef struct {
     } weapon;
 
     struct {
-        fog_params_t        start, end;
+        cl_fog_params_t     start, end;
         int                 lerp_time, lerp_time_start;
     } fog;
 
@@ -901,7 +906,7 @@ void V_AddParticle(const particle_t *p);
 void V_AddLight(const vec3_t org, float intensity, float r, float g, float b);
 void V_AddLightStyle(int style, float value);
 void CL_UpdateBlendSetting(void);
-void V_FogParamsChanged(fog_bits_t bits, const fog_params_t *params, int time);
+void V_FogParamsChanged(fog_bits_t bits, const cl_fog_params_t *params, int time);
 
 // wheel.c
 void CL_Wheel_WeapNext(void);

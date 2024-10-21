@@ -22,6 +22,8 @@ glState_t gls;
 
 const glbackend_t *gl_backend;
 
+const mat4_t gl_identity = { [0] = 1, [5] = 1, [10] = 1, [15] = 1 };
+
 // for uploading
 void GL_ForceTexture(glTmu_t tmu, GLuint texnum)
 {
@@ -196,7 +198,7 @@ void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat zn
     matrix[11] = 0;
     matrix[15] = 1;
 
-    gl_backend->load_matrix(GL_PROJECTION, matrix, mat_identity);
+    gl_backend->load_matrix(GL_PROJECTION, matrix, gl_identity);
 }
 
 void GL_Setup2D(void)
@@ -217,7 +219,7 @@ void GL_Setup2D(void)
     if (gl_backend->setup_2d)
         gl_backend->setup_2d();
 
-    gl_backend->load_matrix(GL_MODELVIEW, mat_identity, mat_identity);
+    gl_backend->load_matrix(GL_MODELVIEW, gl_identity, gl_identity);
 }
 
 void GL_Frustum(GLfloat fov_x, GLfloat fov_y, GLfloat reflect_x)

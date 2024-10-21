@@ -1121,6 +1121,9 @@ static void AL_AddMergeLoopSounds(void)
 
         if (is_new) {
             AL_PlayChannel(ch);
+        } else {
+            qalSourcef(ch->srcnum, AL_GAIN, ch->master_vol);
+            qalSourcef(ch->srcnum, AL_ROLLOFF_FACTOR, ch->dist_mult * (8192 - SOUND_FULLVOLUME));
         }
     }
 }

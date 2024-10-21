@@ -90,23 +90,6 @@ typedef struct {
     float   white;              // highest of RGB
 } lightstyle_t;
 
-// rendered fog parameters
-typedef struct {
-    struct {
-        float       r, g, b;
-        float       density;
-        float       sky_factor;
-    } global;
-    struct {
-        struct {
-            float   r, g, b;
-            float   dist;
-        } start, end;
-        float   falloff;
-        float   density;
-    } height;
-} fog_params_t;
-
 typedef struct {
     int         x, y, width, height;// in virtual screen coordinates
     float       fov_x, fov_y;
@@ -114,6 +97,8 @@ typedef struct {
     vec3_t      viewangles;
     vec4_t      screen_blend;       // rgba 0-1 full screen blend
     vec4_t      damage_blend;       // rgba 0-1 damage blend
+    player_fog_t        fog;
+    player_heightfog_t  heightfog;
     float       time;               // time is uesed to auto animate
     int         rdflags;            // RDF_UNDERWATER, etc
     bool        extended;
@@ -130,8 +115,6 @@ typedef struct {
 
     int         num_particles;
     particle_t  *particles;
-
-    fog_params_t    fog;
 } refdef_t;
 
 enum {

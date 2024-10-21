@@ -1359,20 +1359,20 @@ static void CL_ParseFog(void)
     if (bits & FOG_BIT_MORE_BITS)
         bits |= (fog_bits_t) (MSG_ReadByte () << 8);
 
-    fog_params_t params;
+    cl_fog_params_t params;
     int time = 0;
 
     if (bits & FOG_BIT_DENSITY)
     {
-        params.global.density = MSG_ReadFloat ();
-        params.global.sky_factor = MSG_ReadByte () / 255.f;
+        params.linear.density = MSG_ReadFloat ();
+        params.linear.sky_factor = MSG_ReadByte () / 255.f;
     }
     if (bits & FOG_BIT_R)
-        params.global.r = MSG_ReadByte () / 255.f;
+        params.linear.color[0] = MSG_ReadByte () / 255.f;
     if (bits & FOG_BIT_G)
-        params.global.g = MSG_ReadByte () / 255.f;
+        params.linear.color[1] = MSG_ReadByte () / 255.f;
     if (bits & FOG_BIT_B)
-        params.global.b = MSG_ReadByte () / 255.f;
+        params.linear.color[2] = MSG_ReadByte () / 255.f;
     if (bits & FOG_BIT_TIME)
         time = MSG_ReadWord ();
 
@@ -1382,20 +1382,20 @@ static void CL_ParseFog(void)
         params.height.density = MSG_ReadFloat ();
 
     if (bits & FOG_BIT_HEIGHTFOG_START_R)
-        params.height.start.r = MSG_ReadByte () / 255.f;
+        params.height.start.color[0] = MSG_ReadByte () / 255.f;
     if (bits & FOG_BIT_HEIGHTFOG_START_G)
-        params.height.start.g = MSG_ReadByte () / 255.f;
+        params.height.start.color[1] = MSG_ReadByte () / 255.f;
     if (bits & FOG_BIT_HEIGHTFOG_START_B)
-        params.height.start.b = MSG_ReadByte () / 255.f;
+        params.height.start.color[2] = MSG_ReadByte () / 255.f;
     if (bits & FOG_BIT_HEIGHTFOG_START_DIST)
         params.height.start.dist = MSG_ReadLong ();
 
     if (bits & FOG_BIT_HEIGHTFOG_END_R)
-        params.height.end.r = MSG_ReadByte () / 255.f;
+        params.height.end.color[0] = MSG_ReadByte () / 255.f;
     if (bits & FOG_BIT_HEIGHTFOG_END_G)
-        params.height.end.g = MSG_ReadByte () / 255.f;
+        params.height.end.color[1] = MSG_ReadByte () / 255.f;
     if (bits & FOG_BIT_HEIGHTFOG_END_B)
-        params.height.end.b = MSG_ReadByte () / 255.f;
+        params.height.end.color[2] = MSG_ReadByte () / 255.f;
     if (bits & FOG_BIT_HEIGHTFOG_END_DIST)
         params.height.end.dist = MSG_ReadLong ();
 

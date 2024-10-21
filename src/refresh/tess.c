@@ -72,11 +72,11 @@ void GL_DrawParticles(void)
     if (!glr.fd.num_particles)
         return;
 
-    GL_LoadMatrix(mat_identity, glr.viewmatrix);
+    GL_LoadMatrix(gl_identity, glr.viewmatrix);
     GL_LoadUniforms();
     GL_BindArrays(VA_EFFECT);
 
-    bits = (gl_partstyle->integer ? GLS_BLEND_ADD : GLS_BLEND_BLEND) | GLS_DEPTHMASK_FALSE | GLS_FOG_ENABLE;
+    bits = (gl_partstyle->integer ? GLS_BLEND_ADD : GLS_BLEND_BLEND) | GLS_DEPTHMASK_FALSE | glr.fog_bits;
 
     p = glr.fd.particles;
     total = glr.fd.num_particles;
@@ -147,7 +147,7 @@ static void GL_FlushBeamSegments(void)
         array |= GLA_TC;
 
     GL_BindTexture(TMU_TEXTURE, texnum);
-    GL_StateBits(GLS_BLEND_BLEND | GLS_DEPTHMASK_FALSE);
+    GL_StateBits(GLS_BLEND_BLEND | GLS_DEPTHMASK_FALSE | glr.fog_bits);
     GL_ArrayBits(array);
     GL_DrawIndexed(SHOWTRIS_FX);
 
@@ -314,7 +314,7 @@ void GL_DrawBeams(void)
     if (!glr.num_beams)
         return;
 
-    GL_LoadMatrix(mat_identity, glr.viewmatrix);
+    GL_LoadMatrix(gl_identity, glr.viewmatrix);
 
     if (gl_beamstyle->integer) {
         GL_BindArrays(VA_NULLMODEL);
@@ -388,7 +388,7 @@ void GL_DrawFlares(void)
     if (!gl_static.queries)
         return;
 
-    GL_LoadMatrix(mat_identity, glr.viewmatrix);
+    GL_LoadMatrix(gl_identity, glr.viewmatrix);
     GL_BindArrays(VA_EFFECT);
 
     for (i = 0, ent = glr.fd.entities; i < glr.fd.num_entities; i++, ent++) {
@@ -674,6 +674,11 @@ void GL_Flush3D(void)
     if (!(state & GLS_TEXTURE_REPLACE))
         array |= GLA_COLOR;
 
+    if (state & GLS_SKY_MASK)
+        state |= glr.fog_bits_sky;
+    else
+        state |= glr.fog_bits;
+
     GL_StateBits(state);
     GL_ArrayBits(array);
 
@@ -784,7 +789,7 @@ static void GL_DrawFace(const mface_t *surf)
     tess.numindices += numindices;
 
     memcpy(tess.texnum, texnum, sizeof(texnum));
-    tess.flags = state | GLS_FOG_ENABLE;
+    tess.flags = state;
 
     c.facesTris += numtris;
     c.facesDrawn++;

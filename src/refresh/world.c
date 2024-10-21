@@ -585,7 +585,7 @@ void GL_DrawWorld(void)
 
     R_ClearSkyBox();
 
-    GL_LoadMatrix(mat_identity, glr.viewmatrix);
+    GL_LoadMatrix(gl_identity, glr.viewmatrix);
 
     GL_BindArrays(VA_3D);
 

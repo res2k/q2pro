@@ -575,7 +575,7 @@ static bool enable_intensity_for_surface(const mface_t *surf)
 
 static glStateBits_t statebits_for_surface(const mface_t *surf)
 {
-    glStateBits_t statebits = GLS_DEFAULT | GLS_FOG_ENABLE;
+    glStateBits_t statebits = GLS_DEFAULT;
 
     if (surf->drawflags & SURF_SKY) {
         if (surf->texinfo->image->flags & IF_CLASSIC_SKY)

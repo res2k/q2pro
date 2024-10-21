@@ -416,7 +416,7 @@ static void GL_DrawDebugLines(void)
     if (LIST_EMPTY(&debug_lines_active))
         return;
 
-    GL_LoadMatrix(mat_identity, glr.viewmatrix);
+    GL_LoadMatrix(gl_identity, glr.viewmatrix);
     GL_LoadUniforms();
     GL_BindTexture(TMU_TEXTURE, TEXNUM_WHITE);
     GL_BindArrays(VA_NULLMODEL);
@@ -567,7 +567,7 @@ static void GL_DrawDebugTexts(void)
     if (LIST_EMPTY(&debug_texts_active))
         return;
 
-    GL_LoadMatrix(mat_identity, glr.viewmatrix);
+    GL_LoadMatrix(gl_identity, glr.viewmatrix);
     GL_BindArrays(VA_EFFECT);
 
     LIST_FOR_EACH_SAFE(debug_text_t, text, next, &debug_texts_active, entry) {

@@ -334,7 +334,7 @@ void R_DrawSkyBox(void)
         return; // nothing visible
 
     GL_BindArrays(VA_SPRITE);
-    GL_StateBits(GLS_TEXTURE_REPLACE | GLS_SKY_FOG);
+    GL_StateBits(GLS_TEXTURE_REPLACE | glr.fog_bits_sky);
     GL_ArrayBits(GLA_VERTEX | GLA_TC);
 
     for (i = 0; i < 6; i++) {

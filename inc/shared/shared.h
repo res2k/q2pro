@@ -1739,6 +1739,21 @@ typedef struct {
 // KEX
 } player_state_t;
 
+typedef struct {
+    vec3_t color;
+    float density;
+    float sky_factor;
+} player_fog_t;
+
+typedef struct {
+    struct {
+        vec3_t color;
+        float dist;
+    } start, end;
+    float density;
+    float falloff;
+} player_heightfog_t;
+
 //==============================================
 
 #define ENTITYNUM_BITS      13

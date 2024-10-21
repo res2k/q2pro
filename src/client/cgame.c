@@ -159,7 +159,7 @@ static uint64_t CG_CL_ClientTime(void)
 
 static uint64_t CG_CL_ClientRealTime(void)
 {
-    return cls.realtime;
+    return com_localTime;
 }
 
 static int32_t CG_CL_ServerFrame(void)

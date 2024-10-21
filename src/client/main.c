@@ -3440,8 +3440,11 @@ CL_Init
 static void CL_Client_stat(void)
 {
     SCR_StatKeyValue("realtime", va("%u", cls.realtime));
+    SCR_StatKeyValue("com_localTime", va("%u", com_localTime));
+    SCR_StatKeyValue("com_localTime2", va("%u", com_localTime2));
     SCR_StatKeyValue("time", va("%u", cl.time));
     SCR_StatKeyValue("servertime", va("%u", cl.servertime));
+    SCR_StatKeyValue("frametime", va("%f", cls.frametime));
 }
 
 /*

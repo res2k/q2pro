@@ -134,6 +134,7 @@ unsigned    com_framenum;
 unsigned    com_eventTime;
 unsigned    com_localTime;
 unsigned    com_localTime2;
+unsigned    com_localTime3;
 bool        com_initialized;
 time_t      com_startTime;
 
@@ -1114,7 +1115,9 @@ void Qcommon_Frame(void)
     if (fixedtime->integer) {
         Cvar_ClampInteger(fixedtime, 1, 1000);
         msec = fixedtime->integer;
+        com_localTime3 += msec;
     } else if (ts > 0) {
+        com_localTime3 += msec;
         frac += msec * ts;
         msec = frac;
         frac -= msec;

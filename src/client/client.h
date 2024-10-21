@@ -412,6 +412,7 @@ typedef struct {
         float            distance;
         vec2_t           dir;
         bool             is_powerup_wheel;
+        float            timer, timescale;
 
         cl_wheel_slot_t slots[MAX_WHEEL_ITEMS * 2];
         size_t          num_slots;
@@ -420,7 +421,7 @@ typedef struct {
         float       slice_sin;
 
         int         selected; // -1 = no selection
-        int         deselect_time; // if non-zero, deselect after < cls.realtime
+        int         deselect_time; // if non-zero, deselect after < com_localTime
     } wheel;
 
     int weapon_lock_time; // don't allow BUTTON_ATTACK within this time

@@ -274,7 +274,7 @@ static void SV_Map(bool restart)
     // save pending CM to be freed later if ERR_DROP is thrown
     Com_AbortFunc(abort_func, &cmd.cm);
 
-    SV_AutoSaveBegin(&cmd);
+    bool saved = SV_AutoSaveBegin(&cmd);
 
     // any error will drop from this point
     if (sv.state < ss_game || sv.state == ss_broadcast || restart)
@@ -285,7 +285,8 @@ static void SV_Map(bool restart)
 
     SV_SpawnServer(&cmd);
 
-    SV_AutoSaveEnd();
+    if (saved)
+        SV_AutoSaveEnd();
 }
 
 /*

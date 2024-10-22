@@ -499,7 +499,7 @@ static bool no_save_games(void)
     return false;
 }
 
-void SV_AutoSaveBegin(const mapcmd_t *cmd)
+bool SV_AutoSaveBegin(const mapcmd_t *cmd)
 {
     byte        bitmap[MAX_CLIENTS / CHAR_BIT];
     edict_t     *ent;
@@ -508,17 +508,17 @@ void SV_AutoSaveBegin(const mapcmd_t *cmd)
     // check for clearing the current savegame
     if (cmd->endofunit) {
         wipe_save_dir(SAVE_CURRENT);
-        return;
+        return false;
     }
 
     if (sv.state != ss_game)
-        return;
+        return false;
 
     if (no_save_games())
-        return;
+        return false;
 
     if (!ge->CanSave())
-        return;
+        return false;
 
     memset(bitmap, 0, sizeof(bitmap));
 
@@ -542,19 +542,12 @@ void SV_AutoSaveBegin(const mapcmd_t *cmd)
         ent = EDICT_NUM(i + 1);
         ent->inuse = Q_IsBitSet(bitmap, i);
     }
+
+    return true;
 }
 
 void SV_AutoSaveEnd(void)
 {
-    if (sv.state != ss_game)
-        return;
-
-    if (no_save_games())
-        return;
-
-    if (!ge->CanSave())
-        return;
-
     // save server state
     if (write_server_file(SAVE_LEVEL_START)) {
         Com_EPrintf("Couldn't write server file.\n");

@@ -775,13 +775,13 @@ void PF_Pmove(void *pm);
 // sv_save.c
 //
 #if USE_SAVEGAMES
-void SV_AutoSaveBegin(const mapcmd_t *cmd);
+bool SV_AutoSaveBegin(const mapcmd_t *cmd);
 void SV_AutoSaveEnd(void);
 void SV_CheckForSavegame(const mapcmd_t *cmd);
 void SV_CheckForEnhancedSavegames(void);
 void SV_RegisterSavegames(void);
 #else
-#define SV_AutoSaveBegin(cmd)           (void)0
+#define SV_AutoSaveBegin(cmd)           false
 #define SV_AutoSaveEnd()                (void)0
 #define SV_CheckForSavegame(cmd)        (void)0
 #define SV_CheckForEnhancedSavegames()  (void)0

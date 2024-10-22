@@ -845,10 +845,8 @@ static void CL_AddPacketEntities(void)
 
         ent.scale = s1->scale;
 
-        bool black_out = (effects & EF_TRACKERTRAIL) && !(effects & EF_TRACKER);
-
-        if (black_out)
-            ent.rflags |= REFFLAG_BLACK_OUT;
+        if (IS_TRACKER(effects))
+            ent.flags |= RF_TRACKER;
 
         // add to refresh list
         V_AddEntity(&ent);
@@ -886,11 +884,7 @@ static void CL_AddPacketEntities(void)
             }
             ent.flags = renderfx | RF_TRANSLUCENT;
             ent.alpha = 0.30f;
-            ent.rflags = 0;
             V_AddEntity(&ent);
-
-            if (black_out)
-                ent.rflags |= REFFLAG_BLACK_OUT;
         }
 
         ent.skin = 0;       // never use a custom skin on others
@@ -903,6 +897,9 @@ static void CL_AddPacketEntities(void)
             ent.flags = RF_TRANSLUCENT;
             ent.alpha = s1->alpha;
         }
+
+        if (IS_TRACKER(effects))
+            ent.flags |= RF_TRACKER;
 
         // duplicate for linked models
         if (s1->modelindex2) {
@@ -941,6 +938,9 @@ static void CL_AddPacketEntities(void)
             ent.alpha = s1->alpha;
         }
 
+        if (IS_TRACKER(effects))
+            ent.flags |= RF_TRACKER;
+
         if (s1->modelindex3) {
             ent.model = cl.model_draw[s1->modelindex3];
             V_AddEntity(&ent);
@@ -957,7 +957,6 @@ static void CL_AddPacketEntities(void)
             ent.frame = 0;
             ent.flags = RF_TRANSLUCENT;
             ent.alpha = 0.30f;
-            ent.rflags = 0;
 
             // remaster powerscreen is tiny and needs scaling
             if (cl.need_powerscreen_scale) {

@@ -80,7 +80,8 @@ typedef enum {
     MSG_PS_EXTENSIONS_2         = BIT(7),   // enable more protocol extensions
     MSG_PS_RERELEASE            = BIT(8),   // rerelease extensions: floating point coordinates,
                                             // increased stats numbers,
-                                            // wider pm_time and pm_flags
+                                            // wider pm_time and pm_flags,
+                                            // different viewoffset, kick_angles, gunoffset, gunangles encodings
     MSG_PS_FORCE                = BIT(9),   // send even if unchanged (MVD stream only)
     MSG_PS_REMOVE               = BIT(10),  // player is removed (MVD stream only)
 } msgPsFlags_t;

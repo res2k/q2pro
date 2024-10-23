@@ -117,6 +117,25 @@ static void write_dynamic_light_block(sizebuf_t *buf)
     GLSF("};\n");
 }
 
+static void write_dynamic_lights(sizebuf_t *buf)
+{
+    GLSL(vec3 calc_dynamic_lights() {
+        vec3 shade = vec3(0);
+
+        for (int i = 0; i < num_dlights; i++) {
+            vec3 dir = (dlights[i].position + (v_norm * 16)) - v_world_pos;
+            float len = length(dir);
+            float dist = max((dlights[i].radius - DLIGHT_CUTOFF - len), 0.0f);
+
+            dir /= max(len, 1.0f);
+            float lambert = max(0.0f, dot(dir, v_norm));
+            shade += dlights[i].color.rgb * dist * lambert;
+        }
+
+        return shade;
+    })
+}
+
 static void write_shadedot(sizebuf_t *buf)
 {
     GLSL(
@@ -404,6 +423,48 @@ static void write_height_fog(sizebuf_t *buf)
     })
 }
 
+// adapted from https://github.com/Experience-Monks/glsl-fast-gaussian-blur/blob/master/5.glsl
+static void write_blur(sizebuf_t *buf)
+{
+    GLSL(
+        vec4 blur5(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
+            vec4 color = vec4(0.0);
+            vec2 off1 = vec2(1.3333333333333333) * direction;
+            color += texture(image, uv) * 0.29411764705882354;
+            color += texture(image, uv + (off1 / resolution)) * 0.35294117647058826;
+            color += texture(image, uv - (off1 / resolution)) * 0.35294117647058826;
+            return color; 
+        }
+
+        vec4 blur9(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
+            vec4 color = vec4(0.0);
+            vec2 off1 = vec2(1.3846153846) * direction;
+            vec2 off2 = vec2(3.2307692308) * direction;
+            color += texture(image, uv) * 0.2270270270;
+            color += texture(image, uv + (off1 / resolution)) * 0.3162162162;
+            color += texture(image, uv - (off1 / resolution)) * 0.3162162162;
+            color += texture(image, uv + (off2 / resolution)) * 0.0702702703;
+            color += texture(image, uv - (off2 / resolution)) * 0.0702702703;
+            return color;
+        }
+
+        vec4 blur13(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
+            vec4 color = vec4(0.0);
+            vec2 off1 = vec2(1.411764705882353) * direction;
+            vec2 off2 = vec2(3.2941176470588234) * direction;
+            vec2 off3 = vec2(5.176470588235294) * direction;
+            color += texture(image, uv) * 0.1964825501511404;
+            color += texture(image, uv + (off1 / resolution)) * 0.2969069646728344;
+            color += texture(image, uv - (off1 / resolution)) * 0.2969069646728344;
+            color += texture(image, uv + (off2 / resolution)) * 0.09447039785044732;
+            color += texture(image, uv - (off2 / resolution)) * 0.09447039785044732;
+            color += texture(image, uv + (off3 / resolution)) * 0.010381362401148057;
+            color += texture(image, uv - (off3 / resolution)) * 0.010381362401148057;
+            return color;
+        }
+    )
+}
+
 static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
 {
     write_header(buf, bits);
@@ -416,6 +477,9 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
 
     if (bits & GLS_DYNAMIC_LIGHTS)
         write_dynamic_light_block(buf);
+
+    if (bits & GLS_BLUR_ENABLE)
+        write_blur(buf);
 
     if (bits & GLS_CLASSIC_SKY) {
         GLSL(
@@ -447,27 +511,15 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
     if (bits & (GLS_FOG_HEIGHT | GLS_DYNAMIC_LIGHTS))
         GLSL(in vec3 v_world_pos;)
 
-    if (bits & GLS_DYNAMIC_LIGHTS)
+    if (bits & GLS_DYNAMIC_LIGHTS) {
         GLSL(in vec3 v_norm;)
+        write_dynamic_lights(buf);
+    }
 
     GLSL(out vec4 o_color;)
 
-    if (bits & GLS_DYNAMIC_LIGHTS)
-        GLSL(vec3 calc_dynamic_lights() {
-            vec3 shade = vec3(0);
-
-            for (int i = 0; i < num_dlights; i++) {
-                vec3 dir = (dlights[i].position + (v_norm * 16)) - v_world_pos;
-                float len = length(dir);
-                float dist = max((dlights[i].radius - DLIGHT_CUTOFF - len), 0.0f);
-
-                dir /= max(len, 1.0f);
-                float lambert = max(0.0f, dot(dir, v_norm));
-                shade += dlights[i].color.rgb * dist * lambert;
-            }
-
-            return shade;
-        })
+    if (bits & GLS_BLOOM_ENABLE)
+        GLSL(out vec4 o_bloom;)
 
     GLSF("void main() {\n");
         if (bits & GLS_CLASSIC_SKY) {
@@ -488,7 +540,10 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
             if (bits & GLS_WARP_ENABLE)
                 GLSL(tc += w_amp * sin(tc.ts * w_phase + u_time);)
 
-            GLSL(vec4 diffuse = texture(u_texture, tc);)
+            if (bits & GLS_BLUR_ENABLE)
+                GLSL(vec4 diffuse = blur13(u_texture, v_tc, w_amp, u_scroll);)
+            else
+                GLSL(vec4 diffuse = texture(u_texture, tc);)
         }
 
         if (bits & GLS_ALPHATEST_ENABLE)
@@ -497,12 +552,22 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
         if (!(bits & GLS_TEXTURE_REPLACE))
             GLSL(vec4 color = v_color;)
 
+        if (bits & GLS_BLOOM_ENABLE)
+            GLSL(vec4 bloom = vec4(0, 0, 0, 1);)
+
         if (bits & GLS_LIGHTMAP_ENABLE) {
             GLSL(vec4 lightmap = texture(u_lightmap, v_lmtc);)
 
             if (bits & GLS_GLOWMAP_ENABLE) {
                 GLSL(vec4 glowmap = texture(u_glowmap, tc);)
                 GLSL(lightmap.rgb = mix(lightmap.rgb, vec3(1.0), glowmap.a);)
+                    
+                if (bits & GLS_BLOOM_ENABLE) {
+                    if (bits & GLS_INTENSITY_ENABLE)
+                        GLSL(bloom.rgb = diffuse.rgb * u_intensity * glowmap.a;)
+                    else
+                        GLSL(bloom.rgb = diffuse.rgb * glowmap.a;)
+                }
             }
   
             if (bits & GLS_DYNAMIC_LIGHTS) {
@@ -534,9 +599,14 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
         if (!(bits & GLS_LIGHTMAP_ENABLE) && (bits & GLS_GLOWMAP_ENABLE)) {
             GLSL(vec4 glowmap = texture(u_glowmap, tc);)
             if (bits & GLS_INTENSITY_ENABLE)
-                GLSL(diffuse.rgb += glowmap.rgb * glowmap.a * u_intensity2;)
+                GLSL(glowmap.rgb = glowmap.rgb * glowmap.a * u_intensity2;)
             else
-                GLSL(diffuse.rgb += glowmap.rgb * glowmap.a;)
+                GLSL(glowmap.rgb = glowmap.rgb * glowmap.a;)
+
+            GLSL(diffuse.rgb += glowmap.rgb;)
+                    
+            if (bits & GLS_BLOOM_ENABLE)
+                GLSL(bloom.rgb = glowmap.rgb;)
         }
 
         if (bits & (GLS_FOG_GLOBAL | GLS_FOG_HEIGHT))
@@ -556,6 +626,9 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
             GLSL(diffuse.rgb = mix(diffuse.rgb, u_fog_color.rgb, u_fog_sky_factor);)
 
         GLSL(o_color = diffuse;)
+
+        if (bits & GLS_BLOOM_ENABLE)
+            GLSL(o_bloom = bloom;)
     GLSF("}\n");
 }
 
@@ -642,6 +715,11 @@ static GLuint create_and_use_program(glStateBits_t bits)
             qglBindAttribLocation(program, VERT_ATTR_COLOR, "a_color");
         if (bits & GLS_DYNAMIC_LIGHTS)
             qglBindAttribLocation(program, VERT_ATTR_NORMAL, "a_norm");
+    }
+
+    if (bits & GLS_BLOOM_ENABLE) {
+        qglBindFragDataLocation(program, 0, "o_color");
+        qglBindFragDataLocation(program, 1, "o_bloom");
     }
 
     qglLinkProgram(program);
@@ -748,6 +826,11 @@ static void shader_state_bits(glStateBits_t bits)
         bits &= ~GLS_DYNAMIC_LIGHTS;
     }
 
+    // enable writing to the bloom texture
+    // if the glowmap is being used
+    if (glr.postprocess_bound && gl_bloom->integer)
+        bits |= glr.bloom_bits;
+
     glStateBits_t diff = bits ^ gls.state_bits;
 
     if (diff & GLS_COMMON_MASK)
@@ -763,6 +846,20 @@ static void shader_state_bits(glStateBits_t bits)
 
     if (diff & GLS_DYNAMIC_LIGHTS) {
         gls.u_block_dirtybits |= GLU_DLIGHT;
+    }
+
+    if (glr.postprocess_bound) {
+        if (diff & GLS_BLOOM_ENABLE) {
+            qglDrawBuffers(2, (const GLenum []) {
+                GL_COLOR_ATTACHMENT0,
+                GL_COLOR_ATTACHMENT1
+            });
+        } else {
+            qglDrawBuffers(2, (const GLenum []) {
+                GL_COLOR_ATTACHMENT0,
+                GL_NONE
+            });
+        }
     }
 }
 

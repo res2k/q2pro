@@ -201,11 +201,11 @@ void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat zn
     gl_backend->load_matrix(GL_PROJECTION, matrix, gl_identity);
 }
 
-void GL_Setup2D(void)
+void GL_Setup2D(int w, int h)
 {
-    qglViewport(0, 0, r_config.width, r_config.height);
+    qglViewport(0, 0, w, h);
 
-    GL_Ortho(0, r_config.width, r_config.height, 0, -1, 1);
+    GL_Ortho(0, w, h, 0, -1, 1);
     draw.scale = 1;
 
     draw.colors[0].u32 = U32_WHITE;
@@ -248,9 +248,9 @@ static void GL_RotateForViewer(void)
     GL_ForceMatrix(glr.entmatrix, matrix);
 }
 
-void GL_Setup3D(bool waterwarp)
+void GL_Setup3D(bool postprocess)
 {
-    if (waterwarp)
+    if (postprocess)
         qglViewport(0, 0, glr.fd.width, glr.fd.height);
     else
         qglViewport(glr.fd.x, r_config.height - (glr.fd.y + glr.fd.height),

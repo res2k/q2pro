@@ -245,6 +245,7 @@ static const glsection_t sections[] = {
             QGL_FN(CreateShader),
             QGL_FN(DeleteProgram),
             QGL_FN(DeleteShader),
+            QGL_FN(DrawBuffers),
             QGL_FN(DisableVertexAttribArray),
             QGL_FN(EnableVertexAttribArray),
             QGL_FN(GetProgramInfoLog),
@@ -293,6 +294,8 @@ static const glsection_t sections[] = {
         .functions = (const glfunction_t []) {
             QGL_FN(BindBufferBase),
             QGL_FN(BindBufferRange),
+            // FIXME: this is not supported on ES...
+            QGL_FN(BindFragDataLocation),
             QGL_FN(BindVertexArray),
             QGL_FN(DeleteVertexArrays),
             QGL_FN(GenVertexArrays),

@@ -76,9 +76,15 @@ typedef struct {
         size_t      buffer_size;
         vec_t       size;
     } world;
-    GLuint          warp_texture;
-    GLuint          warp_renderbuffer;
-    GLuint          warp_framebuffer;
+    GLuint          postprocess_texture;
+    GLuint          postprocess_renderbuffer;
+    GLuint          postprocess_framebuffer;
+    GLuint          bloom_texture;
+    GLuint          bloom_downsample_texture;
+    GLuint          bloom_downsample_framebuffer;
+    int             bloom_downsample_width, bloom_downsample_height;
+    GLuint          scratch_texture;
+    GLuint          scratch_framebuffer;
     GLuint          uniform_buffer;
     GLuint          dlight_buffer;
 #if USE_MD5
@@ -129,9 +135,11 @@ typedef struct {
     int             num_beams;
     int             num_flares;
     int             fog_bits, fog_bits_sky;
+    int             bloom_bits;
     int             framebuffer_width;
     int             framebuffer_height;
     bool            framebuffer_ok;
+    bool            postprocess_bound;
 } glRefdef_t;
 
 typedef enum {
@@ -226,6 +234,7 @@ extern cvar_t *gl_md5_use;
 extern cvar_t *gl_md5_distance;
 #endif
 extern cvar_t *gl_damageblend_frac;
+extern cvar_t *gl_bloom;
 
 // development variables
 extern cvar_t *gl_znear;
@@ -517,6 +526,8 @@ typedef enum {
     GLS_FOG_SKY             = BIT(28),
 
     GLS_DYNAMIC_LIGHTS      = BIT(29),
+    GLS_BLOOM_ENABLE        = BIT(30),
+    GLS_BLUR_ENABLE         = BIT(31),
 
     GLS_BLEND_MASK  = GLS_BLEND_BLEND | GLS_BLEND_ADD | GLS_BLEND_MODULATE,
     GLS_COMMON_MASK = GLS_DEPTHMASK_FALSE | GLS_DEPTHTEST_DISABLE | GLS_CULL_DISABLE | GLS_BLEND_MASK,
@@ -527,8 +538,9 @@ typedef enum {
     GLS_SHADER_MASK = GLS_ALPHATEST_ENABLE | GLS_TEXTURE_REPLACE | GLS_SCROLL_ENABLE |
         GLS_LIGHTMAP_ENABLE | GLS_WARP_ENABLE | GLS_INTENSITY_ENABLE | GLS_GLOWMAP_ENABLE |
         GLS_SKY_MASK | GLS_DEFAULT_FLARE | GLS_MESH_MASK | GLS_FOG_MASK |
-        GLS_DYNAMIC_LIGHTS,
-    GLS_UNIFORM_MASK = GLS_WARP_ENABLE | GLS_LIGHTMAP_ENABLE | GLS_INTENSITY_ENABLE | GLS_SKY_MASK | GLS_FOG_MASK | GLS_DYNAMIC_LIGHTS,
+        GLS_DYNAMIC_LIGHTS | GLS_BLOOM_ENABLE | GLS_BLUR_ENABLE,
+    GLS_UNIFORM_MASK = GLS_WARP_ENABLE | GLS_LIGHTMAP_ENABLE | GLS_INTENSITY_ENABLE | GLS_SKY_MASK | GLS_FOG_MASK |
+        GLS_DYNAMIC_LIGHTS | GLS_BLUR_ENABLE,
     GLS_SCROLL_MASK = GLS_SCROLL_ENABLE | GLS_SCROLL_X | GLS_SCROLL_Y | GLS_SCROLL_FLIP | GLS_SCROLL_SLOW,
 } glStateBits_t;
 
@@ -568,7 +580,7 @@ typedef enum {
     VA_EFFECT,
     VA_NULLMODEL,
     VA_OCCLUDE,
-    VA_WATERWARP,
+    VA_POSTPROCESS,
     VA_MESH_SHADE,
     VA_MESH_FLAT,  // also used for per-pixel lighting
     VA_2D,
@@ -832,8 +844,8 @@ void GL_ScrollPos(vec2_t scroll, glStateBits_t bits);
 void GL_DrawOutlines(GLsizei count, GLenum type, const void *indices);
 void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat znear, GLfloat zfar);
 void GL_Frustum(GLfloat fov_x, GLfloat fov_y, GLfloat reflect_x);
-void GL_Setup2D(void);
-void GL_Setup3D(bool waterwarp);
+void GL_Setup2D(int w, int h);
+void GL_Setup3D(bool postprocess);
 void GL_ClearState(void);
 void GL_InitState(void);
 void GL_ShutdownState(void);
@@ -882,7 +894,7 @@ void Scrap_Upload(void);
 void GL_InitImages(void);
 void GL_ShutdownImages(void);
 
-bool GL_InitWarpTexture(void);
+bool GL_InitPostProcessTextures(void);
 
 extern cvar_t *gl_intensity;
 

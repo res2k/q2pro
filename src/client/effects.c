@@ -25,6 +25,8 @@ static void CL_LogoutEffect(const vec3_t org, int color);
 static vec3_t avelocities[NUMVERTEXNORMALS];
 
 static cvar_t *cl_lerp_lightstyles;
+static cvar_t *cl_rerelease_effects;
+static cvar_t *cl_muzzlelight_time;
 
 /*
 ==============================================================
@@ -226,7 +228,7 @@ void CL_MuzzleFlash(void)
     VectorMA(dl->origin, 18, fv, dl->origin);
     VectorMA(dl->origin, 16, rv, dl->origin);
     dl->radius = 100 * (2 - mz.silenced) + (Q_rand() & 31);
-    dl->die = cl.time + 16;
+    dl->die = cl.time + cl_muzzlelight_time->integer;
 
     volume = 1.0f - 0.8f * mz.silenced;
 
@@ -254,7 +256,7 @@ void CL_MuzzleFlash(void)
     case MZ_SHOTGUN:
         VectorSet(dl->color, 1, 1, 0);
         S_StartSound(NULL, mz.entity, CHAN_WEAPON, S_RegisterSound("weapons/shotgf1b.wav"), volume, ATTN_NORM, 0);
-        S_StartSound(NULL, mz.entity, CHAN_AUTO,   S_RegisterSound("weapons/shotgr1b.wav"), volume, ATTN_NORM, 0.1f);
+        S_StartSound(NULL, mz.entity, CHAN_AUTO,   S_RegisterSound("weapons/shotgr1b.wav"), volume, ATTN_NORM, cl_rerelease_effects->integer ? 0.35f : 0.1f);
         CL_AddWeaponMuzzleFX(MFLASH_SHOTG, (const vec3_t) { 26.5f, 8.6f, -9.5f }, 12.0f);
         break;
     case MZ_SSHOTGUN:
@@ -292,18 +294,20 @@ void CL_MuzzleFlash(void)
     case MZ_RAILGUN:
         VectorSet(dl->color, 0.5f, 0.5f, 1.0f);
         S_StartSound(NULL, mz.entity, CHAN_WEAPON, S_RegisterSound("weapons/railgf1a.wav"), volume, ATTN_NORM, 0);
+        if (cl_rerelease_effects->integer)
+            S_StartSound(NULL, mz.entity, CHAN_AUTO, S_RegisterSound("weapons/railgr1b.wav"), volume, ATTN_NORM, 0.4f);
         CL_AddWeaponMuzzleFX(MFLASH_RAIL, (const vec3_t) { 20.0f, 5.2f, -7.0f }, 12.0f);
         break;
     case MZ_ROCKET:
         VectorSet(dl->color, 1, 0.5f, 0.2f);
         S_StartSound(NULL, mz.entity, CHAN_WEAPON, S_RegisterSound("weapons/rocklf1a.wav"), volume, ATTN_NORM, 0);
-        S_StartSound(NULL, mz.entity, CHAN_AUTO,   S_RegisterSound("weapons/rocklr1b.wav"), volume, ATTN_NORM, 0.1f);
+        S_StartSound(NULL, mz.entity, CHAN_AUTO,   S_RegisterSound("weapons/rocklr1b.wav"), volume, ATTN_NORM, cl_rerelease_effects->integer ? 0.15f : 0.1f);
         CL_AddWeaponMuzzleFX(MFLASH_ROCKET, (const vec3_t) { 18.0f, 5.0f, -11.0f }, 10.0f);
         break;
     case MZ_GRENADE:
         VectorSet(dl->color, 1, 0.5f, 0);
         S_StartSound(NULL, mz.entity, CHAN_WEAPON, S_RegisterSound("weapons/grenlf1a.wav"), volume, ATTN_NORM, 0);
-        S_StartSound(NULL, mz.entity, CHAN_AUTO,   S_RegisterSound("weapons/grenlr1b.wav"), volume, ATTN_NORM, 0.1f);
+        S_StartSound(NULL, mz.entity, CHAN_AUTO,   S_RegisterSound("weapons/grenlr1b.wav"), volume, ATTN_NORM, cl_rerelease_effects->integer ? 0.15f : 0.1f);
         CL_AddWeaponMuzzleFX(MFLASH_LAUNCH, (const vec3_t) { 18.0f, 6.0f, -6.5f }, 9.0f);
         break;
     case MZ_BFG:
@@ -347,7 +351,7 @@ void CL_MuzzleFlash(void)
     case MZ_PROX:
         VectorSet(dl->color, 1, 0.5f, 0);
         S_StartSound(NULL, mz.entity, CHAN_WEAPON, S_RegisterSound("weapons/grenlf1a.wav"), volume, ATTN_NORM, 0);
-        S_StartSound(NULL, mz.entity, CHAN_AUTO,   S_RegisterSound("weapons/proxlr1a.wav"), volume, ATTN_NORM, 0.1f);
+        S_StartSound(NULL, mz.entity, CHAN_AUTO,   S_RegisterSound("weapons/proxlr1a.wav"), volume, ATTN_NORM, cl_rerelease_effects->integer ? 0.15f : 0.1f);
         CL_AddWeaponMuzzleFX(MFLASH_LAUNCH, (const vec3_t) { 18.0f, 6.0f, -6.5f }, 9.0f);
         break;
     case MZ_ETF_RIFLE:
@@ -1839,4 +1843,6 @@ void CL_InitEffects(void)
             avelocities[i][j] = (Q_rand() & 255) * 0.01f;
 
     cl_lerp_lightstyles = Cvar_Get("cl_lerp_lightstyles", "1", 0);
+    cl_rerelease_effects = Cvar_Get("cl_rerelease_effects", "1", 0);
+    cl_muzzlelight_time = Cvar_Get("cl_muzzlelight_time", "100", 0);
 }

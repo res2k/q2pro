@@ -2058,14 +2058,14 @@ void MSG_ReadDeltaUsercmd_Enhanced(const usercmd_t *from, usercmd_t *to)
 // read current angles
     if (bits & CM_ANGLE1) {
         if (MSG_ReadBits(1)) {
-            to->angles[0] = SHORT2ANGLE(ANGLE2SHORT(to->angles[0]) + MSG_ReadBits(-8));
+            to->angles[0] = to->angles[0] + SHORT2ANGLE(MSG_ReadBits(-8));
         } else {
             to->angles[0] = SHORT2ANGLE(MSG_ReadBits(-16));
         }
     }
     if (bits & CM_ANGLE2) {
         if (MSG_ReadBits(1)) {
-            to->angles[1] = SHORT2ANGLE(ANGLE2SHORT(to->angles[1]) + MSG_ReadBits(-8));
+            to->angles[1] = to->angles[1] + SHORT2ANGLE(MSG_ReadBits(-8));
         } else {
             to->angles[1] = SHORT2ANGLE(MSG_ReadBits(-16));
         }

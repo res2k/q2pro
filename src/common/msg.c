@@ -890,8 +890,8 @@ void MSG_PackPlayer(player_packed_t *out, const player_state_t *in, msgPsFlags_t
     if (flags & MSG_PS_RERELEASE) {
         for (int i = 0; i < 3; i++) out->viewoffset[i] = scaled_short(in->viewoffset[i], 16);
         for (int i = 0; i < 3; i++) out->kick_angles[i] = scaled_short(in->kick_angles[i], 1024);
-        for (int i = 0; i < 3; i++) out->gunoffset[i] = COORD2SHORT(in->gunoffset[i]);
-        for (int i = 0; i < 3; i++) out->gunangles[i] = ANGLE2SHORT(in->gunangles[i]);
+        for (int i = 0; i < 3; i++) out->gunoffset[i] = scaled_short(in->gunoffset[i], 512);
+        for (int i = 0; i < 3; i++) out->gunangles[i] = scaled_short(in->gunangles[i], 4096);
     } else {
         PACK_OFFSET(out->viewoffset, in->viewoffset);
         PACK_OFFSET(out->kick_angles, in->kick_angles);
@@ -2601,9 +2601,9 @@ void MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t    *from,
 
     if (extraflags & EPS_GUNOFFSET) {
         if (psflags & MSG_PS_EXTENSIONS) {
-            to->gunoffset[0] = SHORT2COORD(MSG_ReadShort());
-            to->gunoffset[1] = SHORT2COORD(MSG_ReadShort());
-            to->gunoffset[2] = SHORT2COORD(MSG_ReadShort());
+            to->gunoffset[0] = MSG_ReadShort() / 512.f;
+            to->gunoffset[1] = MSG_ReadShort() / 512.f;
+            to->gunoffset[2] = MSG_ReadShort() / 512.f;
         } else {
             to->gunoffset[0] = MSG_ReadChar() * 0.25f;
             to->gunoffset[1] = MSG_ReadChar() * 0.25f;
@@ -2613,9 +2613,9 @@ void MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t    *from,
 
     if (extraflags & EPS_GUNANGLES) {
         if (psflags & MSG_PS_EXTENSIONS) {
-            to->gunangles[0] = MSG_ReadAngle16();
-            to->gunangles[1] = MSG_ReadAngle16();
-            to->gunangles[2] = MSG_ReadAngle16();
+            to->gunangles[0] = MSG_ReadShort() / 4096.f;
+            to->gunangles[1] = MSG_ReadShort() / 4096.f;
+            to->gunangles[2] = MSG_ReadShort() / 4096.f;
         } else {
             to->gunangles[0] = MSG_ReadChar() * 0.25f;
             to->gunangles[1] = MSG_ReadChar() * 0.25f;
@@ -2733,9 +2733,9 @@ void MSG_ParseDeltaPlayerstate_Packet(player_state_t        *to,
 
     if (flags & PPS_GUNOFFSET) {
         if (psflags & MSG_PS_EXTENSIONS) {
-            to->gunoffset[0] = SHORT2COORD(MSG_ReadShort());
-            to->gunoffset[1] = SHORT2COORD(MSG_ReadShort());
-            to->gunoffset[2] = SHORT2COORD(MSG_ReadShort());
+            to->gunoffset[0] = MSG_ReadShort() / 512.f;
+            to->gunoffset[1] = MSG_ReadShort() / 512.f;
+            to->gunoffset[2] = MSG_ReadShort() / 512.f;
         } else {
             to->gunoffset[0] = MSG_ReadChar() * 0.25f;
             to->gunoffset[1] = MSG_ReadChar() * 0.25f;
@@ -2745,9 +2745,9 @@ void MSG_ParseDeltaPlayerstate_Packet(player_state_t        *to,
 
     if (flags & PPS_GUNANGLES) {
         if (psflags & MSG_PS_EXTENSIONS) {
-            to->gunangles[0] = MSG_ReadAngle16();
-            to->gunangles[1] = MSG_ReadAngle16();
-            to->gunangles[2] = MSG_ReadAngle16();
+            to->gunangles[0] = MSG_ReadShort() / 4096.f;
+            to->gunangles[1] = MSG_ReadShort() / 4096.f;
+            to->gunangles[2] = MSG_ReadShort() / 4096.f;
         } else {
             to->gunangles[0] = MSG_ReadChar() * 0.25f;
             to->gunangles[1] = MSG_ReadChar() * 0.25f;

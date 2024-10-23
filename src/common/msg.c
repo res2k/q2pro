@@ -514,9 +514,27 @@ void MSG_WriteDir(const vec3_t dir)
      out[1] = ANGLE2SHORT(in[1]),   \
      out[2] = ANGLE2SHORT(in[2]))
 
+// as per re-release spec, values of 0 for alpha
+// and scale should infer a default; as a result,
+// any value that is non-zero should be considered
+// explicitly specified.
+// for alpha, a value of 1.0 (255) *must*
+// still be synced, because it may override another
+// effect that has an implicit alpha assigned to it.
+
+static uint8_t Q_clip_alpha(float in)
+{
+    return in ? max(1, Q_clip_uint8(in * 255.0f)) : in;
+}
+
+static uint8_t Q_clip_scale(float in)
+{
+    return in ? max(1, Q_clip_uint8(in * 16.0f)) : in;
+}
+
 void MSG_PackEntity(entity_packed_t *out, const entity_state_t *in, bool ext)
 {
-    // allow 0 to accomodate empty baselines
+    // allow 0 to accommodate empty baselines
     Q_assert(in->number >= 0 && in->number < MAX_EDICTS);
     out->number = in->number;
 
@@ -536,8 +554,8 @@ void MSG_PackEntity(entity_packed_t *out, const entity_state_t *in, bool ext)
     out->event = in->event;
 
     if (ext) {
-        out->alpha = Q_clip_uint8(in->alpha * 255.0f);
-        out->scale = Q_clip_uint8(in->scale * 16.0f);
+        out->alpha = Q_clip_alpha(in->alpha);
+        out->scale = Q_clip_scale(in->scale);
         out->loop_volume = Q_clip_uint8(in->loop_volume * 255.0f);
         // encode ATTN_STATIC (192) as 0, and ATTN_LOOP_NONE (-1) as 192
         if (in->loop_attenuation == ATTN_LOOP_NONE) {
@@ -548,7 +566,6 @@ void MSG_PackEntity(entity_packed_t *out, const entity_state_t *in, bool ext)
                 out->loop_attenuation = 0;
         }
         // save network bandwidth
-        if (out->alpha == 255) out->alpha = 0;
         if (out->scale == 16) out->scale = 0;
         if (out->loop_volume == 255) out->loop_volume = 0;
     }

@@ -387,27 +387,27 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
     }
 
     GLSF("void main() {\n");
-        if (bits & GLS_CLASSIC_SKY) {
-            GLSL(v_dir = (m_sky[1] * a_pos).xyz;)
-        } else if (bits & GLS_DEFAULT_SKY) {
-            GLSL(v_dir = (m_sky[0] * a_pos).xyz;)
-        } else if (bits & GLS_SCROLL_ENABLE) {
-            GLSL(v_tc = a_tc + u_scroll;)
-        } else {
-            GLSL(v_tc = a_tc;)
-        }
+    if (bits & GLS_CLASSIC_SKY) {
+        GLSL(v_dir = (m_sky[1] * a_pos).xyz;)
+    } else if (bits & GLS_DEFAULT_SKY) {
+        GLSL(v_dir = (m_sky[0] * a_pos).xyz;)
+    } else if (bits & GLS_SCROLL_ENABLE) {
+        GLSL(v_tc = a_tc + u_scroll;)
+    } else {
+        GLSL(v_tc = a_tc;)
+    }
 
-        if (bits & GLS_LIGHTMAP_ENABLE)
-            GLSL(v_lmtc = a_lmtc;)
+    if (bits & GLS_LIGHTMAP_ENABLE)
+        GLSL(v_lmtc = a_lmtc;)
 
-        if (!(bits & GLS_TEXTURE_REPLACE))
-            GLSL(v_color = a_color;)
+    if (!(bits & GLS_TEXTURE_REPLACE))
+        GLSL(v_color = a_color;)
 
-        if (bits & (GLS_FOG_HEIGHT | GLS_DYNAMIC_LIGHTS))
-            GLSL(v_world_pos = (m_model * a_pos).xyz;)
-        if (bits & GLS_DYNAMIC_LIGHTS)
-            GLSL(v_norm = normalize((mat3(m_model) * a_norm).xyz);)
-        GLSL(gl_Position = m_proj * m_view * m_model * a_pos;)
+    if (bits & (GLS_FOG_HEIGHT | GLS_DYNAMIC_LIGHTS))
+        GLSL(v_world_pos = (m_model * a_pos).xyz;)
+    if (bits & GLS_DYNAMIC_LIGHTS)
+        GLSL(v_norm = normalize((mat3(m_model) * a_norm).xyz);)
+    GLSL(gl_Position = m_proj * m_view * m_model * a_pos;)
     GLSF("}\n");
 }
 
@@ -573,129 +573,126 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
         GLSL(out vec4 o_bloom;)
 
     GLSF("void main() {\n");
-        if (bits & GLS_CLASSIC_SKY) {
-            GLSL(
-                float len = length(v_dir);
-                vec2 dir = v_dir.xy * (3.0 / len);
-                vec2 tc1 = dir + vec2(u_time * 0.0625);
-                vec2 tc2 = dir + vec2(u_time * 0.1250);
-                vec4 solid = texture(u_texture1, tc1);
-                vec4 alpha = texture(u_texture2, tc2);
-                vec4 diffuse = vec4((solid.rgb - alpha.rgb * 0.25) * 0.65, 1.0);
-            )
-        } else if (bits & GLS_DEFAULT_SKY) {
-            GLSL(vec4 diffuse = texture(u_texture, v_dir);)
-        } else {
-            GLSL(vec2 tc = v_tc;)
+    if (bits & GLS_CLASSIC_SKY) {
+        GLSL(
+            float len = length(v_dir);
+            vec2 dir = v_dir.xy * (3.0 / len);
+            vec2 tc1 = dir + vec2(u_time * 0.0625);
+            vec2 tc2 = dir + vec2(u_time * 0.1250);
+            vec4 solid = texture(u_texture1, tc1);
+            vec4 alpha = texture(u_texture2, tc2);
+            vec4 diffuse = vec4((solid.rgb - alpha.rgb * 0.25) * 0.65, 1.0);
+        )
+    } else if (bits & GLS_DEFAULT_SKY) {
+        GLSL(vec4 diffuse = texture(u_texture, v_dir);)
+    } else {
+        GLSL(vec2 tc = v_tc;)
 
-            if (bits & GLS_WARP_ENABLE)
-                GLSL(tc += w_amp * sin(tc.ts * w_phase + u_time);)
+        if (bits & GLS_WARP_ENABLE)
+            GLSL(tc += w_amp * sin(tc.ts * w_phase + u_time);)
 
-            if (bits & GLS_BLUR_ENABLE)
-                GLSL(vec4 diffuse = blur(u_texture, v_tc, w_amp, u_scroll);)
-            else
-                GLSL(vec4 diffuse = texture(u_texture, tc);)
+        if (bits & GLS_BLUR_ENABLE)
+            GLSL(vec4 diffuse = blur(u_texture, v_tc, w_amp, u_scroll);)
+        else
+            GLSL(vec4 diffuse = texture(u_texture, tc);)
+    }
+
+    if (bits & GLS_ALPHATEST_ENABLE)
+        GLSL(if (diffuse.a <= 0.666) discard;)
+
+    if (!(bits & GLS_TEXTURE_REPLACE))
+        GLSL(vec4 color = v_color;)
+
+    if (bits & GLS_BLOOM_ENABLE)
+        GLSL(vec4 bloom = vec4(0, 0, 0, 1);)
+
+    if (bits & GLS_LIGHTMAP_ENABLE) {
+        GLSL(vec4 lightmap = texture(u_lightmap, v_lmtc);)
+
+        if (bits & GLS_GLOWMAP_ENABLE) {
+            GLSL(vec4 glowmap = texture(u_glowmap, tc);)
+                    
+            if (bits & GLS_INTENSITY_ENABLE)
+                GLSL(glowmap.a *= u_intensity2;)
+
+            GLSL(lightmap.rgb = mix(lightmap.rgb, vec3(1.0), glowmap.a);)
+                    
+            if (bits & GLS_BLOOM_ENABLE)
+                GLSL(bloom.rgb = diffuse.rgb * glowmap.a;)
         }
-
-        if (bits & GLS_ALPHATEST_ENABLE)
-            GLSL(if (diffuse.a <= 0.666) discard;)
-
-        if (!(bits & GLS_TEXTURE_REPLACE))
-            GLSL(vec4 color = v_color;)
-
-        if (bits & GLS_BLOOM_ENABLE)
-            GLSL(vec4 bloom = vec4(0, 0, 0, 1);)
-
-        if (bits & GLS_LIGHTMAP_ENABLE) {
-            GLSL(vec4 lightmap = texture(u_lightmap, v_lmtc);)
-
-            if (bits & GLS_GLOWMAP_ENABLE) {
-                GLSL(vec4 glowmap = texture(u_glowmap, tc);)
-                    
-                if (bits & GLS_INTENSITY_ENABLE)
-                    GLSL(glowmap.a *= u_intensity2;)
-
-                GLSL(lightmap.rgb = mix(lightmap.rgb, vec3(1.0), glowmap.a);)
-                    
-                if (bits & GLS_BLOOM_ENABLE)
-                    GLSL(bloom.rgb = diffuse.rgb * glowmap.a;)
-            }
   
-            if (bits & GLS_DYNAMIC_LIGHTS) {
-                GLSL(
-                    lightmap.rgb += calc_dynamic_lights();
-                )
-            }
-
-            GLSL(diffuse.rgb *= (lightmap.rgb + u_add) * u_modulate;)
-        } else {
-
-            if ((bits & GLS_DYNAMIC_LIGHTS) && !(bits & GLS_TEXTURE_REPLACE)) {
-                GLSL(color.rgb += calc_dynamic_lights() * u_modulate;)
-            }
-        }
-
-        if (bits & GLS_INTENSITY_ENABLE)
-            GLSL(diffuse.rgb *= u_intensity;)
-
-        if (bits & GLS_DEFAULT_FLARE)
+        if (bits & GLS_DYNAMIC_LIGHTS) {
             GLSL(
-                 diffuse.rgb *= (diffuse.r + diffuse.g + diffuse.b) / 3.0;
-                 diffuse.rgb *= v_color.a;
+                lightmap.rgb += calc_dynamic_lights();
             )
+        }
 
-        if (!(bits & GLS_TEXTURE_REPLACE))
-            GLSL(diffuse *= color;)
+        GLSL(diffuse.rgb *= (lightmap.rgb + u_add) * u_modulate;)
+    } else if ((bits & GLS_DYNAMIC_LIGHTS) && !(bits & GLS_TEXTURE_REPLACE)) {
+        GLSL(color.rgb += calc_dynamic_lights() * u_modulate;)
+    }
 
-        if (!(bits & GLS_LIGHTMAP_ENABLE) && (bits & GLS_GLOWMAP_ENABLE)) {
-            if (bits & GLS_GLOWMAP_COLOR) {
-                GLSL(vec4 glowmap = (diffuse * v_color) * (diffuse.a * v_color.a);)
-            } else if (bits & GLS_MESH_SHELL) {
-                GLSL(vec4 glowmap = v_color;)
-            } else {
-                GLSL(vec4 glowmap = texture(u_glowmap, tc);)
-                GLSL(glowmap.rgb = glowmap.rgb * glowmap.a;)
-            }
+    if (bits & GLS_INTENSITY_ENABLE)
+        GLSL(diffuse.rgb *= u_intensity;)
 
-            if (bits & (GLS_INTENSITY_ENABLE | GLS_GLOWMAP_COLOR))
-                GLSL(glowmap.rgb *= u_intensity2;)
+    if (bits & GLS_DEFAULT_FLARE)
+        GLSL(
+                diffuse.rgb *= (diffuse.r + diffuse.g + diffuse.b) / 3.0;
+                diffuse.rgb *= v_color.a;
+        )
+
+    if (!(bits & GLS_TEXTURE_REPLACE))
+        GLSL(diffuse *= color;)
+
+    if (!(bits & GLS_LIGHTMAP_ENABLE) && (bits & GLS_GLOWMAP_ENABLE)) {
+        if (bits & GLS_GLOWMAP_COLOR) {
+            GLSL(vec4 glowmap = (diffuse * v_color) * (diffuse.a * v_color.a);)
+        } else if (bits & GLS_MESH_SHELL) {
+            GLSL(vec4 glowmap = v_color;)
+        } else {
+            GLSL(vec4 glowmap = texture(u_glowmap, tc);)
+            GLSL(glowmap.rgb = glowmap.rgb * glowmap.a;)
+        }
+
+        if (bits & (GLS_INTENSITY_ENABLE | GLS_GLOWMAP_COLOR))
+            GLSL(glowmap.rgb *= u_intensity2;)
             
-            if (!(bits & GLS_TEXTURE_REPLACE) || (bits & GLS_MESH_SHELL))
-                GLSL(glowmap.rgb *= v_color.a;)
+        if (!(bits & GLS_TEXTURE_REPLACE) || (bits & GLS_MESH_SHELL))
+            GLSL(glowmap.rgb *= v_color.a;)
 
-            if (!(bits & GLS_MESH_SHELL))
-                GLSL(diffuse.rgb += glowmap.rgb;)
+        if (!(bits & GLS_MESH_SHELL))
+            GLSL(diffuse.rgb += glowmap.rgb;)
                     
-            if (bits & GLS_BLOOM_ENABLE)
-                GLSL(bloom.rgb = glowmap.rgb;)
-        }
+        if (bits & GLS_BLOOM_ENABLE)
+            GLSL(bloom.rgb = glowmap.rgb;)
+    }
 
-        if (bits & (GLS_FOG_GLOBAL | GLS_FOG_HEIGHT))
-            GLSL(float frag_depth = gl_FragCoord.z / gl_FragCoord.w;)
+    if (bits & (GLS_FOG_GLOBAL | GLS_FOG_HEIGHT))
+        GLSL(float frag_depth = gl_FragCoord.z / gl_FragCoord.w;)
 
-        if (bits & GLS_FOG_GLOBAL) {
-            GLSL({
-                float d = u_fog_color.a * frag_depth;
-                float fog = 1.0f - exp(-(d * d));
-                diffuse.rgb = mix(diffuse.rgb, u_fog_color.rgb, fog);
-            )
-
-            if (bits & GLS_BLOOM_ENABLE)
-                GLSL(bloom.a *= 1.0f - fog;)
-
-            GLSL(})
-        }
-
-        if (bits & GLS_FOG_HEIGHT)
-            write_height_fog(buf, bits);
-
-        if (bits & GLS_FOG_SKY)
-            GLSL(diffuse.rgb = mix(diffuse.rgb, u_fog_color.rgb, u_fog_sky_factor);)
-
-        GLSL(o_color = diffuse;)
+    if (bits & GLS_FOG_GLOBAL) {
+        GLSL({
+            float d = u_fog_color.a * frag_depth;
+            float fog = 1.0f - exp(-(d * d));
+            diffuse.rgb = mix(diffuse.rgb, u_fog_color.rgb, fog);
+        )
 
         if (bits & GLS_BLOOM_ENABLE)
-            GLSL(o_bloom = bloom;)
+            GLSL(bloom.a *= 1.0f - fog;)
+
+        GLSL(})
+    }
+
+    if (bits & GLS_FOG_HEIGHT)
+        write_height_fog(buf, bits);
+
+    if (bits & GLS_FOG_SKY)
+        GLSL(diffuse.rgb = mix(diffuse.rgb, u_fog_color.rgb, u_fog_sky_factor);)
+
+    GLSL(o_color = diffuse;)
+
+    if (bits & GLS_BLOOM_ENABLE)
+        GLSL(o_bloom = bloom;)
     GLSF("}\n");
 }
 

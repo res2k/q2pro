@@ -20,7 +20,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/sizebuf.h"
 
 cvar_t *gl_per_pixel_lighting;
-static cvar_t *gl_bloom_radius;
 static cvar_t *gl_bloom_sigma;
 static cvar_t *gl_bloom_offset_scale;
 static cvar_t *gl_bloom_sigma_correction;

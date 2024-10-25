@@ -45,6 +45,7 @@ int S_GetSampleRate(void);
 
 #if USE_AVCODEC
 void OGG_Play(void);
+void OGG_PlayMenu(void);
 void OGG_Stop(void);
 void OGG_Update(void);
 void OGG_LoadTrackList(void);
@@ -52,6 +53,7 @@ void OGG_Init(void);
 void OGG_Shutdown(void);
 #else
 #define OGG_Play()          (void)0
+#define OGG_PlayMenu()      (void)0
 #define OGG_Stop()          (void)0
 #define OGG_Update()        (void)0
 #define OGG_LoadTrackList() (void)0

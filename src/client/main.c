@@ -668,7 +668,6 @@ CL_ClearState
 void CL_ClearState(void)
 {
     S_StopAllSounds();
-    OGG_Stop();
     SCR_StopCinematic();
     CL_ClearEffects();
     CL_ClearTEnts();
@@ -759,6 +758,7 @@ void CL_Disconnect(error_type_t type)
 
     if (type == ERR_DISCONNECT) {
         UI_OpenMenu(UIMENU_DEFAULT);
+        OGG_PlayMenu();
     } else {
         UI_OpenMenu(UIMENU_NONE);
     }
@@ -2395,6 +2395,7 @@ void CL_RestartFilesystem(bool total)
 
     if (cls_state == ca_disconnected) {
         UI_OpenMenu(UIMENU_DEFAULT);
+        OGG_PlayMenu();
     } else if (cls_state >= ca_loading && cls_state <= ca_active) {
         CL_LoadState(LOAD_MAP);
         CL_PrepRefresh();
@@ -2453,6 +2454,7 @@ void CL_RestartRefresh(bool total)
 
     if (cls_state == ca_disconnected) {
         UI_OpenMenu(UIMENU_DEFAULT);
+        OGG_PlayMenu();
     } else if (cls_state >= ca_loading && cls_state <= ca_active) {
         CL_LoadState(LOAD_MAP);
         CL_PrepRefresh();
@@ -3486,6 +3488,8 @@ void CL_Init(void)
     HTTP_Init();
 
     UI_OpenMenu(UIMENU_DEFAULT);
+
+    OGG_PlayMenu();
 
     Con_PostInit();
     Con_RunConsole();

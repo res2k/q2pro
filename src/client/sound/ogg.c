@@ -37,10 +37,12 @@ static ogg_state_t  ogg;
 static cvar_t   *ogg_enable;
 static cvar_t   *ogg_volume;
 static cvar_t   *ogg_shuffle;
+static cvar_t   *ogg_menu_track;
 
 static void     **tracklist;
 static int      trackcount;
 static int      trackindex;
+static char     currenttrack[MAX_QPATH];
 
 static char     extensions[MAX_QPATH];
 static int      supported;
@@ -243,8 +245,6 @@ static void shuffle(void)
 
 void OGG_Play(void)
 {
-    ogg_stop();
-
     if (!s_started)
         return;
 
@@ -252,8 +252,10 @@ void OGG_Play(void)
         return;
 
     const char *s = cl.configstrings[CS_CDTRACK];
-    if (!*s || !strcmp(s, "0"))
+    if (!*s || !strcmp(s, "0")) {
+        ogg_stop();
         return;
+    }
 
     if (ogg_shuffle->integer && trackcount) {
         if (trackindex == 0)
@@ -264,7 +266,52 @@ void OGG_Play(void)
         s = va("track%02d", Q_atoi(s));
     }
 
+    // don't restart the current track
+    if (strcmp(s, currenttrack) == 0) {
+        return;
+    }
+    
+    Q_strlcpy(currenttrack, s, sizeof(currenttrack));
+
+    ogg_stop();
+
     ogg_play(ogg_open(s, true));
+
+    if (s_api)
+        s_api->drop_raw_samples();
+}
+
+void OGG_PlayMenu(void)
+{
+    if (!s_started)
+        return;
+
+    if (!ogg_enable->integer)
+        return;
+
+    const char *s = ogg_menu_track->string;
+    if (!*s || !strcmp(s, "0")) {
+        ogg_stop();
+        return;
+    }
+
+    if (COM_IsUint(s)) {
+        s = va("track%02d", Q_atoi(s));
+    }
+
+    // don't restart the current track
+    if (strcmp(s, currenttrack) == 0) {
+        return;
+    }
+    
+    Q_strlcpy(currenttrack, s, sizeof(currenttrack));
+
+    ogg_stop();
+
+    ogg_play(ogg_open(s, true));
+
+    if (s_api)
+        s_api->drop_raw_samples();
 }
 
 void OGG_Stop(void)
@@ -760,6 +807,7 @@ void OGG_Init(void)
     ogg_volume = Cvar_Get("ogg_volume", "1", 0);
     ogg_volume->changed = ogg_volume_changed;
     ogg_shuffle = Cvar_Get("ogg_shuffle", "0", 0);
+    ogg_menu_track = Cvar_Get("ogg_menu_track", "77", 0);
 
     Cmd_Register(c_ogg);
 

@@ -2982,6 +2982,7 @@ const char *MSG_ServerCommandString(int cmd, int version)
             S(rr_setting)
             S(rr_configstringstream)
             S(rr_baselinestream)
+            S(fog)
         }
     } else {
         switch (cmd) {

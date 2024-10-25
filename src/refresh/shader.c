@@ -20,11 +20,17 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/sizebuf.h"
 
 cvar_t *gl_per_pixel_lighting;
+static cvar_t *gl_bloom_radius;
+static cvar_t *gl_bloom_sigma;
+static cvar_t *gl_bloom_offset_scale;
+static cvar_t *gl_bloom_sigma_correction;
 
-#define MAX_SHADER_CHARS    4096
+// used for initial size of growable buffer
+#define MIN_SHADER_CHARS    4096
 
-#define GLSL(x)     SZ_Write(buf, CONST_STR_LEN(#x "\n"));
-#define GLSF(x)     SZ_Write(buf, CONST_STR_LEN(x))
+#define GLSL(x)        SZ_Write(buf, CONST_STR_LEN(#x "\n"));
+#define GLSF(x)        SZ_Write(buf, CONST_STR_LEN(x))
+#define GLSS(f, ...)   sz = Q_scnprintf(sb, sizeof(sb), f, __VA_ARGS__), SZ_Write(buf, sb, sz);
 
 static void write_header(sizebuf_t *buf, glStateBits_t bits)
 {
@@ -423,46 +429,86 @@ static void write_height_fog(sizebuf_t *buf)
     })
 }
 
-// adapted from https://github.com/Experience-Monks/glsl-fast-gaussian-blur/blob/master/5.glsl
+// https://lisyarus.github.io/blog/posts/blur-coefficients-generator.html
+// Q2RTX auto-radius from sigma
 static void write_blur(sizebuf_t *buf)
 {
+    // pre-calculate the weight and offset arrays
+    float BLUR_SIGMA = Q_clipf(gl_bloom_sigma->value * r_config.height * 0.25f, 1.0f, 100.f);
+    int BLUR_RADIUS = (int) (BLUR_SIGMA * 4);
+    int SAMPLE_COUNT = BLUR_RADIUS + 1;
+    int RAW_SAMPLE_COUNT = (BLUR_RADIUS * 2) + 1;
+    bool BLUR_CORRECTION = !!gl_bloom_sigma_correction->integer;
+
+    float *weights = Z_Malloc(sizeof(float) * RAW_SAMPLE_COUNT);
+    float *offsets = Z_Malloc(sizeof(float) * SAMPLE_COUNT);
+    
+    float sumWeights = 0.0;
+
+    for (int i = -BLUR_RADIUS, x = 0; i <= BLUR_RADIUS; i++, x++)
+    {
+        float w = 0.0;
+
+        if (BLUR_CORRECTION) {
+            w = (erf(((float) i + 0.5) / BLUR_SIGMA / sqrt(2.0)) - erf(((float) i - 0.5) / BLUR_SIGMA / sqrt(2.0))) / 2.0;
+        } else {
+            w = exp((float) -i * (float) i / BLUR_SIGMA / BLUR_SIGMA);
+        }
+
+        sumWeights += w;
+        weights[x] = w;
+    }
+
+    for (int i = 0; i < RAW_SAMPLE_COUNT; i++)
+        weights[i] /= sumWeights;
+
+    bool hasZeros = false;
+    float *newWeights = Z_Malloc(sizeof(float) * SAMPLE_COUNT);
+
+    for (int i = -BLUR_RADIUS, x = 0; i <= BLUR_RADIUS; i += 2, x++)
+    {
+        if (i == BLUR_RADIUS)
+        {
+            offsets[x] = (float) i;
+            newWeights[x] = weights[i + BLUR_RADIUS];
+            continue;
+        }
+
+        float w0 = weights[i + BLUR_RADIUS + 0];
+        float w1 = weights[i + BLUR_RADIUS + 1];
+        float w = w0 + w1;
+
+        if (w > 0.0) {
+            offsets[x] = (float) i + w1 / w;
+        } else {
+            hasZeros = true;
+            offsets[x] = (float) i;
+        }
+
+        newWeights[x] = w;
+    }
+    
+    Z_Free(weights);
+
+    size_t sz;
+    char sb[MAX_TOKEN_CHARS];
+
     GLSL(
-        vec4 blur5(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
-            vec4 color = vec4(0.0);
-            vec2 off1 = vec2(1.3333333333333333) * direction;
-            color += texture(image, uv) * 0.29411764705882354;
-            color += texture(image, uv + (off1 / resolution)) * 0.35294117647058826;
-            color += texture(image, uv - (off1 / resolution)) * 0.35294117647058826;
-            return color; 
-        }
+        vec4 blur(sampler2D sourceTexture, vec2 pixelCoord, vec2 resolution, vec2 blurDirection) {
+            vec4 result = vec4(0.0);
+    )
 
-        vec4 blur9(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
-            vec4 color = vec4(0.0);
-            vec2 off1 = vec2(1.3846153846) * direction;
-            vec2 off2 = vec2(3.2307692308) * direction;
-            color += texture(image, uv) * 0.2270270270;
-            color += texture(image, uv + (off1 / resolution)) * 0.3162162162;
-            color += texture(image, uv - (off1 / resolution)) * 0.3162162162;
-            color += texture(image, uv + (off2 / resolution)) * 0.0702702703;
-            color += texture(image, uv - (off2 / resolution)) * 0.0702702703;
-            return color;
-        }
+    for (int i = 0; i < SAMPLE_COUNT; i++)
+        GLSS("result += texture(sourceTexture, pixelCoord + (blurDirection * %g / resolution)) * %g;\n",
+            offsets[i] * gl_bloom_offset_scale->value, newWeights[i]);
 
-        vec4 blur13(sampler2D image, vec2 uv, vec2 resolution, vec2 direction) {
-            vec4 color = vec4(0.0);
-            vec2 off1 = vec2(1.411764705882353) * direction;
-            vec2 off2 = vec2(3.2941176470588234) * direction;
-            vec2 off3 = vec2(5.176470588235294) * direction;
-            color += texture(image, uv) * 0.1964825501511404;
-            color += texture(image, uv + (off1 / resolution)) * 0.2969069646728344;
-            color += texture(image, uv - (off1 / resolution)) * 0.2969069646728344;
-            color += texture(image, uv + (off2 / resolution)) * 0.09447039785044732;
-            color += texture(image, uv - (off2 / resolution)) * 0.09447039785044732;
-            color += texture(image, uv + (off3 / resolution)) * 0.010381362401148057;
-            color += texture(image, uv - (off3 / resolution)) * 0.010381362401148057;
-            return color;
+    GLSL(
+            return result;
         }
     )
+    
+    Z_Free(offsets);
+    Z_Free(newWeights);
 }
 
 static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
@@ -541,7 +587,7 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
                 GLSL(tc += w_amp * sin(tc.ts * w_phase + u_time);)
 
             if (bits & GLS_BLUR_ENABLE)
-                GLSL(vec4 diffuse = blur13(u_texture, v_tc, w_amp, u_scroll);)
+                GLSL(vec4 diffuse = blur(u_texture, v_tc, w_amp, u_scroll);)
             else
                 GLSL(vec4 diffuse = texture(u_texture, tc);)
         }
@@ -667,7 +713,6 @@ static GLuint create_shader(GLenum type, const sizebuf_t *buf)
 
 static GLuint create_and_use_program(glStateBits_t bits)
 {
-    char buffer[MAX_SHADER_CHARS];
     sizebuf_t sb;
 
     GLuint program = qglCreateProgram();
@@ -676,16 +721,19 @@ static GLuint create_and_use_program(glStateBits_t bits)
         return 0;
     }
 
-    SZ_Init(&sb, buffer, sizeof(buffer), "GLSL");
+    SZ_InitGrowable(&sb, MIN_SHADER_CHARS, "GLSL");
     write_vertex_shader(&sb, bits);
     GLuint shader_v = create_shader(GL_VERTEX_SHADER, &sb);
-    if (!shader_v)
+    if (!shader_v) {
+        SZ_Destroy(&sb);
         return program;
+    }
 
     SZ_Clear(&sb);
     write_fragment_shader(&sb, bits);
     GLuint shader_f = create_shader(GL_FRAGMENT_SHADER, &sb);
     if (!shader_f) {
+        SZ_Destroy(&sb);
         qglDeleteShader(shader_v);
         return program;
     }
@@ -739,12 +787,14 @@ static GLuint create_and_use_program(glStateBits_t bits)
             Com_Printf("%s", buffer);
 
         Com_EPrintf("Error linking program\n");
+        SZ_Destroy(&sb);
         return program;
     }
 
     GLuint index = qglGetUniformBlockIndex(program, "u_block");
     if (index == GL_INVALID_INDEX) {
         Com_EPrintf("Uniform block not found\n");
+        SZ_Destroy(&sb);
         return program;
     }
 
@@ -752,6 +802,7 @@ static GLuint create_and_use_program(glStateBits_t bits)
     qglGetActiveUniformBlockiv(program, index, GL_UNIFORM_BLOCK_DATA_SIZE, &size);
     if (size != sizeof(gls.u_block)) {
         Com_EPrintf("Uniform block size mismatch: %d != %zu\n", size, sizeof(gls.u_block));
+        SZ_Destroy(&sb);
         return program;
     }
 
@@ -762,6 +813,7 @@ static GLuint create_and_use_program(glStateBits_t bits)
         index = qglGetUniformBlockIndex(program, "Skeleton");
         if (index == GL_INVALID_INDEX) {
             Com_EPrintf("Skeleton block not found\n");
+            SZ_Destroy(&sb);
             return program;
         }
         qglUniformBlockBinding(program, index, UBO_SKELETON);
@@ -772,6 +824,7 @@ static GLuint create_and_use_program(glStateBits_t bits)
         index = qglGetUniformBlockIndex(program, "u_dlights");
         if (index == GL_INVALID_INDEX) {
             Com_EPrintf("DLight uniform block not found\n");
+            SZ_Destroy(&sb);
             return program;
         }
 
@@ -779,6 +832,7 @@ static GLuint create_and_use_program(glStateBits_t bits)
         qglGetActiveUniformBlockiv(program, index, GL_UNIFORM_BLOCK_DATA_SIZE, &size);
         if (size != sizeof(gls.u_dlights)) {
             Com_EPrintf("DLight uniform block size mismatch: %d != %zu\n", size, sizeof(gls.u_dlights));
+            SZ_Destroy(&sb);
             return program;
         }
 
@@ -803,6 +857,8 @@ static GLuint create_and_use_program(glStateBits_t bits)
         qglUniform1i(qglGetUniformLocation(program, "u_lightmap"), TMU_LIGHTMAP);
     if (bits & GLS_GLOWMAP_ENABLE)
         qglUniform1i(qglGetUniformLocation(program, "u_glowmap"), TMU_GLOWMAP);
+    
+    SZ_Destroy(&sb);
 
     return program;
 }
@@ -1054,6 +1110,9 @@ static void shader_init(void)
     shader_use_program(GLS_DEFAULT);
 
     gl_per_pixel_lighting = Cvar_Get("gl_per_pixel_lighting", "1", 0);
+    gl_bloom_sigma = Cvar_Get("gl_bloom_sigma", "0.037", CVAR_REFRESH);
+    gl_bloom_offset_scale = Cvar_Get("gl_bloom_offset_scale", "1", CVAR_REFRESH);
+    gl_bloom_sigma_correction = Cvar_Get("gl_bloom_sigma_correction", "1", CVAR_REFRESH);
 }
 
 static void shader_shutdown(void)

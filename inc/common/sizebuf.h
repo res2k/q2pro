@@ -22,6 +22,8 @@ typedef struct {
     bool        allowoverflow;
     bool        allowunderflow;
     bool        overflowed;     // set to true if the buffer size failed
+    bool        growable;       // if true, data is maintained by the sz system;
+                                // call SZ_Destroy to reclaim.
     uint32_t    maxsize;
     uint32_t    cursize;
     uint32_t    readcount;
@@ -34,6 +36,8 @@ typedef struct {
 void SZ_Init(sizebuf_t *buf, void *data, size_t size, const char *tag);
 void SZ_InitWrite(sizebuf_t *buf, void *data, size_t size);
 void SZ_InitRead(sizebuf_t *buf, const void *data, size_t size);
+void SZ_InitGrowable(sizebuf_t *buf, size_t size, const char *tag);
+void SZ_Destroy(sizebuf_t *buf);
 void SZ_Clear(sizebuf_t *buf);
 void *SZ_GetSpace(sizebuf_t *buf, size_t len);
 void SZ_WriteByte(sizebuf_t *sb, int c);

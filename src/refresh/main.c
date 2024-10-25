@@ -63,7 +63,6 @@ cvar_t *gl_waterwarp;
 cvar_t *gl_fog;
 cvar_t *gl_swapinterval;
 cvar_t *gl_bloom;
-cvar_t *gl_bloom_radius;
 
 // development variables
 cvar_t *gl_znear;
@@ -780,14 +779,14 @@ void R_RenderFrame(const refdef_t *fd)
             qglClear(GL_COLOR_BUFFER_BIT);
 
             Vector2Set(gls.u_block.w_amp, glr.fd.width, glr.fd.height);
-            Vector2Set(gls.u_block.scroll, gl_bloom_radius->value, 0.0f);
+            Vector2Set(gls.u_block.scroll, 1.0f, 0.0f);
             gls.u_block_dirtybits |= GLU_BLOCK;
 
             GL_PostProcess(gl_static.bloom_downsample_texture, waterwarpbits | GLS_BLUR_ENABLE, glr.fd.x, glr.fd.y, glr.fd.width, glr.fd.height);
 
             // draw Y blur
             qglBindFramebuffer(GL_FRAMEBUFFER, 0);
-            Vector2Set(gls.u_block.scroll, 0.0f, gl_bloom_radius->value);
+            Vector2Set(gls.u_block.scroll, 0.0f, 1.0f);
             gls.u_block_dirtybits |= GLU_BLOCK;
 
             GL_PostProcess(gl_static.scratch_texture, waterwarpbits | GLS_BLEND_ADD | GLS_BLUR_ENABLE, glr.fd.x, glr.fd.y, glr.fd.width, glr.fd.height);
@@ -979,7 +978,6 @@ static void GL_Register(void)
     gl_swapinterval = Cvar_Get("gl_swapinterval", "1", CVAR_ARCHIVE);
     gl_swapinterval->changed = gl_swapinterval_changed;
     gl_bloom = Cvar_Get("gl_bloom", "1", 0);
-    gl_bloom_radius = Cvar_Get("gl_bloom_radius", "2", 0);
 
     // development variables
     gl_znear = Cvar_Get("gl_znear", "2", CVAR_CHEAT);

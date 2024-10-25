@@ -19,6 +19,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "shared/shared.h"
 #include "common/sizebuf.h"
 #include "common/intreadwrite.h"
+#include "common/zone.h"
 
 void SZ_Init(sizebuf_t *buf, void *data, size_t size, const char *tag)
 {
@@ -40,6 +41,25 @@ void SZ_InitRead(sizebuf_t *buf, const void *data, size_t size)
     SZ_Init(buf, (void *)data, size, "none");
     buf->cursize = size;
     buf->allowunderflow = true;
+}
+
+void SZ_InitGrowable(sizebuf_t *buf, size_t size, const char *tag)
+{
+    Q_assert(size <= INT32_MAX);
+    memset(buf, 0, sizeof(*buf));
+    buf->data = Z_Malloc(size);
+    buf->maxsize = size;
+    buf->tag = tag;
+    buf->growable = true;
+}
+
+void SZ_Destroy(sizebuf_t *buf)
+{
+    Q_assert(buf->growable);
+    Z_Free(buf->data);
+    buf->data = NULL;
+    buf->growable = false;
+    SZ_Clear(buf);
 }
 
 void SZ_Clear(sizebuf_t *buf)
@@ -66,15 +86,20 @@ void *SZ_GetSpace(sizebuf_t *buf, size_t len)
                       __func__, buf->tag, len, buf->maxsize);
         }
 
-        if (!buf->allowoverflow) {
-            Com_Error(ERR_FATAL,
-                      "%s: %s: overflow without allowoverflow set",
-                      __func__, buf->tag);
-        }
+        if (buf->growable) {
+            buf->maxsize = max(buf->cursize + len, buf->maxsize * 2);
+            buf->data = Z_Realloc(buf->data, buf->maxsize);
+        } else {
+            if (!buf->allowoverflow) {
+                Com_Error(ERR_FATAL,
+                          "%s: %s: overflow without allowoverflow set",
+                          __func__, buf->tag);
+            }
 
-        //Com_DPrintf("%s: %s: overflow\n", __func__, buf->tag);
-        SZ_Clear(buf);
-        buf->overflowed = true;
+            //Com_DPrintf("%s: %s: overflow\n", __func__, buf->tag);
+            SZ_Clear(buf);
+            buf->overflowed = true;
+        }
     }
 
     data = buf->data + buf->cursize;

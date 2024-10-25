@@ -643,7 +643,7 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
 
         if (!(bits & GLS_LIGHTMAP_ENABLE) && (bits & GLS_GLOWMAP_ENABLE)) {
             if (bits & GLS_MESH_SHELL) {
-                GLSL(vec4 glowmap = v_color * v_color.a;)
+                GLSL(vec4 glowmap = v_color;)
             } else {
                 GLSL(vec4 glowmap = texture(u_glowmap, tc);)
                 GLSL(glowmap.rgb = glowmap.rgb * glowmap.a;)
@@ -652,7 +652,7 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
             if (bits & GLS_INTENSITY_ENABLE)
                 GLSL(glowmap.rgb *= u_intensity2;)
             
-            if (!(bits & GLS_TEXTURE_REPLACE))
+            if (!(bits & GLS_TEXTURE_REPLACE) || (bits & GLS_MESH_SHELL))
                 GLSL(glowmap.rgb *= v_color.a;)
 
             if (!(bits & GLS_MESH_SHELL))

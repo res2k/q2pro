@@ -412,7 +412,7 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
 }
 
 // XXX: this is very broken. but that's how it is in re-release.
-static void write_height_fog(sizebuf_t *buf)
+static void write_height_fog(sizebuf_t *buf, glStateBits_t bits)
 {
     GLSL({
         float dir_z = normalize(v_world_pos - u_vieworg).z;
@@ -425,7 +425,13 @@ static void write_height_fog(sizebuf_t *buf)
         vec3 fog_color = mix(u_heightfog_start.rgb, u_heightfog_end.rgb, fraction) * extinction;
         float fog = (1.0 - exp(-(u_heightfog_density * frag_depth))) * extinction;
         diffuse.rgb = mix(diffuse.rgb, fog_color.rgb, fog);
-    })
+    )
+
+
+    if (bits & GLS_BLOOM_ENABLE)
+        GLSL(bloom.rgb = mix(bloom.rgb, u_fog_color.rgb, fog);)
+
+    GLSL(})
 }
 
 // https://lisyarus.github.io/blog/posts/blur-coefficients-generator.html
@@ -665,15 +671,21 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
         if (bits & (GLS_FOG_GLOBAL | GLS_FOG_HEIGHT))
             GLSL(float frag_depth = gl_FragCoord.z / gl_FragCoord.w;)
 
-        if (bits & GLS_FOG_GLOBAL)
+        if (bits & GLS_FOG_GLOBAL) {
             GLSL({
                 float d = u_fog_color.a * frag_depth;
                 float fog = 1.0f - exp(-(d * d));
                 diffuse.rgb = mix(diffuse.rgb, u_fog_color.rgb, fog);
-            })
+            )
+
+            if (bits & GLS_BLOOM_ENABLE)
+                GLSL(bloom.rgb = mix(bloom.rgb, u_fog_color.rgb, fog);)
+
+            GLSL(})
+        }
 
         if (bits & GLS_FOG_HEIGHT)
-            write_height_fog(buf);
+            write_height_fog(buf, bits);
 
         if (bits & GLS_FOG_SKY)
             GLSL(diffuse.rgb = mix(diffuse.rgb, u_fog_color.rgb, u_fog_sky_factor);)

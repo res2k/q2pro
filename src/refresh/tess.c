@@ -145,7 +145,7 @@ static void GL_FlushBeamSegments(void)
         texnum = TEXNUM_WHITE;
     else
         array |= GLA_TC;
-
+    
     GL_BindTexture(TMU_TEXTURE, texnum);
     GL_StateBits(GLS_BLEND_BLEND | GLS_DEPTHMASK_FALSE | glr.fog_bits);
     GL_ArrayBits(array);

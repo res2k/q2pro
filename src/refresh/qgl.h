@@ -140,6 +140,8 @@ QGLAPI void (APIENTRYP qglUseProgram)(GLuint program);
 QGLAPI void (APIENTRYP qglVertexAttrib4f)(GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
 QGLAPI void (APIENTRYP qglVertexAttribPointer)(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
 
+QGLAPI void (APIENTRYP qglBlendFunci)(GLuint buf, GLenum src, GLenum dst);
+
 // GL 3.0
 QGLAPI void (APIENTRYP qglBindBufferBase)(GLenum target, GLuint index, GLuint buffer);
 QGLAPI void (APIENTRYP qglBindBufferRange)(GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size);

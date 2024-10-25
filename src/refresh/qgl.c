@@ -263,6 +263,19 @@ static const glsection_t sections[] = {
         }
     },
 
+    // GL 2.0, ES 2.0
+    // ARB_draw_buffers_blend
+    {
+        .extension = "GL_ARB_draw_buffers_blend",
+        .suffix = "ARB",
+        .ver_gl = QGL_VER(2, 0),
+        .ver_es = QGL_VER(2, 0),
+        .functions = (const glfunction_t []) {
+            QGL_FN(BlendFunci),
+            { NULL }
+        }
+    },
+
     // GL 3.0, ES 2.0
     {
         .ver_gl = QGL_VER(3, 0),

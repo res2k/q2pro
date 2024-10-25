@@ -119,6 +119,9 @@ void GL_CommonStateBits(glStateBits_t bits)
                 qglBlendFunc(GL_SRC_ALPHA, GL_ONE);
             else if (bits & GLS_BLEND_MODULATE)
                 qglBlendFunc(GL_DST_COLOR, GL_ONE);
+
+            if (qglBlendFunci && (bits & GLS_BLOOM_ENABLE))
+                qglBlendFunci(1, GL_SRC_ALPHA, GL_ONE);
         } else {
             qglDisable(GL_BLEND);
         }

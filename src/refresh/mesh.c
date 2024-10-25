@@ -686,7 +686,7 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
         state |= GLS_BLEND_BLEND | GLS_DEPTHMASK_FALSE;
 
     skin = skin_for_mesh(skins, num_skins);
-    if (skin->texnum2)
+    if (skin->texnum2 || (meshbits & GLS_MESH_SHELL))
         state |= GLS_GLOWMAP_ENABLE;
 
     GL_StateBits(state);

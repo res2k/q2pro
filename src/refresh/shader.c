@@ -547,7 +547,7 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
         GLSL(in vec2 v_lmtc;)
     }
 
-    if (bits & GLS_GLOWMAP_ENABLE)
+    if (bits & GLS_GLOWMAP_ENABLE && !(bits & GLS_MESH_SHELL))
         GLSL(uniform sampler2D u_glowmap;)
 
     if (!(bits & GLS_TEXTURE_REPLACE))
@@ -642,13 +642,21 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
             GLSL(diffuse *= color;)
 
         if (!(bits & GLS_LIGHTMAP_ENABLE) && (bits & GLS_GLOWMAP_ENABLE)) {
-            GLSL(vec4 glowmap = texture(u_glowmap, tc);)
-            if (bits & GLS_INTENSITY_ENABLE)
-                GLSL(glowmap.rgb = glowmap.rgb * glowmap.a * u_intensity2;)
-            else
+            if (bits & GLS_MESH_SHELL) {
+                GLSL(vec4 glowmap = v_color * v_color.a;)
+
+                if (bits & GLS_INTENSITY_ENABLE)
+                    GLSL(glowmap.rgb *= u_intensity2;)
+            } else {
+                GLSL(vec4 glowmap = texture(u_glowmap, tc);)
+
                 GLSL(glowmap.rgb = glowmap.rgb * glowmap.a;)
 
-            GLSL(diffuse.rgb += glowmap.rgb;)
+                if (bits & GLS_INTENSITY_ENABLE)
+                    GLSL(glowmap.rgb *= u_intensity2;)
+
+                GLSL(diffuse.rgb += glowmap.rgb;)
+            }
                     
             if (bits & GLS_BLOOM_ENABLE)
                 GLSL(bloom.rgb = glowmap.rgb;)

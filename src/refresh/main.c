@@ -716,10 +716,10 @@ void R_RenderFrame(const refdef_t *fd)
         GLenum buffers[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
 
         if (gl_clear->integer) {
-            glClear(GL_COLOR_BUFFER_BIT);
+            qglClear(GL_COLOR_BUFFER_BIT);
         } else {
             qglDrawBuffers(1, buffers + 1);
-            glClear(GL_COLOR_BUFFER_BIT);
+            qglClear(GL_COLOR_BUFFER_BIT);
             qglDrawBuffers(2, buffers);
         }
     }

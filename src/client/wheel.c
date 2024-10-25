@@ -95,14 +95,6 @@ static void R_DrawPicShadow(int x, int y, qhandle_t pic, int shadow_offset)
     R_DrawPic(x, y, pic);
 }
 
-static void R_DrawStretchPicShadow(int x, int y, int w, int h, qhandle_t pic, int shadow_offset)
-{
-    R_SetColor(U32_BLACK);
-    R_DrawStretchPic(x + shadow_offset, y + shadow_offset, w, h, pic);
-    R_SetColor(U32_WHITE);
-    R_DrawStretchPic(x, y, w, h, pic);
-}
-
 static void R_DrawStretchPicShadowAlpha(int x, int y, int w, int h, qhandle_t pic, int shadow_offset, float alpha)
 {
     R_SetColor(U32_BLACK);

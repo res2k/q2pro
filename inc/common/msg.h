@@ -51,6 +51,14 @@ typedef struct {
 } entity_packed_t;
 
 typedef struct {
+    uint8_t             color[3][3];
+    uint32_t            density;
+    uint16_t            height_density;
+    uint16_t            height_falloff;
+    int32_t             height_dist[2];
+} player_packed_fog_t;
+
+typedef struct {
     pmove_state_t       pmove;
     int16_t             viewangles[3];
     int16_t             viewoffset[3];
@@ -61,6 +69,7 @@ typedef struct {
     uint8_t             gunframe;
     uint8_t             screen_blend[4];
     uint8_t             damage_blend[4];
+    player_packed_fog_t fog;
     uint8_t             fov;
     uint8_t             rdflags;
     int16_t             stats[MAX_STATS_NEW];
@@ -68,6 +77,35 @@ typedef struct {
     int8_t              gunrate;
 // KEX
 } player_packed_t;
+
+typedef enum
+{
+    // global fog
+    FOG_BIT_DENSITY     = BIT(0),
+    FOG_BIT_R           = BIT(1),
+    FOG_BIT_G           = BIT(2),
+    FOG_BIT_B           = BIT(3),
+    FOG_BIT_TIME        = BIT(4), // if set, the transition takes place over N milliseconds
+
+    // height fog
+    FOG_BIT_HEIGHTFOG_FALLOFF   = BIT(5),
+    FOG_BIT_HEIGHTFOG_DENSITY   = BIT(6),
+    FOG_BIT_MORE_BITS           = BIT(7), // read additional bit
+    FOG_BIT_HEIGHTFOG_START_R   = BIT(8),
+    FOG_BIT_HEIGHTFOG_START_G   = BIT(9),
+    FOG_BIT_HEIGHTFOG_START_B   = BIT(10),
+    FOG_BIT_HEIGHTFOG_START_DIST= BIT(11),
+    FOG_BIT_HEIGHTFOG_END_R     = BIT(12),
+    FOG_BIT_HEIGHTFOG_END_G     = BIT(13),
+    FOG_BIT_HEIGHTFOG_END_B     = BIT(14),
+    FOG_BIT_HEIGHTFOG_END_DIST  = BIT(15)
+} fog_bits_t;
+
+typedef struct {
+    fog_bits_t bits;
+    player_fog_t linear;
+    player_heightfog_t height;
+} player_fogchange_t;
 
 typedef enum {
     MSG_PS_IGNORE_GUNINDEX      = BIT(0),   // ignore gunindex
@@ -78,12 +116,13 @@ typedef enum {
     MSG_PS_IGNORE_PREDICTION    = BIT(5),   // mutually exclusive with IGNORE_VIEWANGLES
     MSG_PS_EXTENSIONS           = BIT(6),   // enable protocol extensions
     MSG_PS_EXTENSIONS_2         = BIT(7),   // enable more protocol extensions
-    MSG_PS_RERELEASE            = BIT(8),   // rerelease extensions: floating point coordinates,
+    MSG_PS_MOREBITS             = BIT(8),   // read more playerstate bits
+    MSG_PS_FORCE                = BIT(9),   // send even if unchanged (MVD stream only)
+    MSG_PS_REMOVE               = BIT(10),  // player is removed (MVD stream only)
+    MSG_PS_RERELEASE            = BIT(11),  // rerelease extensions: floating point coordinates,
                                             // increased stats numbers,
                                             // wider pm_time and pm_flags,
                                             // different viewoffset, kick_angles, gunoffset, gunangles encodings
-    MSG_PS_FORCE                = BIT(9),   // send even if unchanged (MVD stream only)
-    MSG_PS_REMOVE               = BIT(10),  // player is removed (MVD stream only)
 } msgPsFlags_t;
 
 typedef enum {
@@ -171,10 +210,10 @@ void    MSG_ReadDeltaUsercmd_Enhanced(const usercmd_t *from, usercmd_t *to);
 int     MSG_ParseEntityBits(uint64_t *bits, msgEsFlags_t flags);
 void    MSG_ParseDeltaEntity(entity_state_t *to, int number, uint64_t bits, msgEsFlags_t flags);
 #if USE_CLIENT
-void    MSG_ParseDeltaPlayerstate_Default(const player_state_t *from, player_state_t *to, int flags, msgPsFlags_t psflags);
-void    MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t *from, player_state_t *to, int flags, int extraflags, msgPsFlags_t psflags);
+void    MSG_ParseDeltaPlayerstate_Default(const player_state_t *from, player_state_t *to, player_fogchange_t *fog_change, int flags, msgPsFlags_t psflags);
+void    MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t *from, player_state_t *to, player_fogchange_t *fog_change, int flags, int extraflags, msgPsFlags_t psflags);
 #endif
-void    MSG_ParseDeltaPlayerstate_Packet(player_state_t *to, int flags, msgPsFlags_t psflags);
+void    MSG_ParseDeltaPlayerstate_Packet(player_state_t *to, player_fogchange_t *fog_change, int flags, msgPsFlags_t psflags);
 
 #if USE_DEBUG
 #if USE_CLIENT

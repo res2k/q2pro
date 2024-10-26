@@ -1092,17 +1092,19 @@ void SV_InitGameProgs(void)
     if (!ge) {
         Com_Error(ERR_DROP, "Game library returned NULL exports");
     }
+
+    Com_DPrintf("Game API version: %d\n", ge->apiversion);
+
     // get extended api if present
     void* entry_ex = Sys_GetProcAddress(game_library, "GetGameAPIEx");
 
     if (ge->apiversion != GAME_API_VERSION) {
         svs.is_game_rerelease = false;
         if (ge->apiversion == GAME3_API_VERSION_OLD || ge->apiversion == GAME3_API_VERSION_NEW) {
-            Com_DPrintf("Detected version %d game library, using proxy game\n", ge->apiversion);
+            Com_DPrintf("... using proxy game\n");
             ge = GetGame3Proxy(&import, entry, entry_ex);
         } else {
-            Com_Error(ERR_DROP, "Game library is version %d, expected %d",
-                      ge->apiversion, GAME_API_VERSION);
+            Com_Error(ERR_DROP, "...but expected %d\n", GAME_API_VERSION);
         }
     } else {
         svs.is_game_rerelease = true;

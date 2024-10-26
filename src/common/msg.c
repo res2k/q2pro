@@ -1099,7 +1099,7 @@ void MSG_WriteDeltaPlayerstate_Default(const player_packed_t *from, const player
     // write the rest of the player_state_t
     //
     if (pflags & PS_VIEWOFFSET) {
-        if (flags & MSG_PS_EXTENSIONS) {
+        if (flags & MSG_PS_RERELEASE) {
             MSG_WriteShort(to->viewoffset[0]);
             MSG_WriteShort(to->viewoffset[1]);
             MSG_WriteShort(to->viewoffset[2]);
@@ -1117,7 +1117,7 @@ void MSG_WriteDeltaPlayerstate_Default(const player_packed_t *from, const player
     }
 
     if (pflags & PS_KICKANGLES) {
-        if (flags & MSG_PS_EXTENSIONS) {
+        if (flags & MSG_PS_RERELEASE) {
             MSG_WriteShort(to->kick_angles[0]);
             MSG_WriteShort(to->kick_angles[1]);
             MSG_WriteShort(to->kick_angles[2]);
@@ -2552,7 +2552,7 @@ void MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t    *from,
     // parse the rest of the player_state_t
     //
     if (flags & PS_VIEWOFFSET) {
-        if (psflags & MSG_PS_EXTENSIONS) {
+        if (psflags & MSG_PS_RERELEASE) {
             to->viewoffset[0] = MSG_ReadShort() / 16.f;
             to->viewoffset[1] = MSG_ReadShort() / 16.f;
             to->viewoffset[2] = MSG_ReadShort() / 16.f;
@@ -2572,7 +2572,7 @@ void MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t    *from,
         to->viewangles[2] = MSG_ReadAngle16();
 
     if (flags & PS_KICKANGLES) {
-        if (psflags & MSG_PS_EXTENSIONS) {
+        if (psflags & MSG_PS_RERELEASE) {
             to->kick_angles[0] = MSG_ReadShort() / 1024.f;
             to->kick_angles[1] = MSG_ReadShort() / 1024.f;
             to->kick_angles[2] = MSG_ReadShort() / 1024.f;
@@ -2593,7 +2593,7 @@ void MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t    *from,
     }
 
     if (flags & PS_WEAPONFRAME) {
-        if (psflags & MSG_PS_EXTENSIONS)
+        if (psflags & MSG_PS_RERELEASE)
             to->gunframe = MSG_ReadWord();
         else
             to->gunframe = MSG_ReadByte();
@@ -2604,10 +2604,6 @@ void MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t    *from,
             to->gunoffset[0] = MSG_ReadShort() / 512.f;
             to->gunoffset[1] = MSG_ReadShort() / 512.f;
             to->gunoffset[2] = MSG_ReadShort() / 512.f;
-        } else if (psflags & MSG_PS_EXTENSIONS) {
-            to->gunoffset[0] = SHORT2COORD(MSG_ReadShort());
-            to->gunoffset[1] = SHORT2COORD(MSG_ReadShort());
-            to->gunoffset[2] = SHORT2COORD(MSG_ReadShort());
         } else {
             to->gunoffset[0] = MSG_ReadChar() * 0.25f;
             to->gunoffset[1] = MSG_ReadChar() * 0.25f;
@@ -2620,10 +2616,6 @@ void MSG_ParseDeltaPlayerstate_Enhanced(const player_state_t    *from,
             to->gunangles[0] = MSG_ReadShort() / 4096.f;
             to->gunangles[1] = MSG_ReadShort() / 4096.f;
             to->gunangles[2] = MSG_ReadShort() / 4096.f;
-        } else if (psflags & MSG_PS_EXTENSIONS) {
-            to->gunangles[0] = MSG_ReadAngle16();
-            to->gunangles[1] = MSG_ReadAngle16();
-            to->gunangles[2] = MSG_ReadAngle16();
         } else {
             to->gunangles[0] = MSG_ReadChar() * 0.25f;
             to->gunangles[1] = MSG_ReadChar() * 0.25f;
@@ -2692,7 +2684,7 @@ void MSG_ParseDeltaPlayerstate_Packet(player_state_t        *to,
     // parse the rest of the player_state_t
     //
     if (flags & PPS_VIEWOFFSET) {
-        if (psflags & MSG_PS_EXTENSIONS) {
+        if (psflags & MSG_PS_RERELEASE) {
             to->viewoffset[0] = MSG_ReadShort() / 16.f;
             to->viewoffset[1] = MSG_ReadShort() / 16.f;
             to->viewoffset[2] = MSG_ReadShort() / 16.f;
@@ -2712,7 +2704,7 @@ void MSG_ParseDeltaPlayerstate_Packet(player_state_t        *to,
         to->viewangles[2] = MSG_ReadAngle16();
 
     if (flags & PPS_KICKANGLES) {
-        if (psflags & MSG_PS_EXTENSIONS) {
+        if (psflags & MSG_PS_RERELEASE) {
             to->kick_angles[0] = MSG_ReadShort() / 1024.f;
             to->kick_angles[1] = MSG_ReadShort() / 1024.f;
             to->kick_angles[2] = MSG_ReadShort() / 1024.f;
@@ -2733,7 +2725,7 @@ void MSG_ParseDeltaPlayerstate_Packet(player_state_t        *to,
     }
 
     if (flags & PPS_WEAPONFRAME) {
-        if (psflags & MSG_PS_EXTENSIONS)
+        if (psflags & MSG_PS_RERELEASE)
             to->gunframe = MSG_ReadWord();
         else
             to->gunframe = MSG_ReadByte();

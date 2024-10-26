@@ -1375,9 +1375,6 @@ void CL_ParseTEnt(void)
         break;
 
     case TE_BLUEHYPERBLASTER_2: // fixed version
-        CL_BlasterParticles(te.pos1, te.dir);
-        break;
-
     case TE_BLASTER:            // blaster hitting wall
     case TE_BLASTER2:           // green blaster hitting wall
     case TE_FLECHETTE:          // flechette
@@ -1401,6 +1398,11 @@ void CL_ParseTEnt(void)
             CL_BlasterParticles2(te.pos1, te.dir, 0x6f);  // 75
             ex->ent.skinnum = 2;
             VectorSet(ex->lightcolor, 0.19f, 0.41f, 0.75f);
+            break;
+        case TE_BLUEHYPERBLASTER_2:
+            CL_BlasterParticles2(te.pos1, te.dir, 0xb0);
+            ex->ent.skinnum = 2;
+            VectorSet(ex->lightcolor, 0.0f, 0.0f, 1.0f);
             break;
         }
         ex->start = cl.servertime - CL_FRAMETIME;

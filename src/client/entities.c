@@ -1556,16 +1556,47 @@ void CL_GetEntitySoundOrigin(unsigned entnum, vec3_t org)
     }
 
     // interpolate origin
-    // FIXME: what should be the sound origin point for RF_BEAM entities?
     ent = &cl_entities[entnum];
     LerpVector(ent->prev.origin, ent->current.origin, cl.lerpfrac, org);
 
-    // offset the origin for BSP models
-    if (ent->current.solid == PACKED_BSP) {
-        mod = cl.model_clip[ent->current.modelindex];
-        if (mod) {
-            VectorAvg(mod->mins, mod->maxs, mid);
-            VectorAdd(org, mid, org);
+    // use re-releases algorithm for bmodels & beams
+    if (cl.csr.extended) {
+        // for BSP models, we want the nearest point from
+        // the bmodel to the listener; if we're "inside"
+        // the bmodel we want it full strength.
+        if (ent->current.solid == PACKED_BSP) {
+            mod = cl.model_clip[ent->current.modelindex];
+            if (mod) {
+                vec3_t absmin, absmax;
+                VectorAdd(org, mod->mins, absmin);
+                VectorAdd(org, mod->maxs, absmax);
+
+                for (int i = 0; i < 3; i++)
+                    org[i] = (listener_origin[i] < absmin[i]) ? absmin[i] :
+                             (listener_origin[i] > absmax[i]) ? absmax[i] :
+                             listener_origin[i];
+            }
+        } else if (ent->current.renderfx & RF_BEAM) {
+            // for beams, we use the nearest point on the line
+            // between the two origins
+            vec3_t old_origin;
+            LerpVector(ent->prev.old_origin, ent->current.old_origin, cl.lerpfrac, old_origin);
+
+            vec3_t vec, p;
+            VectorSubtract(old_origin, org, vec);
+            VectorSubtract(listener_origin, org, p);
+
+            float frac = Q_clipf(DotProduct(p, vec) / DotProduct(vec, vec), 0.0f, 1.0f);
+            VectorMA(org, frac, vec, org);
+        }
+    } else {
+        // offset the origin for BSP models
+        if (ent->current.solid == PACKED_BSP) {
+            mod = cl.model_clip[ent->current.modelindex];
+            if (mod) {
+                VectorAvg(mod->mins, mod->maxs, mid);
+                VectorAdd(org, mid, org);
+            }
         }
     }
 }

@@ -429,7 +429,7 @@ static void write_height_fog(sizebuf_t *buf, glStateBits_t bits)
 
 
     if (bits & GLS_BLOOM_ENABLE)
-        GLSL(bloom.rgb = mix(bloom.rgb, u_fog_color.rgb, fog);)
+        GLSL(bloom.a *= 1.0f - fog;)
 
     GLSL(})
 }
@@ -611,14 +611,14 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
 
             if (bits & GLS_GLOWMAP_ENABLE) {
                 GLSL(vec4 glowmap = texture(u_glowmap, tc);)
+                    
+                if (bits & GLS_INTENSITY_ENABLE)
+                    GLSL(glowmap.a *= u_intensity2;)
+
                 GLSL(lightmap.rgb = mix(lightmap.rgb, vec3(1.0), glowmap.a);)
                     
-                if (bits & GLS_BLOOM_ENABLE) {
-                    if (bits & GLS_INTENSITY_ENABLE)
-                        GLSL(bloom.rgb = diffuse.rgb * u_intensity * glowmap.a;)
-                    else
-                        GLSL(bloom.rgb = diffuse.rgb * glowmap.a;)
-                }
+                if (bits & GLS_BLOOM_ENABLE)
+                    GLSL(bloom.rgb = diffuse.rgb * glowmap.a;)
             }
   
             if (bits & GLS_DYNAMIC_LIGHTS) {
@@ -679,7 +679,7 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
             )
 
             if (bits & GLS_BLOOM_ENABLE)
-                GLSL(bloom.rgb = mix(bloom.rgb, u_fog_color.rgb, fog);)
+                GLSL(bloom.a *= 1.0f - fog;)
 
             GLSL(})
         }

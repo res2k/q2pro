@@ -609,6 +609,7 @@ typedef struct {
         entity_packed_t     entities[MAX_EDICTS];
         msgPsFlags_t        psFlags;
         msgEsFlags_t        esFlags;    // for writing
+        msgPsFlags_t        psFlags;
 
         sizebuf_t       message;
     } gtv;
@@ -808,7 +809,7 @@ void CL_SendCmd(void);
     (MSG_ES_LONGSOLID | MSG_ES_UMASK | MSG_ES_BEAMORIGIN | MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS)
 
 #define CL_ES_EXTENDED_MASK_2 (CL_ES_EXTENDED_MASK | MSG_ES_EXTENSIONS_2)
-#define CL_PS_EXTENDED_MASK_2 (MSG_PS_EXTENSIONS | MSG_PS_EXTENSIONS_2)
+#define CL_PS_EXTENDED_MASK_2 (MSG_PS_EXTENSIONS | MSG_PS_EXTENSIONS_2 | MSG_PS_MOREBITS)
 
 typedef struct {
     int type;
@@ -878,29 +879,6 @@ void CL_GetEntitySoundOrigin(unsigned entnum, vec3_t org);
 //
 extern int          gun_frame;
 extern qhandle_t    gun_model;
-
-typedef enum
-{
-    // global fog
-    FOG_BIT_DENSITY     = BIT(0),
-    FOG_BIT_R           = BIT(1),
-    FOG_BIT_G           = BIT(2),
-    FOG_BIT_B           = BIT(3),
-    FOG_BIT_TIME        = BIT(4), // if set, the transition takes place over N milliseconds
-
-    // height fog
-    FOG_BIT_HEIGHTFOG_FALLOFF   = BIT(5),
-    FOG_BIT_HEIGHTFOG_DENSITY   = BIT(6),
-    FOG_BIT_MORE_BITS           = BIT(7), // read additional bit
-    FOG_BIT_HEIGHTFOG_START_R   = BIT(8),
-    FOG_BIT_HEIGHTFOG_START_G   = BIT(9),
-    FOG_BIT_HEIGHTFOG_START_B   = BIT(10),
-    FOG_BIT_HEIGHTFOG_START_DIST= BIT(11),
-    FOG_BIT_HEIGHTFOG_END_R     = BIT(12),
-    FOG_BIT_HEIGHTFOG_END_G     = BIT(13),
-    FOG_BIT_HEIGHTFOG_END_B     = BIT(14),
-    FOG_BIT_HEIGHTFOG_END_DIST  = BIT(15)
-} fog_bits_t;
 
 void V_Init(void);
 void V_Shutdown(void);

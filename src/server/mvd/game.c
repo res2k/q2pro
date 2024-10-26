@@ -776,7 +776,7 @@ void MVD_BroadcastPrintf(mvd_t *mvd, int level, int mask, const char *fmt, ...)
 }
 
 #define ES_MASK     (MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS | MSG_ES_EXTENSIONS_2)
-#define PS_MASK     (MSG_PS_EXTENSIONS | MSG_PS_EXTENSIONS_2)
+#define PS_MASK     (MSG_PS_EXTENSIONS | MSG_PS_EXTENSIONS_2 | MSG_PS_MOREBITS)
 
 static void MVD_SetServerState(client_t *cl, mvd_t *mvd)
 {

@@ -89,15 +89,21 @@ typedef struct {
     vec3_t      gunoffset;
     int         gunindex;
     int         gunframe;
+    int         reserved_1;
+    int         reserved_2;
 
     vec4_t      blend;          // rgba full screen effect
     vec4_t      damage_blend;
+
+    player_fog_t        fog;
+    player_heightfog_t  heightfog;
 
     float       fov;            // horizontal field of view
 
     int         rdflags;        // refdef flags
 
-    int         reserved[4];
+    int         reserved_3;
+    int         reserved_4;
 
     int16_t     stats[MAX_STATS_NEW];   // fast status bar updates
 } game3_player_state_new_t;

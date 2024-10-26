@@ -722,6 +722,12 @@ static void MVD_ParsePacketPlayers(mvd_t *mvd)
         player = &mvd->players[number];
 
         bits = MSG_ReadWord();
+        if (bits & PPS_MOREBITS) {
+            if (mvd->psFlags & MSG_PS_MOREBITS)
+                bits |= (uint32_t)MSG_ReadByte() << 16;
+            else
+                bits |= PPS_REMOVE; // MOREBITS == REMOVE for old demos
+        }
 
 #if USE_DEBUG
         if (mvd_shownet->integer > 2) {
@@ -732,7 +738,8 @@ static void MVD_ParsePacketPlayers(mvd_t *mvd)
         }
 #endif
 
-        MSG_ParseDeltaPlayerstate_Packet(&player->ps, bits, mvd->psFlags);
+        player_fogchange_t fog_change; // FIXME: what to do with this?
+        MSG_ParseDeltaPlayerstate_Packet(&player->ps, &fog_change, bits, mvd->psFlags);
 
         if (bits & PPS_REMOVE) {
             SHOWNET(2, "%3u:remove:%d\n", readcount, number);
@@ -918,6 +925,8 @@ static void MVD_ParseServerData(mvd_t *mvd, int extrabits)
         if (!(mvd->flags & MVF_EXTLIMITS)) {
             MVD_Destroyf(mvd, "MVF_EXTLIMITS_2 without MVF_EXTLIMITS");
         }
+        if (mvd->version >= PROTOCOL_VERSION_MVD_PLAYERFOG)
+            mvd->psFlags |= MSG_PS_MOREBITS;
     }
 
     /* HACKY: is_game_rerelease must match the value that was used on the server

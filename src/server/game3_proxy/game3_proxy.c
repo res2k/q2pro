@@ -91,18 +91,29 @@ static const game_q2pro_customize_entity_t game_q2pro_customize_entity = {
 #define GAME_EDICT_NUM(n) ((game3_edict_t *)((byte *)game3_export->edicts + game3_export->edict_size*(n)))
 #define NUM_FOR_GAME_EDICT(e) ((int)(((byte *)(e) - (byte *)game3_export->edicts) / game3_export->edict_size))
 
-static edict_t *server_edicts;
+typedef struct {
+    edict_t edict;
+
+    // fog values to deal with fog changes
+    struct {
+        player_fog_t linear;
+        player_heightfog_t height;
+    } fog;
+} game3_proxy_edict_t;
+
+static game3_proxy_edict_t *server_edicts;
 
 static edict_t *translate_edict_from_game(game3_edict_t *ent)
 {
     assert(!ent || (ent >= GAME_EDICT_NUM(0) && ent < GAME_EDICT_NUM(game3_export->num_edicts)));
-    return ent ? &server_edicts[NUM_FOR_GAME_EDICT(ent)] : NULL;
+    return ent ? &server_edicts[NUM_FOR_GAME_EDICT(ent)].edict : NULL;
 }
 
 static game3_edict_t* translate_edict_to_game(edict_t* ent)
 {
-    assert(!ent || (ent >= server_edicts && ent < server_edicts + game_export.num_edicts));
-    return ent ? GAME_EDICT_NUM(ent - server_edicts) : NULL;
+    game3_proxy_edict_t *proxy_edict = (game3_proxy_edict_t *)ent;
+    assert(!proxy_edict || (proxy_edict >= server_edicts && proxy_edict < server_edicts + game_export.num_edicts));
+    return ent ? GAME_EDICT_NUM(proxy_edict - server_edicts) : NULL;
 }
 
 static void wrap_multicast(const vec3_t origin, multicast_t to)
@@ -386,7 +397,7 @@ static void wrap_SetAreaPortalState(int portalnum, qboolean open)
 
 static void sync_single_edict_server_to_game(int index)
 {
-    edict_t *server_edict = &server_edicts[index];
+    edict_t *server_edict = &server_edicts[index].edict;
     server_entity_t *sent = &sv.entities[index];
     game3_edict_t *game_edict = GAME_EDICT_NUM(index);
 
@@ -454,8 +465,9 @@ static void sync_single_edict_server_to_game(int index)
     // We cannot sensibly set 'sv', as this is all game-private data.
 
     // slightly changed 'translate_edict_to_game', as owners may be beyond num_edicts when loading a game
-    assert(!server_edict->owner || (server_edict->owner >= server_edicts && server_edict->owner < server_edicts + game_export.max_edicts));
-    game_edict->owner = server_edict->owner ? GAME_EDICT_NUM(server_edict->owner - server_edicts) : NULL;
+    game3_proxy_edict_t *proxy_owner = (game3_proxy_edict_t *)server_edict->owner;
+    assert(!proxy_owner || (proxy_owner >= server_edicts && proxy_owner < server_edicts + game_export.max_edicts));
+    game_edict->owner = proxy_owner ? GAME_EDICT_NUM(proxy_owner - server_edicts) : NULL;
 }
 
 // Sync edicts from server to game
@@ -532,9 +544,99 @@ static void game_entity_state_to_server(entity_state_t* server_state, const game
     server_state->event = game_state->event;
 }
 
+static void sync_fog(edict_t *server_edict, const game3_player_state_new_t *ps)
+{
+    game3_proxy_edict_t *proxy_edict = (game3_proxy_edict_t *)server_edict;
+
+    int fog_bits = 0;
+    if (proxy_edict->fog.linear.color[0] != ps->fog.color[0])
+        fog_bits |= FOG_BIT_R;
+    if (proxy_edict->fog.linear.color[1] != ps->fog.color[1])
+        fog_bits |= FOG_BIT_G;
+    if (proxy_edict->fog.linear.color[2] != ps->fog.color[2])
+        fog_bits |= FOG_BIT_B;
+    if (proxy_edict->fog.linear.density != ps->fog.density || proxy_edict->fog.linear.sky_factor != ps->fog.sky_factor)
+        fog_bits |= FOG_BIT_DENSITY;
+
+    if (proxy_edict->fog.height.start.color[0] != ps->heightfog.start.color[0])
+        fog_bits |= FOG_BIT_HEIGHTFOG_START_R;
+    if (proxy_edict->fog.height.start.color[1] != ps->heightfog.start.color[1])
+        fog_bits |= FOG_BIT_HEIGHTFOG_START_G;
+    if (proxy_edict->fog.height.start.color[2] != ps->heightfog.start.color[2])
+        fog_bits |= FOG_BIT_HEIGHTFOG_START_B;
+    if (proxy_edict->fog.height.start.dist != ps->heightfog.start.dist)
+        fog_bits |= FOG_BIT_HEIGHTFOG_START_DIST;
+
+    if (proxy_edict->fog.height.end.color[0] != ps->heightfog.end.color[0])
+        fog_bits |= FOG_BIT_HEIGHTFOG_END_R;
+    if (proxy_edict->fog.height.end.color[1] != ps->heightfog.end.color[1])
+        fog_bits |= FOG_BIT_HEIGHTFOG_END_G;
+    if (proxy_edict->fog.height.end.color[2] != ps->heightfog.end.color[2])
+        fog_bits |= FOG_BIT_HEIGHTFOG_END_B;
+    if (proxy_edict->fog.height.end.dist != ps->heightfog.end.dist)
+        fog_bits |= FOG_BIT_HEIGHTFOG_END_DIST;
+
+    if (fog_bits == 0)
+        return;
+
+    fog_bits |= FOG_BIT_TIME; // always transition over the time a single frame takes
+
+    // Write a fog packet
+    if (fog_bits & 0xFF00)
+        fog_bits |= FOG_BIT_MORE_BITS;
+
+    game_import.WriteByte(svc_fog);
+
+    if (fog_bits & FOG_BIT_MORE_BITS)
+        game_import.WriteShort(fog_bits);
+    else
+        game_import.WriteByte(fog_bits);
+
+    if (fog_bits & FOG_BIT_DENSITY) {
+        game_import.WriteFloat(ps->fog.density);
+        game_import.WriteByte(ps->fog.sky_factor);
+    }
+    if (fog_bits & FOG_BIT_R)
+        game_import.WriteByte(Q_clip_uint8(ps->fog.color[0] * 255));
+    if (fog_bits & FOG_BIT_G)
+        game_import.WriteByte(Q_clip_uint8(ps->fog.color[1] * 255));
+    if (fog_bits & FOG_BIT_B)
+        game_import.WriteByte(Q_clip_uint8(ps->fog.color[2] * 255));
+    if (fog_bits & FOG_BIT_TIME)
+        game_import.WriteShort(SV_FRAMETIME);
+
+    if (fog_bits & FOG_BIT_HEIGHTFOG_FALLOFF)
+        game_import.WriteFloat(ps->heightfog.falloff);
+    if (fog_bits & FOG_BIT_HEIGHTFOG_DENSITY)
+        game_import.WriteFloat(ps->heightfog.density);
+
+    if (fog_bits & FOG_BIT_HEIGHTFOG_START_R)
+        game_import.WriteByte(Q_clip_uint8(ps->heightfog.start.color[0] * 255));
+    if (fog_bits & FOG_BIT_HEIGHTFOG_START_G)
+        game_import.WriteByte(Q_clip_uint8(ps->heightfog.start.color[1] * 255));
+    if (fog_bits & FOG_BIT_HEIGHTFOG_START_B)
+        game_import.WriteByte(Q_clip_uint8(ps->heightfog.start.color[2] * 255));
+    if (fog_bits & FOG_BIT_HEIGHTFOG_START_DIST)
+        game_import.WriteLong(ps->heightfog.start.dist);
+
+    if (fog_bits & FOG_BIT_HEIGHTFOG_END_R)
+        game_import.WriteByte(Q_clip_uint8(ps->heightfog.end.color[0] * 255));
+    if (fog_bits & FOG_BIT_HEIGHTFOG_END_G)
+        game_import.WriteByte(Q_clip_uint8(ps->heightfog.end.color[1] * 255));
+    if (fog_bits & FOG_BIT_HEIGHTFOG_END_B)
+        game_import.WriteByte(Q_clip_uint8(ps->heightfog.end.color[2] * 255));
+    if (fog_bits & FOG_BIT_HEIGHTFOG_END_DIST)
+        game_import.WriteLong(ps->heightfog.end.dist);
+
+    game_import.unicast(server_edict, true, 0);
+
+    proxy_edict->fog.linear = ps->fog;
+    proxy_edict->fog.height = ps->heightfog;
+}
+
 static void sync_single_edict_game_to_server(int index)
 {
-    edict_t *server_edict = &server_edicts[index];
+    edict_t *server_edict = &server_edicts[index].edict;
     server_entity_t *sent = &sv.entities[index];
     game3_edict_t *game_edict = GAME_EDICT_NUM(index);
 
@@ -542,8 +644,11 @@ static void sync_single_edict_game_to_server(int index)
         if(!server_edict->client) {
             server_edict->client = Z_Malloc(sizeof(struct gclient_s));
         }
-        if (IS_NEW_GAME_API)
+        if (IS_NEW_GAME_API) {
             game_client_new_to_server(server_edict->client, game_edict->client);
+            // deal with fog
+            sync_fog(server_edict, &((const struct game3_gclient_new_s *)game_edict->client)->ps);
+        }
         else
             game_client_old_to_server(server_edict->client, game_edict->client);
     } else if (server_edict->client) {
@@ -576,7 +681,7 @@ static void sync_single_edict_game_to_server(int index)
     server_edict->solid = game_edict->solid;
     server_edict->clipmask = game_edict->clipmask;
 
-    server_edict->owner = game_edict->owner ? &server_edicts[NUM_FOR_GAME_EDICT(game_edict->owner)] : NULL;
+    server_edict->owner = game_edict->owner ? &server_edicts[NUM_FOR_GAME_EDICT(game_edict->owner)].edict : NULL;
 }
 
 // Sync edicts from game to server
@@ -611,9 +716,9 @@ static void wrap_Init(void)
         svs.pmp.extended_server_ver = 0;
     }
 
-    server_edicts = Z_Mallocz(sizeof(edict_t) * game3_export->max_edicts);
-    game_export.edicts = server_edicts;
-    game_export.edict_size = sizeof(edict_t);
+    server_edicts = Z_Mallocz(sizeof(game3_proxy_edict_t) * game3_export->max_edicts);
+    game_export.edicts = (edict_t*)server_edicts;
+    game_export.edict_size = sizeof(game3_proxy_edict_t);
     game_export.max_edicts = game3_export->max_edicts;
     game_export.num_edicts = game3_export->num_edicts;
 
@@ -625,7 +730,7 @@ static void wrap_Shutdown(void)
     game3_export->Shutdown();
 
     for (int i = 0; i < game3_export->max_edicts; i++) {
-        Z_Free(server_edicts[i].client);
+        Z_Free(server_edicts[i].edict.client);
     }
     Z_Free(server_edicts);
     server_edicts = NULL;

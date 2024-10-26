@@ -20,7 +20,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define GAME3_PROXY_H_
 
 #define GAME3_API_VERSION_OLD    3       // game uses gclient_old_t
-#define GAME3_API_VERSION_NEW    3300    // game uses gclient_new_t
+#define GAME3_API_VERSION_NEW    3301    // game uses gclient_new_t
 
 extern const char *game_q2pro_restart_filesystem_ext;
 extern const char *game_q2pro_customize_entity_ext;

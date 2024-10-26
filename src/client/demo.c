@@ -444,7 +444,7 @@ static void CL_Record_f(void)
     if (cls.serverProtocol == PROTOCOL_VERSION_RERELEASE)
         MSG_WriteLong(PROTOCOL_VERSION_RERELEASE);
     else if (cl.csr.extended)
-        MSG_WriteLong(PROTOCOL_VERSION_EXTENDED);
+        MSG_WriteLong(PROTOCOL_VERSION_EXTENDED_CURRENT);
     else
         MSG_WriteLong(min(cls.serverProtocol, PROTOCOL_VERSION_DEFAULT));
     MSG_WriteLong(cl.servercount);
@@ -1224,7 +1224,7 @@ bool CL_GetDemoInfo(const char *path, demoInfo_t *info)
         int protocol = MSG_ReadLong();
         if (protocol == PROTOCOL_VERSION_RERELEASE) {
             // Don't futz anything
-        } else if (protocol == PROTOCOL_VERSION_EXTENDED || protocol == PROTOCOL_VERSION_EXTENDED_OLD) {
+        } else if (EXTENDED_SUPPORTED(protocol)) {
             csr = &cs_remap_q2pro_new;
         } else if (protocol < PROTOCOL_VERSION_OLD || protocol > PROTOCOL_VERSION_DEFAULT) {
             goto fail;

@@ -322,10 +322,14 @@ static void CL_ParseFrame(int extrabits)
         }
     }
 
+    player_fogchange_t fog_change = {0};
     // parse playerstate
     bits = MSG_ReadWord();
+    if (cl.psFlags & MSG_PS_MOREBITS && bits & PS_MOREBITS)
+        bits |= (uint32_t)MSG_ReadByte() << 16;
+
     if (cls.serverProtocol > PROTOCOL_VERSION_DEFAULT) {
-        MSG_ParseDeltaPlayerstate_Enhanced(from, &frame.ps, bits, extraflags, cl.psFlags);
+        MSG_ParseDeltaPlayerstate_Enhanced(from, &frame.ps, &fog_change, bits, extraflags, cl.psFlags);
 #if USE_DEBUG
         if (cl_shownet->integer > 2 && (bits || extraflags)) {
             Com_LPrintf(PRINT_DEVELOPER, "   ");
@@ -351,7 +355,7 @@ static void CL_ParseFrame(int extrabits)
             frame.clientNum = cl.clientNum;
         }
     } else {
-        MSG_ParseDeltaPlayerstate_Default(from, &frame.ps, bits, cl.psFlags);
+        MSG_ParseDeltaPlayerstate_Default(from, &frame.ps, &fog_change, bits, cl.psFlags);
 #if USE_DEBUG
         if (cl_shownet->integer > 2 && bits) {
             Com_LPrintf(PRINT_DEVELOPER, "   ");
@@ -360,6 +364,13 @@ static void CL_ParseFrame(int extrabits)
         }
 #endif
         frame.clientNum = cl.clientNum;
+    }
+
+    if (fog_change.bits != 0) {
+        cl_fog_params_t fog_params;
+        fog_params.linear = fog_change.linear;
+        fog_params.height = fog_change.height;
+        V_FogParamsChanged(fog_change.bits, &fog_params, CL_FRAMETIME);
     }
 
     SHOWNET(2, "%3u:packetentities\n", msg_read.readcount);
@@ -561,6 +572,8 @@ static void read_q2pro_protocol_flags(void)
         Com_DPrintf("Q2PRO protocol extensions v2 enabled\n");
         cl.esFlags |= MSG_ES_EXTENSIONS_2;
         cl.psFlags |= MSG_PS_EXTENSIONS_2;
+        if (cls.protocolVersion >= PROTOCOL_VERSION_Q2PRO_PLAYERFOG)
+            cl.psFlags |= MSG_PS_MOREBITS;
         PmoveEnableExt(&cl.pmp);
     }
     cl.is_rerelease_game = (cls.serverProtocol == PROTOCOL_VERSION_RERELEASE) && (i & Q2PRO_PF_GAME3_COMPAT) == 0;
@@ -613,7 +626,7 @@ static void CL_ParseServerData(void)
         if (protocol == PROTOCOL_VERSION_RERELEASE) {
             // keep protocol as-is
             cls.serverProtocol = protocol;
-        } else if (protocol == PROTOCOL_VERSION_EXTENDED || protocol == PROTOCOL_VERSION_EXTENDED_OLD) {
+        } else if (EXTENDED_SUPPORTED(protocol)) {
             cl.csr = cs_remap_q2pro_new;
             cls.serverProtocol = PROTOCOL_VERSION_DEFAULT;
         } else if (protocol < PROTOCOL_VERSION_OLD || protocol > PROTOCOL_VERSION_DEFAULT) {
@@ -758,9 +771,13 @@ static void CL_ParseServerData(void)
         cl.psFlags |= MSG_PS_EXTENSIONS;
 
         // hack for demo playback
-        if (protocol == PROTOCOL_VERSION_EXTENDED) {
-            cl.esFlags |= MSG_ES_EXTENSIONS_2;
-            cl.psFlags |= MSG_PS_EXTENSIONS_2;
+        if (EXTENDED_SUPPORTED(protocol)) {
+            if (protocol >= PROTOCOL_VERSION_EXTENDED_LIMITS_2) {
+                cl.esFlags |= MSG_ES_EXTENSIONS_2;
+                cl.psFlags |= MSG_PS_EXTENSIONS_2;
+            }
+            if (protocol >= PROTOCOL_VERSION_EXTENDED_PLAYERFOG)
+                cl.psFlags |= MSG_PS_MOREBITS;
         }
 
         cl.pmp.extended_server_ver = cl.psFlags & MSG_PS_EXTENSIONS_2 ? 2 : 1;

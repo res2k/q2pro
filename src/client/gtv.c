@@ -53,10 +53,11 @@ static void build_gamestate(void)
     }
 
     // set protocol flags
-    cls.gtv.psFlags = MSG_PS_RERELEASE | MSG_PS_EXTENSIONS;
     cls.gtv.esFlags = MSG_ES_UMASK | MSG_ES_BEAMORIGIN | (cl.esFlags & CL_ES_EXTENDED_MASK_2);
-    if (cl.csr.extended)
-        cls.gtv.esFlags |= MSG_ES_LONGSOLID | MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS;
+    cls.gtv.psFlags = MSG_PS_FORCE | MSG_PS_RERELEASE | (cl.psFlags & CL_PS_EXTENDED_MASK_2);
+
+    if (cls.gtv.psFlags & MSG_PS_EXTENSIONS_2)
+        cls.gtv.psFlags |= MSG_PS_MOREBITS;
 }
 
 static void emit_gamestate(void)
@@ -109,8 +110,7 @@ static void emit_gamestate(void)
     MSG_WriteByte(0);
 
     // send player state
-    MSG_WriteDeltaPlayerstate_Packet(NULL, &cls.gtv.ps,
-                                     cl.clientNum, cl.psFlags | MSG_PS_FORCE);
+    MSG_WriteDeltaPlayerstate_Packet(NULL, &cls.gtv.ps, cl.clientNum, cls.gtv.psFlags);
     MSG_WriteByte(CLIENTNUM_NONE);
 
     // send entity states
@@ -148,8 +148,7 @@ void CL_GTV_EmitFrame(void)
     // send player state
     MSG_PackPlayer(&newps, &cl.frame.ps, cl.psFlags);
 
-    MSG_WriteDeltaPlayerstate_Packet(&cls.gtv.ps, &newps,
-                                     cl.clientNum, cl.psFlags | MSG_PS_FORCE);
+    MSG_WriteDeltaPlayerstate_Packet(&cls.gtv.ps, &newps, cl.clientNum, cls.gtv.psFlags);
 
     // shuffle current state to previous
     cls.gtv.ps = newps;

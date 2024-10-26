@@ -467,7 +467,6 @@ static void write_blur(sizebuf_t *buf)
     for (int i = 0; i < RAW_SAMPLE_COUNT; i++)
         weights[i] /= sumWeights;
 
-    bool hasZeros = false;
     float *newWeights = Z_Malloc(sizeof(float) * SAMPLE_COUNT);
 
     for (int i = -BLUR_RADIUS, x = 0; i <= BLUR_RADIUS; i += 2, x++)
@@ -486,7 +485,6 @@ static void write_blur(sizebuf_t *buf)
         if (w > 0.0) {
             offsets[x] = (float) i + w1 / w;
         } else {
-            hasZeros = true;
             offsets[x] = (float) i;
         }
 

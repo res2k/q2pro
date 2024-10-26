@@ -73,6 +73,8 @@ static cvar_t   *scr_pois;
 static cvar_t   *scr_poi_edge_frac;
 static cvar_t   *scr_poi_max_scale;
 
+static cvar_t   *scr_safe_zone;
+
 const uint32_t colorTable[8] = {
     U32_BLACK, U32_RED, U32_GREEN, U32_YELLOW,
     U32_BLUE, U32_CYAN, U32_MAGENTA, U32_WHITE
@@ -1365,6 +1367,7 @@ void SCR_Init(void)
     scr_pois = Cvar_Get("scr_pois", "1", 0);
     scr_poi_edge_frac = Cvar_Get("scr_poi_edge_frac", "0.15", 0);
     scr_poi_max_scale = Cvar_Get("scr_poi_max_scale", "1.0", 0);
+    scr_safe_zone = Cvar_Get("scr_safe_zone", "0.02", 0);
 
     Cmd_Register(scr_cmds);
 
@@ -1864,7 +1867,7 @@ static void SCR_Draw2D(void)
      * Note: a scaling factor of 1 is fine, we're passing a "pre-scale" HUD rect
      * and the drawing functions do the scaling */
     vrect_t hud_rect = {0, 0, scr.hud_width, scr.hud_height};
-    vrect_t hud_safe = {0, 0};
+    vrect_t hud_safe = {scr.hud_width * scr_safe_zone->value, scr.hud_height * scr_safe_zone->value};
     cgame->DrawHUD(0, &cl.cgame_data, hud_rect, hud_safe, 1, 0, &cl.frame.ps);
     R_ClearColor();
 

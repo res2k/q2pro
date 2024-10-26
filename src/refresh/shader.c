@@ -886,11 +886,14 @@ static void shader_use_program(glStateBits_t key)
 {
     GLuint *prog = HashMap_Lookup(GLuint, gl_static.programs, &key);
 
-    if (prog) {
+    if (prog && *prog) {
         qglUseProgram(*prog);
     } else {
         GLuint val = create_and_use_program(key);
-        HashMap_Insert(gl_static.programs, &key, &val);
+        if (prog)
+            *prog = val;
+        else
+            HashMap_Insert(gl_static.programs, &key, &val);
     }
 }
 
@@ -1097,6 +1100,22 @@ static void shader_clear_state(void)
     shader_use_program(GLS_DEFAULT);
 }
 
+static void bloom_changed(struct cvar_s *cvar)
+{
+    // Discard all programs with GLS_BLOOM_ENABLE in the key
+    uint32_t num_shaders = HashMap_Size(gl_static.programs);
+    for (uint32_t i = 0; i < num_shaders; i++) {
+        glStateBits_t *key = HashMap_GetKey(glStateBits_t, gl_static.programs, i);
+        if ((*key & (GLS_BLOOM_ENABLE | GLS_BLUR_ENABLE)) == 0)
+            continue;
+        GLuint *prog = HashMap_GetValue(GLuint, gl_static.programs, i);
+        if (!prog)
+            continue;
+        qglDeleteProgram(*prog);
+        *prog = 0;
+    }
+}
+
 static void shader_init(void)
 {
     gl_static.programs = HashMap_TagCreate(glStateBits_t, GLuint, HashInt32, NULL, TAG_RENDERER);
@@ -1129,9 +1148,12 @@ static void shader_init(void)
     shader_use_program(GLS_DEFAULT);
 
     gl_per_pixel_lighting = Cvar_Get("gl_per_pixel_lighting", "1", 0);
-    gl_bloom_sigma = Cvar_Get("gl_bloom_sigma", "0.037", CVAR_REFRESH);
-    gl_bloom_offset_scale = Cvar_Get("gl_bloom_offset_scale", "1", CVAR_REFRESH);
-    gl_bloom_sigma_correction = Cvar_Get("gl_bloom_sigma_correction", "1", CVAR_REFRESH);
+    gl_bloom_sigma = Cvar_Get("gl_bloom_sigma", "0.037", 0);
+    gl_bloom_sigma->changed = &bloom_changed;
+    gl_bloom_offset_scale = Cvar_Get("gl_bloom_offset_scale", "1", 0);
+    gl_bloom_offset_scale->changed = &bloom_changed;
+    gl_bloom_sigma_correction = Cvar_Get("gl_bloom_sigma_correction", "1", 0);
+    gl_bloom_sigma_correction->changed = &bloom_changed;
 }
 
 static void shader_shutdown(void)

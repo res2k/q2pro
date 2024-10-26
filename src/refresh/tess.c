@@ -147,7 +147,7 @@ static void GL_FlushBeamSegments(void)
         array |= GLA_TC;
     
     GL_BindTexture(TMU_TEXTURE, texnum);
-    GL_StateBits(GLS_BLEND_BLEND | GLS_DEPTHMASK_FALSE | glr.fog_bits);
+    GL_StateBits(GLS_BLEND_BLEND | GLS_DEPTHMASK_FALSE | GLS_GLOWMAP_ENABLE | GLS_GLOWMAP_COLOR | glr.fog_bits);
     GL_ArrayBits(array);
     GL_DrawIndexed(SHOWTRIS_FX);
 

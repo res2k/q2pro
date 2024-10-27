@@ -54,8 +54,8 @@ typedef GLuint glIndex_t;
 #define TAB_COS(x)  gl_static.sintab[((x) + 64) & 255]
 
 // auto textures
-#define AUTO_TEX(n)             gl_static.texnums[n]
 #define NUM_AUTO_TEXTURES       13
+#define AUTO_TEX(n)             gl_static.texnums[n]
 
 #define TEXNUM_DEFAULT          AUTO_TEX(0)
 #define TEXNUM_SCRAP            AUTO_TEX(1)
@@ -71,6 +71,12 @@ typedef GLuint glIndex_t;
 #define TEXNUM_PP_BLUR_0        AUTO_TEX(11)
 #define TEXNUM_PP_BLUR_1        AUTO_TEX(12)
 
+// framebuffers
+#define FBO_COUNT   3
+#define FBO_SCENE   gl_static.framebuffers[0]
+#define FBO_BLUR_0  gl_static.framebuffers[1]
+#define FBO_BLUR_1  gl_static.framebuffers[2]
+
 typedef struct {
     GLuint query;
     float frac;
@@ -78,8 +84,6 @@ typedef struct {
     bool pending;
     bool visible;
 } glquery_t;
-
-enum { FBO_SCENE, FBO_BLUR_0, FBO_BLUR_1, FBO_COUNT };
 
 typedef struct {
     bool            registering;
@@ -94,8 +98,8 @@ typedef struct {
         size_t      buffer_size;
         vec_t       size;
     } world;
-    GLuint          pp_renderbuffer;
-    GLuint          pp_framebuffers[FBO_COUNT];
+    GLuint          renderbuffer;
+    GLuint          framebuffers[FBO_COUNT];
     GLuint          uniform_buffer;
     GLuint          dlight_buffer;
 #if USE_MD5

@@ -29,6 +29,7 @@ static cvar_t *gl_bloom_sigma;
 static cvar_t *gl_bloom_radius;
 cvar_t *gl_per_pixel_lighting;
 
+q_printf(2, 3)
 static void shader_printf(sizebuf_t *buf, const char *fmt, ...)
 {
     va_list ap;
@@ -506,7 +507,7 @@ static void write_height_fog(sizebuf_t *buf, glStateBits_t bits)
     )
 
     if ((bits & GLS_BLOOM_MASK) == GLS_BLOOM_GENERATE)
-        GLSL(bloom.rgb *= 1.0f - fog;)
+        GLSL(bloom.rgb *= 1.0 - fog;)
 
     GLSL(})
 }
@@ -605,7 +606,7 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
         GLSL(vec4 color = v_color;)
 
     if ((bits & GLS_BLOOM_MASK) == GLS_BLOOM_GENERATE)
-        GLSL(vec4 bloom = vec4(0.0, 0.0, 0.0, 1.0);)
+        GLSL(vec4 bloom = vec4(0.0);)
 
     if (bits & GLS_LIGHTMAP_ENABLE) {
         GLSL(vec4 lightmap = texture(u_lightmap, v_lmtc);)
@@ -654,14 +655,18 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
             GLSL(diffuse.rgb += glowmap.rgb;)
 
         if ((bits & GLS_BLOOM_MASK) == GLS_BLOOM_GENERATE) {
-            GLSL(bloom = vec4(glowmap.rgb, diffuse.a);)
+            GLSL(bloom.rgb = glowmap.rgb;)
             if (bits & GLS_INTENSITY_ENABLE)
                 GLSL(bloom.rgb *= u_intensity2;)
         }
     }
 
-    if (bits & GLS_BLOOM_SHELL)
-        GLSL(bloom = diffuse;)
+    if ((bits & GLS_BLOOM_MASK) == GLS_BLOOM_GENERATE) {
+        if (bits & GLS_BLOOM_SHELL)
+            GLSL(bloom = diffuse;)
+        else
+            GLSL(bloom.a = diffuse.a;)
+    }
 
     if (bits & (GLS_FOG_GLOBAL | GLS_FOG_HEIGHT))
         GLSL(float frag_depth = gl_FragCoord.z / gl_FragCoord.w;)
@@ -669,12 +674,12 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
     if (bits & GLS_FOG_GLOBAL) {
         GLSL({
             float d = u_fog_color.a * frag_depth;
-            float fog = 1.0f - exp(-(d * d));
+            float fog = 1.0 - exp(-(d * d));
             diffuse.rgb = mix(diffuse.rgb, u_fog_color.rgb, fog);
         )
 
         if ((bits & GLS_BLOOM_MASK) == GLS_BLOOM_GENERATE)
-            GLSL(bloom.rgb *= 1.0f - fog;)
+            GLSL(bloom.rgb *= 1.0 - fog;)
 
         GLSL(})
     }
@@ -1097,7 +1102,7 @@ static void shader_blur_changed(cvar_t *self)
 static void shader_init(void)
 {
     gl_bloom_sigma = Cvar_Get("gl_bloom_sigma", "8", 0);
-    gl_bloom_radius = Cvar_Get("gl_bloom_radius", "16", 0);
+    gl_bloom_radius = Cvar_Get("gl_bloom_radius", "15", 0);
     gl_bloom_sigma->changed = shader_blur_changed;
     gl_bloom_radius->changed = shader_blur_changed;
 

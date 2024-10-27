@@ -72,6 +72,7 @@ cvar_t *gl_drawsky;
 cvar_t *gl_showtris;
 cvar_t *gl_showorigins;
 cvar_t *gl_showtearing;
+cvar_t *gl_showbloom;
 #if USE_DEBUG
 cvar_t *gl_showstats;
 cvar_t *gl_showscrap;
@@ -688,6 +689,7 @@ static void GL_DrawBloom(bool waterwarp)
     qglBindFramebuffer(GL_FRAMEBUFFER, 0);
     GL_PostProcess(bits, glr.fd.x, glr.fd.y, glr.fd.width, glr.fd.height);
 }
+
 static int32_t gl_bloom_modified = 0;
 
 void R_RenderFrame(const refdef_t *fd)
@@ -737,7 +739,7 @@ void R_RenderFrame(const refdef_t *fd)
     }
 
     if (waterwarp || bloom) {
-        qglBindFramebuffer(GL_FRAMEBUFFER, gl_static.pp_framebuffers[FBO_SCENE]);
+        qglBindFramebuffer(GL_FRAMEBUFFER, FBO_SCENE);
         glr.framebuffer_bound = true;
 
         if (gl_clear->integer) {
@@ -783,7 +785,7 @@ void R_RenderFrame(const refdef_t *fd)
     GL_Setup2D();
 
     if (bloom) {
-        GL_Bloom(waterwarp);
+        GL_DrawBloom(waterwarp);
     } else if (waterwarp) {
         GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_SCENE);
         GL_PostProcess(GLS_WARP_ENABLE, glr.fd.x, glr.fd.y, glr.fd.width, glr.fd.height);
@@ -959,7 +961,7 @@ static void GL_Register(void)
     gl_dlight_falloff = Cvar_Get("gl_dlight_falloff", "1", 0);
     gl_modulate_entities = Cvar_Get("gl_modulate_entities", "1", 0);
     gl_modulate_entities->changed = gl_modulate_entities_changed;
-    gl_glowmap_intensity = Cvar_Get("gl_glowmap_intensity", "1.0", 0);
+    gl_glowmap_intensity = Cvar_Get("gl_glowmap_intensity", "1", 0);
     gl_flarespeed = Cvar_Get("gl_flarespeed", "8", 0);
     gl_fontshadow = Cvar_Get("gl_fontshadow", "0", 0);
     gl_shaders = Cvar_Get("gl_shaders", "1", CVAR_FILES);
@@ -984,6 +986,7 @@ static void GL_Register(void)
     gl_showtris = Cvar_Get("gl_showtris", "0", CVAR_CHEAT);
     gl_showorigins = Cvar_Get("gl_showorigins", "0", CVAR_CHEAT);
     gl_showtearing = Cvar_Get("gl_showtearing", "0", CVAR_CHEAT);
+    gl_showbloom = Cvar_Get("gl_showbloom", "0", CVAR_CHEAT);
 #if USE_DEBUG
     gl_showstats = Cvar_Get("gl_showstats", "0", 0);
     gl_showscrap = Cvar_Get("gl_showscrap", "0", 0);

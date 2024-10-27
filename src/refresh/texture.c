@@ -1160,15 +1160,15 @@ bool GL_InitFramebuffers(void)
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_BLOOM);
     GL_InitPostProcTexture(w, h);
 
-    qglBindFramebuffer(GL_FRAMEBUFFER, gl_static.pp_framebuffers[FBO_SCENE]);
+    qglBindFramebuffer(GL_FRAMEBUFFER, FBO_SCENE);
     qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, TEXNUM_PP_SCENE, 0);
     qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gl_bloom->integer ? TEXNUM_PP_BLOOM : GL_NONE, 0);
 
-    qglBindRenderbuffer(GL_RENDERBUFFER, gl_static.pp_renderbuffer);
+    qglBindRenderbuffer(GL_RENDERBUFFER, gl_static.renderbuffer);
     qglRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, glr.fd.width, glr.fd.height);
     qglBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-    qglFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gl_static.pp_renderbuffer);
+    qglFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, gl_static.renderbuffer);
 
     GLenum status = qglCheckFramebufferStatus(GL_FRAMEBUFFER);
     qglBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1193,10 +1193,10 @@ bool GL_InitFramebuffers(void)
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_BLUR_1);
     GL_InitPostProcTexture(w, h);
 
-    qglBindFramebuffer(GL_FRAMEBUFFER, gl_static.pp_framebuffers[FBO_BLUR_0]);
+    qglBindFramebuffer(GL_FRAMEBUFFER, FBO_BLUR_0);
     qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl_bloom->integer ? TEXNUM_PP_BLUR_0 : GL_NONE, 0);
 
-    qglBindFramebuffer(GL_FRAMEBUFFER, gl_static.pp_framebuffers[FBO_BLUR_1]);
+    qglBindFramebuffer(GL_FRAMEBUFFER, FBO_BLUR_1);
     qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl_bloom->integer ? TEXNUM_PP_BLUR_1 : GL_NONE, 0);
 
     qglBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -1280,8 +1280,8 @@ void GL_InitImages(void)
     qglGenTextures(LM_MAX_LIGHTMAPS, lm.texnums);
 
     if (gl_static.use_shaders) {
-        qglGenRenderbuffers(1, &gl_static.pp_renderbuffer);
-        qglGenFramebuffers(FBO_COUNT, gl_static.pp_framebuffers);
+        qglGenRenderbuffers(1, &gl_static.renderbuffer);
+        qglGenFramebuffers(FBO_COUNT, gl_static.framebuffers);
     }
 
     Scrap_Init();
@@ -1324,11 +1324,11 @@ void GL_ShutdownImages(void)
 
     // delete framebuffers
     if (gl_static.use_shaders) {
-        qglDeleteFramebuffers(FBO_COUNT, gl_static.pp_framebuffers);
-        memset(gl_static.pp_framebuffers, 0, sizeof(gl_static.pp_framebuffers));
+        qglDeleteFramebuffers(FBO_COUNT, gl_static.framebuffers);
+        memset(gl_static.framebuffers, 0, sizeof(gl_static.framebuffers));
 
-        qglDeleteRenderbuffers(1, &gl_static.pp_renderbuffer);
-        gl_static.pp_renderbuffer = 0;
+        qglDeleteRenderbuffers(1, &gl_static.renderbuffer);
+        gl_static.renderbuffer = 0;
     }
 
 #if USE_DEBUG

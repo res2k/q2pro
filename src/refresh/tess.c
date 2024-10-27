@@ -675,7 +675,7 @@ void GL_Flush3D(void)
         array |= GLA_NORMAL;
     }
 
-    if (glr.framebuffer_bound && gl_bloom->integer && state & GLS_TEXTURE_REPLACE)
+    if (glr.framebuffer_bound && gl_bloom->integer)
         state |= GLS_BLOOM_GENERATE;
 
     if (!(state & GLS_TEXTURE_REPLACE))

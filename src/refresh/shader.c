@@ -1091,11 +1091,12 @@ static void shader_blur_changed(cvar_t *self)
             *prog = create_and_use_program(*bits);
         }
     }
+    shader_use_program(gls.state_bits & GLS_SHADER_MASK);
 }
 
 static void shader_init(void)
 {
-    gl_bloom_sigma = Cvar_Get("gl_bloom_sigma", "6", 0);
+    gl_bloom_sigma = Cvar_Get("gl_bloom_sigma", "8", 0);
     gl_bloom_radius = Cvar_Get("gl_bloom_radius", "16", 0);
     gl_bloom_sigma->changed = shader_blur_changed;
     gl_bloom_radius->changed = shader_blur_changed;

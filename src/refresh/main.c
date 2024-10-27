@@ -643,42 +643,51 @@ static void GL_PostProcess(glStateBits_t bits, int x, int y, int w, int h)
     GL_UnlockArrays();
 }
 
-static void GL_Bloom(bool waterwarp)
+static void GL_DrawBloom(bool waterwarp)
 {
     int iterations = Cvar_ClampInteger(gl_bloom, 1, 16) * 2;
-    GLuint tex[2] = { TEXNUM_PP_BLUR_0, TEXNUM_PP_BLUR_1 };
-    GLuint fbo[2] = { gl_static.pp_framebuffers[FBO_BLUR_0], gl_static.pp_framebuffers[FBO_BLUR_1] };
-    int buf = 0;
-    int w = glr.fd.width / 4;
-    int h = glr.fd.height / 4;
+    float aspect = (float)glr.fd.width / glr.fd.height;
+    int h = 640;
+    int w = h * aspect;
 
     qglViewport(0, 0, w, h);
     GL_Ortho(0, w, h, 0, -1, 1);
 
+    // downscale
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_BLOOM);
-    qglBindFramebuffer(GL_FRAMEBUFFER, fbo[buf]);
+    qglBindFramebuffer(GL_FRAMEBUFFER, FBO_BLUR_0);
     GL_PostProcess(GLS_DEFAULT, 0, 0, w, h);
 
+    // blur X/Y
     for (int i = 0; i < iterations; i++) {
+        int j = i & 1;
+
         gls.u_block.fog_color[0] = 1.0f / w;
         gls.u_block.fog_color[1] = 1.0f / h;
-        gls.u_block.fog_color[buf ^ 1] = 0;
+        gls.u_block.fog_color[j] = 0;
 
-        GL_ForceTexture(TMU_TEXTURE, tex[buf]);
-        qglBindFramebuffer(GL_FRAMEBUFFER, fbo[buf ^ 1]);
+        GL_ForceTexture(TMU_TEXTURE, j ? TEXNUM_PP_BLUR_1 : TEXNUM_PP_BLUR_0);
+        qglBindFramebuffer(GL_FRAMEBUFFER, j ? FBO_BLUR_0 : FBO_BLUR_1);
         GL_PostProcess(GLS_BLOOM_BLUR, 0, 0, w, h);
-
-        buf ^= 1;
     }
 
     GL_Setup2D();
-    qglBindFramebuffer(GL_FRAMEBUFFER, 0);
-    GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_SCENE);
-    GL_ForceTexture(TMU_LIGHTMAP, tex[buf]);
-    GL_PostProcess(GLS_BLOOM_OUTPUT | (waterwarp ? GLS_WARP_ENABLE : 0),
-                   glr.fd.x, glr.fd.y, glr.fd.width, glr.fd.height);
-}
 
+    glStateBits_t bits = GLS_BLOOM_OUTPUT;
+    if (q_unlikely(gl_showbloom->integer)) {
+        GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_BLUR_0);
+        bits = GLS_DEFAULT;
+    } else {
+        GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_SCENE);
+        GL_ForceTexture(TMU_LIGHTMAP, TEXNUM_PP_BLUR_0);
+        if (waterwarp)
+            bits |= GLS_WARP_ENABLE;
+    }
+
+    // upscale & add
+    qglBindFramebuffer(GL_FRAMEBUFFER, 0);
+    GL_PostProcess(bits, glr.fd.x, glr.fd.y, glr.fd.width, glr.fd.height);
+}
 static int32_t gl_bloom_modified = 0;
 
 void R_RenderFrame(const refdef_t *fd)

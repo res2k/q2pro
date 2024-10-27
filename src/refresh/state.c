@@ -117,12 +117,8 @@ void GL_CommonStateBits(glStateBits_t bits)
                 qglBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             else if (bits & GLS_BLEND_ADD)
                 qglBlendFunc(GL_SRC_ALPHA, GL_ONE);
-            // unused bit stolen
-            //else if (bits & GLS_BLEND_MODULATE)
-            //    qglBlendFunc(GL_DST_COLOR, GL_ONE);
-
-            if (qglBlendFunci && (bits & GLS_BLOOM_ENABLE))
-                qglBlendFunci(1, GL_SRC_ALPHA, GL_ONE);
+            else if (bits & GLS_BLEND_MODULATE)
+                qglBlendFunc(GL_DST_COLOR, GL_ONE);
         } else {
             qglDisable(GL_BLEND);
         }
@@ -205,11 +201,11 @@ void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat zn
     gl_backend->load_matrix(GL_PROJECTION, matrix, gl_identity);
 }
 
-void GL_Setup2D(int w, int h)
+void GL_Setup2D(void)
 {
-    qglViewport(0, 0, w, h);
+    qglViewport(0, 0, r_config.width, r_config.height);
 
-    GL_Ortho(0, w, h, 0, -1, 1);
+    GL_Ortho(0, r_config.width, r_config.height, 0, -1, 1);
     draw.scale = 1;
 
     draw.colors[0].u32 = U32_WHITE;
@@ -252,9 +248,9 @@ static void GL_RotateForViewer(void)
     GL_ForceMatrix(glr.entmatrix, matrix);
 }
 
-void GL_Setup3D(bool postprocess)
+void GL_Setup3D(void)
 {
-    if (postprocess)
+    if (glr.framebuffer_bound)
         qglViewport(0, 0, glr.fd.width, glr.fd.height);
     else
         qglViewport(glr.fd.x, r_config.height - (glr.fd.y + glr.fd.height),
@@ -331,8 +327,10 @@ void GL_ClearState(void)
     qglEnable(GL_CULL_FACE);
 
     // unbind buffers
-    GL_BindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-    GL_BindBuffer(GL_UNIFORM_BUFFER, 0);
+    if (qglBindBuffer) {
+        qglBindBuffer(GL_ARRAY_BUFFER, 0);
+        qglBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    }
 
     gl_backend->clear_state();
 

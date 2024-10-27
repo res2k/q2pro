@@ -691,6 +691,19 @@ gl_fog::
     Enable re-release fog effect. Only effective when using GLSL backend.
     Default value is 1 (enabled).
 
+gl_bloom::
+    Enable re-release bloom effect. Only effective when using GLSL backend.
+    Default value is 0 (disabled). Higher values specify number of blurring
+    filter iterations (typical value is 1).
+
+gl_bloom_sigma::
+    Specifies sigma parameter of gaussian blur filter for the bloom effect.
+    Default value is 6.
+
+gl_bloom_radius::
+    Specifies radius parameter of gaussian blur filter for the bloom effect.
+    Default value is 16. Should not be higher than _3 * sigma_.
+
 gl_flarespeed::
     Specifies flare fading effect speed. Default value is 8. Set this to 0
     to disable fading.

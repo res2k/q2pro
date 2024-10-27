@@ -53,7 +53,23 @@ typedef GLuint glIndex_t;
 #define TAB_SIN(x)  gl_static.sintab[(x) & 255]
 #define TAB_COS(x)  gl_static.sintab[((x) + 64) & 255]
 
-#define NUM_AUTO_TEXTURES   9
+// auto textures
+#define AUTO_TEX(n)             gl_static.texnums[n]
+#define NUM_AUTO_TEXTURES       13
+
+#define TEXNUM_DEFAULT          AUTO_TEX(0)
+#define TEXNUM_SCRAP            AUTO_TEX(1)
+#define TEXNUM_PARTICLE         AUTO_TEX(2)
+#define TEXNUM_BEAM             AUTO_TEX(3)
+#define TEXNUM_WHITE            AUTO_TEX(4)
+#define TEXNUM_BLACK            AUTO_TEX(5)
+#define TEXNUM_RAW              AUTO_TEX(6)
+#define TEXNUM_CUBEMAP_DEFAULT  AUTO_TEX(7)
+#define TEXNUM_CUBEMAP_BLACK    AUTO_TEX(8)
+#define TEXNUM_PP_SCENE         AUTO_TEX(9)
+#define TEXNUM_PP_BLOOM         AUTO_TEX(10)
+#define TEXNUM_PP_BLUR_0        AUTO_TEX(11)
+#define TEXNUM_PP_BLUR_1        AUTO_TEX(12)
 
 typedef struct {
     GLuint query;
@@ -62,6 +78,8 @@ typedef struct {
     bool pending;
     bool visible;
 } glquery_t;
+
+enum { FBO_SCENE, FBO_BLUR_0, FBO_BLUR_1, FBO_COUNT };
 
 typedef struct {
     bool            registering;
@@ -76,15 +94,8 @@ typedef struct {
         size_t      buffer_size;
         vec_t       size;
     } world;
-    GLuint          postprocess_texture;
-    GLuint          postprocess_renderbuffer;
-    GLuint          postprocess_framebuffer;
-    GLuint          bloom_texture;
-    GLuint          bloom_downsample_texture;
-    GLuint          bloom_downsample_framebuffer;
-    int             bloom_downsample_width, bloom_downsample_height;
-    GLuint          scratch_texture;
-    GLuint          scratch_framebuffer;
+    GLuint          pp_renderbuffer;
+    GLuint          pp_framebuffers[FBO_COUNT];
     GLuint          uniform_buffer;
     GLuint          dlight_buffer;
 #if USE_MD5
@@ -135,11 +146,10 @@ typedef struct {
     int             num_beams;
     int             num_flares;
     int             fog_bits, fog_bits_sky;
-    int             bloom_bits;
     int             framebuffer_width;
     int             framebuffer_height;
     bool            framebuffer_ok;
-    bool            postprocess_bound;
+    bool            framebuffer_bound;
 } glRefdef_t;
 
 typedef enum {
@@ -495,7 +505,7 @@ typedef enum {
     GLS_CULL_DISABLE        = BIT(2),
     GLS_BLEND_BLEND         = BIT(3),
     GLS_BLEND_ADD           = BIT(4),
-    GLS_GLOWMAP_COLOR       = BIT(5),
+    GLS_BLEND_MODULATE      = 0, // unused, stealing for now
 
     // shader bits
     GLS_ALPHATEST_ENABLE    = BIT(6),
@@ -525,11 +535,15 @@ typedef enum {
     GLS_FOG_HEIGHT          = BIT(27),
     GLS_FOG_SKY             = BIT(28),
 
-    GLS_DYNAMIC_LIGHTS      = BIT(29),
-    GLS_BLOOM_ENABLE        = BIT(30),
-    GLS_BLUR_ENABLE         = BIT(31),
+    GLS_BLOOM_GENERATE      = BIT(29),
+    GLS_BLOOM_BLUR          = BIT(30),
+    GLS_BLOOM_SHELL         = BIT(31),
+    GLS_BLOOM_OUTPUT        = GLS_BLOOM_GENERATE | GLS_BLOOM_BLUR,
+    GLS_BLOOM_MASK          = GLS_BLOOM_OUTPUT,
 
-    GLS_BLEND_MASK  = GLS_BLEND_BLEND | GLS_BLEND_ADD,
+    GLS_DYNAMIC_LIGHTS      = BIT(5),
+
+    GLS_BLEND_MASK  = GLS_BLEND_BLEND | GLS_BLEND_ADD | GLS_BLEND_MODULATE,
     GLS_COMMON_MASK = GLS_DEPTHMASK_FALSE | GLS_DEPTHTEST_DISABLE | GLS_CULL_DISABLE | GLS_BLEND_MASK,
     GLS_SKY_MASK    = GLS_CLASSIC_SKY | GLS_DEFAULT_SKY,
     GLS_FOG_MASK    = GLS_FOG_GLOBAL | GLS_FOG_HEIGHT | GLS_FOG_SKY,
@@ -537,10 +551,10 @@ typedef enum {
     GLS_MESH_MASK   = GLS_MESH_ANY | GLS_MESH_LERP | GLS_MESH_SHELL | GLS_MESH_SHADE,
     GLS_SHADER_MASK = GLS_ALPHATEST_ENABLE | GLS_TEXTURE_REPLACE | GLS_SCROLL_ENABLE |
         GLS_LIGHTMAP_ENABLE | GLS_WARP_ENABLE | GLS_INTENSITY_ENABLE | GLS_GLOWMAP_ENABLE |
-        GLS_SKY_MASK | GLS_DEFAULT_FLARE | GLS_MESH_MASK | GLS_FOG_MASK |
-        GLS_DYNAMIC_LIGHTS | GLS_BLOOM_ENABLE | GLS_BLUR_ENABLE | GLS_GLOWMAP_COLOR,
-    GLS_UNIFORM_MASK = GLS_WARP_ENABLE | GLS_LIGHTMAP_ENABLE | GLS_INTENSITY_ENABLE | GLS_SKY_MASK | GLS_FOG_MASK |
-        GLS_DYNAMIC_LIGHTS | GLS_BLUR_ENABLE | GLS_GLOWMAP_COLOR,
+        GLS_SKY_MASK | GLS_DEFAULT_FLARE | GLS_MESH_MASK | GLS_FOG_MASK | GLS_BLOOM_MASK |
+        GLS_BLOOM_SHELL | GLS_DYNAMIC_LIGHTS,
+    GLS_UNIFORM_MASK = GLS_WARP_ENABLE | GLS_LIGHTMAP_ENABLE | GLS_INTENSITY_ENABLE |
+        GLS_SKY_MASK | GLS_FOG_MASK | GLS_BLOOM_MASK | GLS_DYNAMIC_LIGHTS,
     GLS_SCROLL_MASK = GLS_SCROLL_ENABLE | GLS_SCROLL_X | GLS_SCROLL_Y | GLS_SCROLL_FLIP | GLS_SCROLL_SLOW,
 } glStateBits_t;
 
@@ -844,8 +858,8 @@ void GL_ScrollPos(vec2_t scroll, glStateBits_t bits);
 void GL_DrawOutlines(GLsizei count, GLenum type, const void *indices);
 void GL_Ortho(GLfloat xmin, GLfloat xmax, GLfloat ymin, GLfloat ymax, GLfloat znear, GLfloat zfar);
 void GL_Frustum(GLfloat fov_x, GLfloat fov_y, GLfloat reflect_x);
-void GL_Setup2D(int w, int h);
-void GL_Setup3D(bool postprocess);
+void GL_Setup2D(void);
+void GL_Setup3D(void);
 void GL_ClearState(void);
 void GL_InitState(void);
 void GL_ShutdownState(void);
@@ -878,23 +892,12 @@ void GL_Blend(void);
  *
  */
 
-// auto textures
-#define TEXNUM_DEFAULT  gl_static.texnums[0]
-#define TEXNUM_SCRAP    gl_static.texnums[1]
-#define TEXNUM_PARTICLE gl_static.texnums[2]
-#define TEXNUM_BEAM     gl_static.texnums[3]
-#define TEXNUM_WHITE    gl_static.texnums[4]
-#define TEXNUM_BLACK    gl_static.texnums[5]
-#define TEXNUM_RAW      gl_static.texnums[6]
-#define TEXNUM_CUBEMAP_DEFAULT  gl_static.texnums[7]
-#define TEXNUM_CUBEMAP_BLACK    gl_static.texnums[8]
-
 void Scrap_Upload(void);
 
 void GL_InitImages(void);
 void GL_ShutdownImages(void);
 
-bool GL_InitPostProcessTextures(void);
+bool GL_InitFramebuffers(void);
 
 extern cvar_t *gl_intensity;
 

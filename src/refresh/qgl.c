@@ -263,19 +263,6 @@ static const glsection_t sections[] = {
         }
     },
 
-    // GL 2.0, ES 2.0
-    // ARB_draw_buffers_blend
-    {
-        .extension = "GL_ARB_draw_buffers_blend",
-        .suffix = "ARB",
-        .ver_gl = QGL_VER(2, 0),
-        .ver_es = QGL_VER(2, 0),
-        .functions = (const glfunction_t []) {
-            QGL_FN(BlendFunci),
-            { NULL }
-        }
-    },
-
     // GL 3.0, ES 2.0
     {
         .ver_gl = QGL_VER(3, 0),
@@ -307,13 +294,20 @@ static const glsection_t sections[] = {
         .functions = (const glfunction_t []) {
             QGL_FN(BindBufferBase),
             QGL_FN(BindBufferRange),
-            // FIXME: this is not supported on ES...
-            QGL_FN(BindFragDataLocation),
             QGL_FN(BindVertexArray),
             QGL_FN(DeleteVertexArrays),
             QGL_FN(GenVertexArrays),
             QGL_FN(GetStringi),
             QGL_FN(VertexAttribIPointer),
+            { NULL }
+        }
+    },
+
+    // GL 3.0, not ES
+    {
+        .ver_gl = QGL_VER(3, 0),
+        .functions = (const glfunction_t []) {
+            QGL_FN(BindFragDataLocation),
             { NULL }
         }
     },

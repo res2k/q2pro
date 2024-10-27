@@ -125,7 +125,6 @@ QGLAPI GLuint (APIENTRYP qglCreateShader)(GLenum type);
 QGLAPI void (APIENTRYP qglDeleteProgram)(GLuint program);
 QGLAPI void (APIENTRYP qglDeleteShader)(GLuint shader);
 QGLAPI void (APIENTRYP qglDrawBuffers)(GLsizei n, const GLenum *bufs);
-
 QGLAPI void (APIENTRYP qglDisableVertexAttribArray)(GLuint index);
 QGLAPI void (APIENTRYP qglEnableVertexAttribArray)(GLuint index);
 QGLAPI void (APIENTRYP qglGetProgramInfoLog)(GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog);
@@ -140,12 +139,9 @@ QGLAPI void (APIENTRYP qglUseProgram)(GLuint program);
 QGLAPI void (APIENTRYP qglVertexAttrib4f)(GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
 QGLAPI void (APIENTRYP qglVertexAttribPointer)(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer);
 
-QGLAPI void (APIENTRYP qglBlendFunci)(GLuint buf, GLenum src, GLenum dst);
-
 // GL 3.0
 QGLAPI void (APIENTRYP qglBindBufferBase)(GLenum target, GLuint index, GLuint buffer);
 QGLAPI void (APIENTRYP qglBindBufferRange)(GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size);
-QGLAPI void (APIENTRYP qglBindFragDataLocation)(GLuint program, GLuint colorNumber, const GLchar *name);
 QGLAPI void (APIENTRYP qglBindFramebuffer)(GLenum target, GLuint framebuffer);
 QGLAPI void (APIENTRYP qglBindRenderbuffer)(GLenum target, GLuint renderbuffer);
 QGLAPI void (APIENTRYP qglBindVertexArray)(GLuint array);
@@ -163,6 +159,9 @@ QGLAPI void (APIENTRYP qglGetFramebufferAttachmentParameteriv)(GLenum target, GL
 QGLAPI const GLubyte *(APIENTRYP qglGetStringi)(GLenum name, GLuint index);
 QGLAPI void (APIENTRYP qglRenderbufferStorage)(GLenum target, GLenum internalformat, GLsizei width, GLsizei height);
 QGLAPI void (APIENTRYP qglVertexAttribIPointer)(GLuint index, GLint size, GLenum type, GLsizei stride, const void *pointer);
+
+// GL 3.0, not ES
+QGLAPI void (APIENTRYP qglBindFragDataLocation)(GLuint program, GLuint colorNumber, const GLchar *name);
 
 // GL 3.1
 QGLAPI void (APIENTRYP qglGetActiveUniformBlockiv)(GLuint program, GLuint uniformBlockIndex, GLenum pname, GLint *params);

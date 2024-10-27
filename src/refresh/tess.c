@@ -138,16 +138,20 @@ static void GL_FlushBeamSegments(void)
     if (!tess.numindices)
         return;
 
+    glStateBits_t state = GLS_BLEND_BLEND | GLS_DEPTHMASK_FALSE | glr.fog_bits;
     glArrayBits_t array = GLA_VERTEX | GLA_COLOR;
     GLuint texnum = TEXNUM_BEAM;
 
-    if (gl_beamstyle->integer)
+    if (gl_beamstyle->integer) {
         texnum = TEXNUM_WHITE;
-    else
+        if (glr.framebuffer_bound && gl_bloom->integer)
+            state |= GLS_BLOOM_GENERATE | GLS_BLOOM_SHELL;
+    } else {
         array |= GLA_TC;
-    
+    }
+
     GL_BindTexture(TMU_TEXTURE, texnum);
-    GL_StateBits(GLS_BLEND_BLEND | GLS_DEPTHMASK_FALSE | GLS_GLOWMAP_ENABLE | GLS_GLOWMAP_COLOR | glr.fog_bits);
+    GL_StateBits(state);
     GL_ArrayBits(array);
     GL_DrawIndexed(SHOWTRIS_FX);
 
@@ -670,6 +674,9 @@ void GL_Flush3D(void)
         state |= GLS_DYNAMIC_LIGHTS;
         array |= GLA_NORMAL;
     }
+
+    if (glr.framebuffer_bound && gl_bloom->integer && state & GLS_TEXTURE_REPLACE)
+        state |= GLS_BLOOM_GENERATE;
 
     if (!(state & GLS_TEXTURE_REPLACE))
         array |= GLA_COLOR;

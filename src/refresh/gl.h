@@ -154,6 +154,8 @@ typedef struct {
     int             framebuffer_height;
     bool            framebuffer_ok;
     bool            framebuffer_bound;
+    int             bloom_width;
+    int             bloom_height;
 } glRefdef_t;
 
 typedef enum {
@@ -249,6 +251,7 @@ extern cvar_t *gl_md5_distance;
 #endif
 extern cvar_t *gl_damageblend_frac;
 extern cvar_t *gl_bloom;
+extern cvar_t *gl_bloom_height;
 
 // development variables
 extern cvar_t *gl_znear;
@@ -555,8 +558,8 @@ typedef enum {
     GLS_MESH_MASK   = GLS_MESH_ANY | GLS_MESH_LERP | GLS_MESH_SHELL | GLS_MESH_SHADE,
     GLS_SHADER_MASK = GLS_ALPHATEST_ENABLE | GLS_TEXTURE_REPLACE | GLS_SCROLL_ENABLE |
         GLS_LIGHTMAP_ENABLE | GLS_WARP_ENABLE | GLS_INTENSITY_ENABLE | GLS_GLOWMAP_ENABLE |
-        GLS_SKY_MASK | GLS_DEFAULT_FLARE | GLS_MESH_MASK | GLS_FOG_MASK | GLS_BLOOM_MASK |
-        GLS_BLOOM_SHELL | GLS_DYNAMIC_LIGHTS,
+        GLS_SKY_MASK | GLS_DEFAULT_FLARE | GLS_MESH_MASK | GLS_FOG_MASK | GLS_BLOOM_MASK | GLS_BLOOM_SHELL |
+        GLS_DYNAMIC_LIGHTS,
     GLS_UNIFORM_MASK = GLS_WARP_ENABLE | GLS_LIGHTMAP_ENABLE | GLS_INTENSITY_ENABLE |
         GLS_SKY_MASK | GLS_FOG_MASK | GLS_BLOOM_MASK | GLS_DYNAMIC_LIGHTS,
     GLS_SCROLL_MASK = GLS_SCROLL_ENABLE | GLS_SCROLL_X | GLS_SCROLL_Y | GLS_SCROLL_FLIP | GLS_SCROLL_SLOW,

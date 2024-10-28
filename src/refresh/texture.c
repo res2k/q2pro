@@ -436,6 +436,20 @@ static bool GL_MakePowerOfTwo(int *width, int *height)
     return false;
 }
 
+static void GL_ClampTextureSize(int *width, int *height)
+{
+    while (*width > gl_config.max_texture_size ||
+           *height > gl_config.max_texture_size) {
+        *width >>= 1;
+        *height >>= 1;
+    }
+
+    if (*width < 1)
+        *width = 1;
+    if (*height < 1)
+        *height = 1;
+}
+
 /*
 ===============
 GL_Upload32
@@ -467,17 +481,7 @@ static void GL_Upload32(byte *data, int width, int height, int baselevel, imaget
     }
 
     // don't ever bother with >256 textures
-    while (scaled_width > gl_config.max_texture_size ||
-           scaled_height > gl_config.max_texture_size) {
-        scaled_width >>= 1;
-        scaled_height >>= 1;
-    }
-
-    if (scaled_width < 1)
-        scaled_width = 1;
-    if (scaled_height < 1)
-        scaled_height = 1;
-
+    GL_ClampTextureSize(&scaled_width, &scaled_height);
     upload_width = scaled_width;
     upload_height = scaled_height;
 
@@ -1183,9 +1187,13 @@ bool GL_InitFramebuffers(void)
 
     if (gl_bloom->integer) {
         float aspect = (float)glr.fd.width / glr.fd.height;
-        h = 640;
+        h = Cvar_ClampInteger(gl_bloom_height, 1, 2048);
         w = h * aspect;
+        GL_ClampTextureSize(&w, &h);
     }
+
+    glr.bloom_width = w;
+    glr.bloom_height = h;
 
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_BLUR_0);
     GL_InitPostProcTexture(w, h);

@@ -62,6 +62,7 @@ cvar_t *gl_damageblend_frac;
 cvar_t *gl_waterwarp;
 cvar_t *gl_fog;
 cvar_t *gl_bloom;
+cvar_t *gl_bloom_height;
 cvar_t *gl_swapinterval;
 
 // development variables
@@ -646,10 +647,9 @@ static void GL_PostProcess(glStateBits_t bits, int x, int y, int w, int h)
 
 static void GL_DrawBloom(bool waterwarp)
 {
-    int iterations = Cvar_ClampInteger(gl_bloom, 1, 16) * 2;
-    float aspect = (float)glr.fd.width / glr.fd.height;
-    int h = 640;
-    int w = h * aspect;
+    int iterations = Cvar_ClampInteger(gl_bloom, 1, 8) * 2;
+    int w = glr.bloom_width;
+    int h = glr.bloom_height;
 
     qglViewport(0, 0, w, h);
     GL_Ortho(0, w, h, 0, -1, 1);
@@ -691,6 +691,7 @@ static void GL_DrawBloom(bool waterwarp)
 }
 
 static int32_t gl_bloom_modified = 0;
+static int32_t gl_bloom_height_modified = 0;
 
 void R_RenderFrame(const refdef_t *fd)
 {
@@ -728,11 +729,13 @@ void R_RenderFrame(const refdef_t *fd)
     bool bloom = gl_static.use_shaders && gl_bloom->integer;
 
     if (waterwarp || bloom || gl_bloom->modified_count != gl_bloom_modified) {
-        if (glr.fd.width != glr.framebuffer_width || glr.fd.height != glr.framebuffer_height || gl_bloom->modified_count != gl_bloom_modified) {
+        if (glr.fd.width != glr.framebuffer_width || glr.fd.height != glr.framebuffer_height ||
+            gl_bloom->modified_count != gl_bloom_modified || gl_bloom_height->modified_count != gl_bloom_height_modified) {
             glr.framebuffer_ok = GL_InitFramebuffers();
             glr.framebuffer_width = glr.fd.width;
             glr.framebuffer_height = glr.fd.height;
             gl_bloom_modified = gl_bloom->modified_count;
+            gl_bloom_height_modified = gl_bloom_height->modified_count;
         }
         if (!glr.framebuffer_ok)
             waterwarp = bloom = false;
@@ -974,6 +977,7 @@ static void GL_Register(void)
     gl_waterwarp = Cvar_Get("gl_waterwarp", "1", 0);
     gl_fog = Cvar_Get("gl_fog", "1", 0);
     gl_bloom = Cvar_Get("gl_bloom", "1", 0);
+    gl_bloom_height = Cvar_Get("gl_bloom_height", "640", 0);
     gl_swapinterval = Cvar_Get("gl_swapinterval", "1", CVAR_ARCHIVE);
     gl_swapinterval->changed = gl_swapinterval_changed;
 

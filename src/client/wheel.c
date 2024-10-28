@@ -323,7 +323,8 @@ void CL_Wheel_Input(int x, int y)
         return;
 
     // always holster while open
-    cl.cmd.buttons |= BUTTON_HOLSTER;
+    if (!cl.wheel.is_powerup_wheel)
+        cl.cmd.buttons |= BUTTON_HOLSTER;
 
     if (cl.wheel.state != WHEEL_OPEN)
         return;

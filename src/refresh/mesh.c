@@ -46,6 +46,8 @@ static drawshadow_t drawshadow;
 static mat4_t       m_shadow_view;
 static mat4_t       m_shadow_model;     // fog hack
 
+static const model_t *m_model;
+
 #if USE_MD5
 static md5_joint_t  temp_skeleton[MD5_MAX_JOINTS];
 #endif
@@ -546,7 +548,7 @@ static void setup_shadow(void)
     GL_RotationMatrix(m_rot);
 
     GL_MultMatrix(m_shadow_model, m_proj, m_rot);
-    GL_MultMatrix(m_shadow_view, glr.viewmatrix, m_shadow_model);
+    //GL_MultMatrix(m_shadow_view, glr.viewmatrix, m_shadow_model);
 }
 
 static void draw_shadow(const uint16_t *indices, int num_indices)
@@ -554,12 +556,24 @@ static void draw_shadow(const uint16_t *indices, int num_indices)
     if (!drawshadow)
         return;
 
-    // fog hack
-    if (glr.fog_bits)
-        memcpy(gls.u_block.m_model, m_shadow_model, sizeof(gls.u_block.m_model));
+    float alpha = color[3] * 0.5f;
+
+    if (gl_shadows_fade->integer && glr.ent->bottom_z) {
+        float dist = glr.ent->bottom_z - glr.lightpoint.position[2];
+
+        float radius = LERP2(m_model->frames[newframenum].radius, m_model->frames[oldframenum].radius,
+            backlerp, frontlerp) * 5.0f * (glr.ent->scale ? glr.ent->scale : 1.0f);
+
+        dist = dist / radius;
+
+        if (dist >= 1.0f)
+            return;
+
+        alpha *= 1.0f - dist;
+    }
 
     // load shadow projection matrix
-    GL_LoadMatrix(glr.entmatrix, m_shadow_view);
+    GL_LoadMatrix(m_shadow_model, glr.viewmatrix);
 
     // eliminate z-fighting by utilizing stencil buffer, if available
     if (gl_config.stencilbits) {
@@ -571,9 +585,9 @@ static void draw_shadow(const uint16_t *indices, int num_indices)
     GL_BindTexture(TMU_TEXTURE, TEXNUM_WHITE);
     GL_StateBits(GLS_BLEND_BLEND | (meshbits & ~GLS_MESH_SHADE) | glr.fog_bits);
     if (gls.currentva)
-    GL_ArrayBits(GLA_VERTEX);
+        GL_ArrayBits(GLA_VERTEX);
 
-    uniform_mesh_color(0, 0, 0, color[3] * 0.5f);
+    uniform_mesh_color(0, 0, 0, alpha);
     GL_LoadUniforms();
 
     qglEnable(GL_POLYGON_OFFSET_FILL);
@@ -937,6 +951,8 @@ static void setup_weaponmodel(void)
 
 void GL_DrawAliasModel(const model_t *model)
 {
+    m_model = model;
+
     const entity_t *ent = glr.ent;
     glCullResult_t cull;
     void (*tessfunc)(const maliasmesh_t *);

@@ -232,6 +232,7 @@ extern cvar_t *gl_beamstyle;
 extern cvar_t *gl_celshading;
 extern cvar_t *gl_dotshading;
 extern cvar_t *gl_shadows;
+extern cvar_t *gl_shadows_fade;
 extern cvar_t *gl_modulate;
 extern cvar_t *gl_modulate_world;
 extern cvar_t *gl_coloredlightmaps;

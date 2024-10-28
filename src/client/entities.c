@@ -684,6 +684,9 @@ static void CL_AddPacketEntities(void)
             ent.oldorigin[2] = ent.origin[2];
         }
 
+        // bottom Z position, for shadow fading
+        ent.bottom_z = ent.origin[2] + cent->mins[2];
+
         if (!cl_gibs->integer) {
             if (effects & EF_GIB && !(cl.csr.extended && effects & EF_ROCKET))
                 goto skip;

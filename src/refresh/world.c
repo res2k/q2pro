@@ -207,6 +207,8 @@ static bool GL_LightPoint_(const vec3_t start, vec3_t color)
             glr.lightpoint = pt;
     }
 
+    LerpVector(start, end, glr.lightpoint.fraction, glr.lightpoint.position);
+
     if (GL_LightGridPoint(&bsp->lightgrid, start, color))
         return true;
 

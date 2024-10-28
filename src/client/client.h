@@ -83,6 +83,8 @@ typedef struct {
 
 // KEX
     int32_t         current_frame, last_frame, frame_servertime;
+    int             stair_time;
+    float           stair_height;
 // KEX
 } centity_t;
 

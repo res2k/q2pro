@@ -56,6 +56,7 @@ entity_update_new(centity_t *ent, const entity_state_t *state, const vec_t *orig
 // KEX
     ent->current_frame = ent->last_frame = state->frame;
     ent->frame_servertime = cl.servertime;
+    ent->stair_time = cls.realtime;
 // KEX
 
     if (state->event == EV_PLAYER_TELEPORT ||
@@ -71,6 +72,8 @@ entity_update_new(centity_t *ent, const entity_state_t *state, const vec_t *orig
     VectorCopy(state->old_origin, ent->prev.origin);
     VectorCopy(state->old_origin, ent->lerp_origin);
 }
+
+#define	MAX_STEP_CHANGE 32
 
 static inline void
 entity_update_old(centity_t *ent, const entity_state_t *state, const vec_t *origin)
@@ -117,6 +120,7 @@ entity_update_old(centity_t *ent, const entity_state_t *state, const vec_t *orig
 #endif
         // no lerping if teleported or morphed
         VectorCopy(origin, ent->lerp_origin);
+        ent->stair_time = cls.realtime;
         return;
     }
 
@@ -127,6 +131,27 @@ entity_update_old(centity_t *ent, const entity_state_t *state, const vec_t *orig
         ent->anim_start = cl.servertime - cl.frametime.time;
     }
 #endif
+
+    // stair interpolation support; this is only
+    // necessary for > 10 fps
+    if (cl.frametime.time != 100) {
+        if (state->renderfx & RF_STAIR_STEP) {
+            // Code below adapted from Q3A.
+            // check for stepping up before a previous step is completed
+            float step = origin[2] - ent->current.origin[2];
+            float delta = cls.realtime - ent->stair_time;
+            float old_step;
+            if (delta < STEP_TIME) {
+                old_step = ent->stair_height * (STEP_TIME - delta) / STEP_TIME;
+            } else {
+                old_step = 0;
+            }
+
+            // add this amount
+            ent->stair_height = Q_clip(old_step + step, -MAX_STEP_CHANGE, MAX_STEP_CHANGE);
+            ent->stair_time = cls.realtime;
+        }
+    }
 
     // shuffle the last state to previous
     ent->prev = ent->current;
@@ -642,6 +667,16 @@ static void CL_AddPacketEntities(void)
         if (effects & EF_BOB && !cl_nobob->integer) {
             ent.origin[2] += autobob;
             ent.oldorigin[2] += autobob;
+        }
+
+        // use predicted values
+        unsigned step_delta = cls.realtime - cent->stair_time;
+
+        // smooth out stair climbing
+        if (step_delta < STEP_TIME && cent->stair_height) {
+            float step_change = cent->stair_height * ((STEP_TIME - step_delta) * (1.f / STEP_TIME));
+            ent.origin[2] = cent->current.origin[2] - step_change;
+            ent.oldorigin[2] = ent.origin[2];
         }
 
         if (!cl_gibs->integer) {

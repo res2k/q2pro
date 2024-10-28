@@ -542,7 +542,8 @@ static void CL_AddPacketEntities(void)
     centity_t           *cent;
     int                 autoanim;
     clientinfo_t        *ci;
-    unsigned int        effects, renderfx;
+    effects_t           effects;
+    renderfx_t          renderfx;
     bool                has_alpha, has_trail;
 
     // bonus items rotate at a fixed rate
@@ -823,23 +824,45 @@ static void CL_AddPacketEntities(void)
         if (effects & EF_FLASHLIGHT) {
             vec3_t forward, start, end;
             trace_t trace;
-            const int mask = CONTENTS_SOLID | CONTENTS_MONSTER | CONTENTS_PLAYER;
+            contents_t mask = CONTENTS_SOLID;
+            
+            if (!cl_shadowlights->integer)
+                mask |= CONTENTS_MONSTER | CONTENTS_PLAYER;
 
             if (s1->number == cl.frame.clientNum + 1) {
                 VectorMA(cl.refdef.vieworg, 256, cl.v_forward, end);
                 VectorCopy(cl.refdef.vieworg, start);
+                VectorCopy(cl.v_forward, forward);
             } else {
                 AngleVectors(ent.angles, forward, NULL, NULL);
-                VectorMA(ent.origin, 256, forward, end);
+                float dist = cl_shadowlights->integer ? 1024 : 256;
+                VectorMA(ent.origin, dist, forward, end);
                 VectorCopy(ent.origin, start);
             }
 
             CL_Trace(&trace, start, end, vec3_origin, vec3_origin, NULL, mask);
-            LerpVector(start, end, cent->flashlightfrac, end);
-            V_AddLight(end, 256, 1, 1, 1);
 
-            // smooth out distance "jumps"
-            CL_AdvanceValue(&cent->flashlightfrac, trace.fraction, 1);
+            if (cl_shadowlights->integer) {
+                cl_shadow_light_t light;
+                light.fade_end = light.fade_start = 0;
+                light.lightstyle = -1;
+                light.resolution = 512.0f;
+                light.intensity = 2.0f;
+                light.radius = 512.0f;
+                light.coneangle = 22.0f;
+                VectorCopy(forward, light.conedirection);
+                light.color.u32 = U32_WHITE;
+                VectorCopy(start, light.origin);
+                if (s1->number == cl.frame.clientNum + 1 && info_hand->integer != 2) {
+                    VectorMA(light.origin, info_hand->integer ? -7 : 7, cl.v_right, light.origin);
+                }
+                V_AddLightEx(&light);
+            } else {
+                // smooth out distance "jumps"
+                LerpVector(start, end, cent->flashlightfrac, end);
+                V_AddLight(end, 256, 1, 1, 1);
+                CL_AdvanceValue(&cent->flashlightfrac, trace.fraction, 1);
+            }
         }
 
         if (effects & EF_GRENADE_LIGHT)

@@ -209,7 +209,7 @@ typedef struct {
 } cl_fog_params_t;
 
 typedef struct {
-    int         number;
+    vec3_t      origin;
     float       radius;
     int         resolution;
     float       intensity;
@@ -217,6 +217,7 @@ typedef struct {
     int         lightstyle;
     float       coneangle; // spot if non-zero
     vec3_t      conedirection;
+    color_t     color;
 } cl_shadow_light_t;
 
 //
@@ -440,7 +441,10 @@ typedef struct {
     int weapon_lock_time; // don't allow BUTTON_ATTACK within this time
 
     // shadow lights
-    cl_shadow_light_t shadowlights[MAX_SHADOW_LIGHTS];
+    struct {
+        int                 number;
+        cl_shadow_light_t   light;
+    } shadowdefs[MAX_SHADOW_LIGHTS];
 } client_state_t;
 
 extern client_state_t   cl;
@@ -668,6 +672,7 @@ extern cvar_t   *cl_rollhack;
 extern cvar_t   *cl_noglow;
 extern cvar_t   *cl_nobob;
 extern cvar_t   *cl_nolerp;
+extern cvar_t   *cl_shadowlights;
 
 #if USE_DEBUG
 #define SHOWNET(level, ...) \

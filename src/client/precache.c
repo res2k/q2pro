@@ -563,10 +563,10 @@ static void CS_LoadShadowLight(int index, const char *s)
         return;
     }
 
-    cl_shadow_light_t *light = &cl.shadowlights[index - cl.csr.shadowlights];
+    cl_shadow_light_t *light = &cl.shadowdefs[index - cl.csr.shadowlights].light;
 
     const char *p = buf;
-    light->number = Q_atoi(COM_Parse(&p));
+    cl.shadowdefs[index - cl.csr.shadowlights].number = Q_atoi(COM_Parse(&p));
     bool is_cone = !!Q_atoi(COM_Parse(&p));
     light->radius = Q_atof(COM_Parse(&p));
     light->resolution = Q_atoi(COM_Parse(&p));

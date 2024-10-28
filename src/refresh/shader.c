@@ -139,22 +139,27 @@ static void write_dynamic_light_block(sizebuf_t *buf)
 
 static void write_dynamic_lights(sizebuf_t *buf)
 {
-    GLSL(float rcp(float x) { return 1.0 / x; } vec3 calc_dynamic_lights() {
+    GLSL(vec3 calc_dynamic_lights() {
         vec3 shade = vec3(0);
 
         for (int i = 0; i < num_dlights; i++) {
-            vec3 dir = (dlights[i].position + (v_norm * 16)) - v_world_pos;
-            float len = length(dir);
-            float dist = max((dlights[i].radius - DLIGHT_CUTOFF - len), 0.0f);
+            vec3 frag_pos = v_world_pos;
+            float light_cone = dlights[i].cone.w;
 
-            dir /= max(len, 1.0f);
-            float lambert = max(0.0f, dot(dir, v_norm));
+            if (light_cone == 0.0)
+                frag_pos += v_norm * 16.0;
 
-            vec3 result = dlights[i].color.rgb * dist * dlights[i].color.a * lambert;
+            vec3 light_dir  = dlights[i].position - frag_pos;
+            float dist       = length(light_dir);
+            float radius     = dlights[i].radius - DLIGHT_CUTOFF;
+            float len        = max(radius - dist, 0.0) / radius;
+            vec3 dir         = light_dir / max(dist, 1.0);
+            float lambert    = max(dot(v_norm, dir), 0.0);
+            vec3 result      = ((dlights[i].color.rgb * dlights[i].color.a) * len) * lambert;
 
-            if (dlights[i].cone.a != 0.0) {
+            if (light_cone != 0.0) {
                 float mag = -dot(dir, dlights[i].cone.xyz);
-                result *= max(1.0 - (1.0 - mag) * (1.0 / (1.0 - dlights[i].cone.a)), 0.0);
+                result *= max(1.0 - (1.0 - mag) * (1.0 / (1.0 - light_cone)), 0.0);
             }
 
             shade += result;
@@ -1066,12 +1071,10 @@ static void shader_setup_3d(void)
             const dlight_t *dl = &glr.fd.dlights[i];
             VectorCopy(dl->origin, gls.u_dlights.lights[i].position);
             gls.u_dlights.lights[i].radius = dl->radius;
-            // Paril TODO: why the double multiply? this seems to fix something
-            // but I don't know why it's necessary.
-            VectorScale(dl->color, (1.0f / 255), gls.u_dlights.lights[i].color);
+            VectorCopy(dl->color, gls.u_dlights.lights[i].color);
             gls.u_dlights.lights[i].color[3] = dl->_intensity;
             VectorCopy(dl->cone, gls.u_dlights.lights[i].cone);
-            gls.u_dlights.lights[i].cone[3] = DEG2RAD(dl->cone[3]);
+            gls.u_dlights.lights[i].cone[3] = cosf(DEG2RAD(dl->cone[3]));
         }
     }
 }

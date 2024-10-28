@@ -27,7 +27,7 @@ static vec3_t avelocities[NUMVERTEXNORMALS];
 static cvar_t *cl_lerp_lightstyles;
 static cvar_t *cl_rerelease_effects;
 static cvar_t *cl_muzzlelight_time;
-static cvar_t *cl_shadowlights;
+cvar_t *cl_shadowlights;
 
 /*
 ==============================================================
@@ -1837,7 +1837,23 @@ void CL_AddShadowLights(void)
         if (!*cl.configstrings[cl.csr.shadowlights + i])
             continue;
 
-        V_AddLightEx(&cl.shadowlights[i]);
+        centity_t *ent = &cl_entities[cl.shadowdefs[i].number];
+
+        if (ent->serverframe != cl.frame.number)
+            continue;
+
+        color_t color;
+        if (!ent->current.skinnum)
+            color.u32 = U32_WHITE;
+        else
+            color.u32 = BigLong(ent->current.skinnum);
+        // technically we should be lerping but
+        // these lights never move in the game
+        // (even though they can)
+        VectorCopy(ent->current.origin, cl.shadowdefs[i].light.origin);
+        cl.shadowdefs[i].light.color = color;
+
+        V_AddLightEx(&cl.shadowdefs[i].light);
     }
 }
 

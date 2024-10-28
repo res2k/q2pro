@@ -120,28 +120,14 @@ void V_AddLightEx(cl_shadow_light_t *light)
 
     if (r_numdlights >= MAX_DLIGHTS)
         return;
-    
-    centity_t *ent = &cl_entities[light->number];
-
-    if (ent->serverframe != cl.frame.number)
-        return;
-
-    color_t color;
-    if (!ent->current.skinnum)
-        color.u32 = U32_WHITE;
-    else
-        color.u32 = BigLong(ent->current.skinnum);
 
     dl = &r_dlights[r_numdlights++];
-    // technically we should be lerping but
-    // these lights never move in the game
-    // (even though they can)
-    VectorCopy(ent->current.origin, dl->origin);
+    VectorCopy(light->origin, dl->origin);
     dl->radius = light->radius;
     dl->_intensity = light->intensity * (light->lightstyle == -1 ? 1.0f : r_lightstyles[light->lightstyle].white);
-    dl->color[0] = color.u8[0] / 255.f;
-    dl->color[1] = color.u8[1] / 255.f;
-    dl->color[2] = color.u8[2] / 255.f;
+    dl->color[0] = light->color.u8[0] / 255.f;
+    dl->color[1] = light->color.u8[1] / 255.f;
+    dl->color[2] = light->color.u8[2] / 255.f;
 
     if (light->coneangle) {
         VectorCopy(light->conedirection, dl->cone);

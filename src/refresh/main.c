@@ -971,7 +971,7 @@ static void GL_Register(void)
     gl_md5_distance = Cvar_Get("gl_md5_distance", "2048", 0);
 #endif
     gl_damageblend_frac = Cvar_Get("gl_damageblend_frac", "0.2", 0);
-    gl_waterwarp = Cvar_Get("gl_waterwarp", "0", 0);
+    gl_waterwarp = Cvar_Get("gl_waterwarp", "1", 0);
     gl_fog = Cvar_Get("gl_fog", "1", 0);
     gl_bloom = Cvar_Get("gl_bloom", "1", 0);
     gl_swapinterval = Cvar_Get("gl_swapinterval", "1", CVAR_ARCHIVE);

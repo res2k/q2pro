@@ -143,18 +143,23 @@ static void write_dynamic_lights(sizebuf_t *buf)
         vec3 shade = vec3(0);
 
         for (int i = 0; i < num_dlights; i++) {
-            vec3 frag_pos = v_world_pos;
+            vec3 light_pos = dlights[i].position;
             float light_cone = dlights[i].cone.w;
 
             if (light_cone == 0.0)
-                frag_pos += v_norm * 16.0;
+                light_pos += v_norm * 16.0;
 
-            vec3 light_dir  = dlights[i].position - frag_pos;
+            vec3 light_dir   = light_pos - v_world_pos;
             float dist       = length(light_dir);
-            float radius     = dlights[i].radius - DLIGHT_CUTOFF;
-            float len        = max(radius - dist, 0.0) / radius;
+            float radius     = dlights[i].radius + DLIGHT_CUTOFF;
+            float len        = max(radius - dist - DLIGHT_CUTOFF, 0.0) / radius;
             vec3 dir         = light_dir / max(dist, 1.0);
-            float lambert    = max(dot(v_norm, dir), 0.0);
+            float lambert;
+            
+            if (dlights[i].color.r < 0.0f)
+                lambert = 1.0f;
+            else
+                lambert = max(dot(v_norm, dir), 0.0);
             vec3 result      = ((dlights[i].color.rgb * dlights[i].color.a) * len) * lambert;
 
             if (light_cone != 0.0) {
@@ -1073,8 +1078,12 @@ static void shader_setup_3d(void)
             gls.u_dlights.lights[i].radius = dl->radius;
             VectorCopy(dl->color, gls.u_dlights.lights[i].color);
             gls.u_dlights.lights[i].color[3] = dl->_intensity;
-            VectorCopy(dl->cone, gls.u_dlights.lights[i].cone);
-            gls.u_dlights.lights[i].cone[3] = cosf(DEG2RAD(dl->cone[3]));
+            if (dl->cone[3]) {
+                VectorCopy(dl->cone, gls.u_dlights.lights[i].cone);
+                gls.u_dlights.lights[i].cone[3] = cosf(DEG2RAD(dl->cone[3]));
+            } else {
+                gls.u_dlights.lights[i].cone[3] = 0.0f;
+            }
         }
     }
 }

@@ -27,6 +27,7 @@ static vec3_t avelocities[NUMVERTEXNORMALS];
 static cvar_t *cl_lerp_lightstyles;
 static cvar_t *cl_rerelease_effects;
 static cvar_t *cl_muzzlelight_time;
+static cvar_t *cl_shadowlights;
 
 /*
 ==============================================================
@@ -1822,6 +1823,23 @@ void CL_AddParticles(void)
     active_particles = active;
 }
 
+/*
+==============
+CL_AddShadowLights
+==============
+*/
+void CL_AddShadowLights(void)
+{
+    if (!cl_shadowlights->integer)
+        return;
+
+    for (size_t i = 0; i < cl.csr.max_shadowlights; i++) {
+        if (!*cl.configstrings[cl.csr.shadowlights + i])
+            continue;
+
+        V_AddLightEx(&cl.shadowlights[i]);
+    }
+}
 
 /*
 ==============
@@ -1847,4 +1865,5 @@ void CL_InitEffects(void)
     cl_lerp_lightstyles = Cvar_Get("cl_lerp_lightstyles", "1", 0);
     cl_rerelease_effects = Cvar_Get("cl_rerelease_effects", "1", 0);
     cl_muzzlelight_time = Cvar_Get("cl_muzzlelight_time", "100", 0);
+    cl_shadowlights = Cvar_Get("cl_shadowlights", "0", 0);
 }

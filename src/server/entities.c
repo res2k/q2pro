@@ -656,7 +656,7 @@ void SV_BuildClientFrame(client_t *client)
             bool beam_cull = ent->s.renderfx & RF_BEAM;
             bool sound_cull = ent->s.sound;
 
-            if (!SV_EntityVisible(client, svent, (beam_cull || sound_cull) ? clientphs : clientpvs))
+            if (!SV_EntityVisible(client, svent, (beam_cull || sound_cull || (ent->s.renderfx & RF_CASTSHADOW)) ? clientphs : clientpvs))
                 continue;
 
             // don't send sounds if they will be attenuated away
@@ -667,7 +667,10 @@ void SV_BuildClientFrame(client_t *client)
                     if (!beam_cull && !SV_EntityVisible(client, svent, clientpvs))
                         continue;
                 }
-            } else if (!ent->s.modelindex) {
+            } else if (!ent->s.modelindex && !(ent->s.renderfx & RF_CASTSHADOW)) {
+                // Paril TODO: is this a good idea? seems weird to remove
+                // visual effects based on distance if there's no model and
+                // no sound...
                 if (Distance(org, ent->s.origin) > 400)
                     continue;
             }

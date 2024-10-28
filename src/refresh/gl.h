@@ -637,7 +637,8 @@ enum { SSBO_WEIGHTS, SSBO_JOINTNUMS };
 typedef struct {
     vec3_t    position;
     float     radius;
-    vec4_t    color;
+    vec4_t    color; // a = intensity
+    vec4_t    cone; // a = angle
 } glDlight_t;
 
 typedef struct {

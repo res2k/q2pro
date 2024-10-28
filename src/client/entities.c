@@ -559,6 +559,11 @@ static void CL_AddPacketEntities(void)
         i = (cl.frame.firstEntity + pnum) & PARSE_ENTITIES_MASK;
         s1 = &cl.entityStates[i];
 
+        // handled elsewhere
+        if (s1->renderfx & RF_CASTSHADOW) {
+            continue;
+        }
+
         cent = &cl_entities[s1->number];
 
         has_trail = false;
@@ -1562,6 +1567,7 @@ void CL_AddEntities(void)
     CL_AddParticles();
     CL_AddDLights();
     CL_AddLightStyles();
+    CL_AddShadowLights();
     LOC_AddLocationsToScene();
 }
 

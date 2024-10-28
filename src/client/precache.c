@@ -519,6 +519,73 @@ static void CL_LoadWheelEntry(int index, const char *s)
 
 /*
 =================
+CS_LoadShadowLight
+
+In hindsight, I should have overloaded entity_state_t for
+these parameters, but the shadow lights were done very
+early on in KexQ2's development and I have to live with it.
+=================
+*/
+static void CS_LoadShadowLight(int index, const char *s)
+{
+/*
+		gi.configstring(CS_SHADOWLIGHTS + i, G_Fmt("{};{};{:1};{};{:1};{:1};{:1};{};{:1};{:1};{:1};{:1}",
+			self->s.number,
+			(int)shadowlightinfo[i].shadowlight.lighttype,
+			shadowlightinfo[i].shadowlight.radius,
+			shadowlightinfo[i].shadowlight.resolution,
+			shadowlightinfo[i].shadowlight.intensity,
+			shadowlightinfo[i].shadowlight.fade_start,
+			shadowlightinfo[i].shadowlight.fade_end,
+			shadowlightinfo[i].shadowlight.lightstyle,
+			shadowlightinfo[i].shadowlight.coneangle,
+			shadowlightinfo[i].shadowlight.conedirection[0],
+			shadowlightinfo[i].shadowlight.conedirection[1],
+			shadowlightinfo[i].shadowlight.conedirection[2]).data());
+*/
+    char buf[CS_MAX_STRING_LENGTH];
+    int n = 0;
+
+    for (size_t i = 0; i < CS_MAX_STRING_LENGTH; i++, s++) {
+        if (!*s) {
+            buf[i] = '\0';
+            break;
+        } else if (*s == ';') {
+            buf[i] = ' ';
+            n++;
+        } else {
+            buf[i] = *s;
+        }
+    }
+
+    // bad shadow light
+    if (n != 11) {
+        return;
+    }
+
+    cl_shadow_light_t *light = &cl.shadowlights[index - cl.csr.shadowlights];
+
+    const char *p = buf;
+    light->number = Q_atoi(COM_Parse(&p));
+    bool is_cone = !!Q_atoi(COM_Parse(&p));
+    light->radius = Q_atof(COM_Parse(&p));
+    light->resolution = Q_atoi(COM_Parse(&p));
+    light->intensity = Q_atof(COM_Parse(&p));
+    light->fade_start = Q_atof(COM_Parse(&p));
+    light->fade_end = Q_atof(COM_Parse(&p));
+    light->lightstyle = Q_atoi(COM_Parse(&p));
+    light->coneangle = Q_atof(COM_Parse(&p));
+    light->conedirection[0] = Q_atof(COM_Parse(&p));
+    light->conedirection[1] = Q_atof(COM_Parse(&p));
+    light->conedirection[2] = Q_atof(COM_Parse(&p));
+
+    if (!is_cone) {
+        light->coneangle = 0.0f;
+    }
+}
+
+/*
+=================
 CL_PrepRefresh
 
 Call before entering a new level, or after changing dlls
@@ -584,6 +651,13 @@ void CL_PrepRefresh(void)
     for (n = cl.csr.wheelweapons, i = 0; i < MAX_WHEEL_ITEMS * 3; i++, n++) {
         if (*cl.configstrings[n]) {
             CL_LoadWheelEntry(n, cl.configstrings[n]);
+        }
+    }
+
+    // load shadow lights
+    for (n = cl.csr.shadowlights, i = 0; i < MAX_SHADOW_LIGHTS; i++, n++) {
+        if (*cl.configstrings[n]) {
+            CS_LoadShadowLight(n, cl.configstrings[n]);
         }
     }
 
@@ -665,8 +739,13 @@ static void update_configstring(int index)
         return;
     }
 
-    if (index >= cl.csr.wheelweapons && index <= cl.csr.wheelpowerups + MAX_WHEEL_ITEMS) {
+    if (index >= cl.csr.wheelweapons && index < cl.csr.wheelpowerups + cl.csr.max_wheelitems) {
         CL_LoadWheelEntry(index, s);
+        return;
+    }
+
+    if (index >= cl.csr.shadowlights && index <= cl.csr.shadowlights + cl.csr.max_shadowlights) {
+        CS_LoadShadowLight(index, s);
         return;
     }
 }

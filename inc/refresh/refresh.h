@@ -72,7 +72,9 @@ typedef struct {
     vec3_t  origin;
     vec3_t  transformed;
     vec3_t  color;
-    float   intensity;
+    float   radius;
+    float   _intensity;
+    vec4_t  cone;
 } dlight_t;
 
 typedef struct {

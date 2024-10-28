@@ -208,6 +208,17 @@ typedef struct {
     player_heightfog_t height;
 } cl_fog_params_t;
 
+typedef struct {
+    int         number;
+    float       radius;
+    int         resolution;
+    float       intensity;
+    float       fade_start, fade_end;
+    int         lightstyle;
+    float       coneangle; // spot if non-zero
+    vec3_t      conedirection;
+} cl_shadow_light_t;
+
 //
 // the client_state_t structure is wiped completely at every
 // server map change
@@ -427,6 +438,9 @@ typedef struct {
     } wheel;
 
     int weapon_lock_time; // don't allow BUTTON_ATTACK within this time
+
+    // shadow lights
+    cl_shadow_light_t shadowlights[MAX_SHADOW_LIGHTS];
 } client_state_t;
 
 extern client_state_t   cl;
@@ -887,6 +901,7 @@ void V_Shutdown(void);
 void V_RenderView(void);
 void V_AddEntity(const entity_t *ent);
 void V_AddParticle(const particle_t *p);
+void V_AddLightEx(cl_shadow_light_t *light);
 void V_AddLight(const vec3_t org, float intensity, float r, float g, float b);
 void V_AddLightStyle(int style, float value);
 void CL_UpdateBlendSetting(void);
@@ -1031,6 +1046,7 @@ cdlight_t *CL_AllocDlight(int key);
 void CL_AddDLights(void);
 void CL_SetLightStyle(int index, const char *s);
 void CL_AddLightStyles(void);
+void CL_AddShadowLights(void);
 
 //
 // newfx.c

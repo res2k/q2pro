@@ -743,7 +743,7 @@ void SV_PrintMiscInfo(void);
 //
 
 #define HAS_EFFECTS(ent) \
-    ((ent)->s.modelindex || (ent)->s.effects || (ent)->s.sound || (ent)->s.event)
+    ((ent)->s.modelindex || (ent)->s.effects || (ent)->s.sound || (ent)->s.event || ((ent)->s.renderfx & RF_CASTSHADOW))
 
 static inline void SV_CheckEntityNumber(edict_t *ent, int e, const char *func)
 {

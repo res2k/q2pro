@@ -110,6 +110,49 @@ void V_AddParticle(const particle_t *p)
 
 /*
 =====================
+V_AddLightEx
+
+=====================
+*/
+void V_AddLightEx(cl_shadow_light_t *light)
+{
+    dlight_t    *dl;
+
+    if (r_numdlights >= MAX_DLIGHTS)
+        return;
+    
+    centity_t *ent = &cl_entities[light->number];
+
+    if (ent->serverframe != cl.frame.number)
+        return;
+
+    color_t color;
+    if (!ent->current.skinnum)
+        color.u32 = U32_WHITE;
+    else
+        color.u32 = BigLong(ent->current.skinnum);
+
+    dl = &r_dlights[r_numdlights++];
+    // technically we should be lerping but
+    // these lights never move in the game
+    // (even though they can)
+    VectorCopy(ent->current.origin, dl->origin);
+    dl->radius = light->radius;
+    dl->_intensity = light->intensity * (light->lightstyle == -1 ? 1.0f : r_lightstyles[light->lightstyle].white);
+    dl->color[0] = color.u8[0] / 255.f;
+    dl->color[1] = color.u8[1] / 255.f;
+    dl->color[2] = color.u8[2] / 255.f;
+
+    if (light->coneangle) {
+        VectorCopy(light->conedirection, dl->cone);
+        dl->cone[3] = light->coneangle;
+    } else {
+        dl->cone[3] = 0.0f;
+    }
+}
+
+/*
+=====================
 V_AddLight
 
 =====================
@@ -122,10 +165,12 @@ void V_AddLight(const vec3_t org, float intensity, float r, float g, float b)
         return;
     dl = &r_dlights[r_numdlights++];
     VectorCopy(org, dl->origin);
-    dl->intensity = intensity;
+    dl->radius = intensity;
+    dl->_intensity = 1.0f;
     dl->color[0] = r;
     dl->color[1] = g;
     dl->color[2] = b;
+    dl->cone[3] = 0.0f;
 }
 
 /*
@@ -227,7 +272,8 @@ static void V_TestLights(void)
             VectorSet(dl->color, -1, -1, -1);
         else
             VectorSet(dl->color, 1, 1, 1);
-        dl->intensity = 256;
+        dl->radius = 256;
+        dl->_intensity = 1.0f;
         return;
     }
 
@@ -246,7 +292,8 @@ static void V_TestLights(void)
         dl->color[0] = ((i % 6) + 1) & 1;
         dl->color[1] = (((i % 6) + 1) & 2) >> 1;
         dl->color[2] = (((i % 6) + 1) & 4) >> 2;
-        dl->intensity = 200;
+        dl->radius = 200;
+        dl->_intensity = 1.0f;
     }
 }
 

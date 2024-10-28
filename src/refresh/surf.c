@@ -154,7 +154,7 @@ static void add_dynamic_lights(const mface_t *surf)
 
         light = &glr.fd.dlights[i];
         dist = PlaneDiffFast(light->transformed, surf->plane);
-        rad = light->intensity - fabsf(dist);
+        rad = light->radius - fabsf(dist);
         if (rad < DLIGHT_CUTOFF)
             continue;
 
@@ -165,6 +165,8 @@ static void add_dynamic_lights(const mface_t *surf)
             minlight = rad - DLIGHT_CUTOFF;
             scale = 1;              // fall off from rad to minlight
         }
+
+        scale *= light->_intensity;
 
         VectorMA(light->transformed, -dist, surf->plane->normal, point);
 

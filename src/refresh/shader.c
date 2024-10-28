@@ -125,6 +125,7 @@ static void write_dynamic_light_block(sizebuf_t *buf)
             vec3    position;
             float   radius;
             vec4    color;
+            vec4    cone;
         };
     )
     GLSF("#define DLIGHT_CUTOFF 64\n");
@@ -138,7 +139,7 @@ static void write_dynamic_light_block(sizebuf_t *buf)
 
 static void write_dynamic_lights(sizebuf_t *buf)
 {
-    GLSL(vec3 calc_dynamic_lights() {
+    GLSL(float rcp(float x) { return 1.0 / x; } vec3 calc_dynamic_lights() {
         vec3 shade = vec3(0);
 
         for (int i = 0; i < num_dlights; i++) {
@@ -148,7 +149,15 @@ static void write_dynamic_lights(sizebuf_t *buf)
 
             dir /= max(len, 1.0f);
             float lambert = max(0.0f, dot(dir, v_norm));
-            shade += dlights[i].color.rgb * dist * lambert;
+
+            vec3 result = dlights[i].color.rgb * dist * dlights[i].color.a * lambert;
+
+            if (dlights[i].cone.a != 0.0) {
+                float mag = -dot(dir, dlights[i].cone.xyz);
+                result *= max(1.0 - (1.0 - mag) * (1.0 / (1.0 - dlights[i].cone.a)), 0.0);
+            }
+
+            shade += result;
         }
 
         return shade;
@@ -1056,8 +1065,13 @@ static void shader_setup_3d(void)
         for (int i = 0; i < min(q_countof(gls.u_dlights.lights), glr.fd.num_dlights); i++) {
             const dlight_t *dl = &glr.fd.dlights[i];
             VectorCopy(dl->origin, gls.u_dlights.lights[i].position);
-            gls.u_dlights.lights[i].radius = dl->intensity;
+            gls.u_dlights.lights[i].radius = dl->radius;
+            // Paril TODO: why the double multiply? this seems to fix something
+            // but I don't know why it's necessary.
             VectorScale(dl->color, (1.0f / 255), gls.u_dlights.lights[i].color);
+            gls.u_dlights.lights[i].color[3] = dl->_intensity;
+            VectorCopy(dl->cone, gls.u_dlights.lights[i].cone);
+            gls.u_dlights.lights[i].cone[3] = DEG2RAD(dl->cone[3]);
         }
     }
 }

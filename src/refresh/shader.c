@@ -447,7 +447,7 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
 #define MAX_RADIUS  50
 
 // https://lisyarus.github.io/blog/posts/blur-coefficients-generator.html
-static void write_blur(sizebuf_t *buf)
+static void write_gaussian_blur(sizebuf_t *buf)
 {
     float sigma = gl_static.bloom_sigma;
     int radius = min(sigma * 2 + 0.5f, MAX_RADIUS);
@@ -507,6 +507,21 @@ static void write_blur(sizebuf_t *buf)
             vec4 result = vec4(0.0);
             for (int i = 0; i < BLUR_SAMPLES; i++)
                 result += texture(src, tc + dir * blur_offsets[i]) * blur_weights[i];
+            return result;
+        }
+    )
+}
+
+static void write_box_blur(sizebuf_t *buf)
+{
+    GLSL(
+        vec4 blur(sampler2D src, vec2 tc, vec2 dir) {
+            vec4 result = vec4(0.0);
+            const float o = 0.25;
+            result += texture(src, tc + vec2(-o, -o) * dir) * 0.25;
+            result += texture(src, tc + vec2(-o,  o) * dir) * 0.25;
+            result += texture(src, tc + vec2( o, -o) * dir) * 0.25;
+            result += texture(src, tc + vec2( o,  o) * dir) * 0.25;
             return result;
         }
     )
@@ -595,8 +610,12 @@ static void write_fragment_shader(sizebuf_t *buf, glStateBits_t bits)
         write_dynamic_lights(buf);
     }
 
-    if ((bits & GLS_BLOOM_MASK) == GLS_BLOOM_BLUR)
-        write_blur(buf);
+    if ((bits & GLS_BLOOM_MASK) == GLS_BLOOM_BLUR) {
+        if (bits & GLS_BLOOM_SHELL)
+            write_box_blur(buf);
+        else
+            write_gaussian_blur(buf);
+    }
 
     GLSF("void main() {\n");
     if (bits & GLS_CLASSIC_SKY) {

@@ -655,9 +655,11 @@ static void GL_DrawBloom(bool waterwarp)
     GL_Ortho(0, w, h, 0, -1, 1);
 
     // downscale
+    gls.u_block.fog_color[0] = 1.0f / w;
+    gls.u_block.fog_color[1] = 1.0f / h;
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_BLOOM);
     qglBindFramebuffer(GL_FRAMEBUFFER, FBO_BLUR_0);
-    GL_PostProcess(GLS_DEFAULT, 0, 0, w, h);
+    GL_PostProcess(GLS_BLOOM_DOWNSCALE, 0, 0, w, h);
 
     // blur X/Y
     for (int i = 0; i < iterations; i++) {

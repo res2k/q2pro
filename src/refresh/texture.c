@@ -1185,22 +1185,13 @@ bool GL_InitFramebuffers(void)
         return false;
     }
 
-    // keep blur buffer size small and resolution independent
-    if (gl_bloom->integer) {
-        float aspect = (float)glr.fd.width / glr.fd.height;
-        h = Cvar_ClampInteger(gl_bloom_height, 128, 2160);
-        w = h * aspect;
-        GL_ClampTextureSize(&w, &h);
-    }
-
-    glr.bloom_width = w;
-    glr.bloom_height = h;
+    GL_UpdateBlurParams();
 
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_BLUR_0);
-    GL_InitPostProcTexture(w, h);
+    GL_InitPostProcTexture(w / 4, h / 4);
 
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_BLUR_1);
-    GL_InitPostProcTexture(w, h);
+    GL_InitPostProcTexture(w / 4, h / 4);
 
     qglBindFramebuffer(GL_FRAMEBUFFER, FBO_BLUR_0);
     qglFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gl_bloom->integer ? TEXNUM_PP_BLUR_0 : GL_NONE, 0);

@@ -114,6 +114,7 @@ typedef struct {
     GLenum          samples_passed;
     GLbitfield      stencil_buffer_bit;
     float           entity_modulate;
+    float           bloom_sigma;
     uint32_t        inverse_intensity_33;
     uint32_t        inverse_intensity_66;
     uint32_t        inverse_intensity_100;
@@ -872,6 +873,7 @@ void GL_Setup3D(void);
 void GL_ClearState(void);
 void GL_InitState(void);
 void GL_ShutdownState(void);
+void GL_UpdateBlurParams(void);
 
 /*
  * gl_draw.c

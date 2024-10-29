@@ -63,7 +63,6 @@ cvar_t *gl_damageblend_frac;
 cvar_t *gl_waterwarp;
 cvar_t *gl_fog;
 cvar_t *gl_bloom;
-cvar_t *gl_bloom_height;
 cvar_t *gl_swapinterval;
 
 // development variables
@@ -649,8 +648,8 @@ static void GL_PostProcess(glStateBits_t bits, int x, int y, int w, int h)
 static void GL_DrawBloom(bool waterwarp)
 {
     int iterations = Cvar_ClampInteger(gl_bloom, 1, 8) * 2;
-    int w = glr.bloom_width;
-    int h = glr.bloom_height;
+    int w = glr.fd.width / 4;
+    int h = glr.fd.height / 4;
 
     qglViewport(0, 0, w, h);
     GL_Ortho(0, w, h, 0, -1, 1);
@@ -731,12 +730,11 @@ void R_RenderFrame(const refdef_t *fd)
 
     if (waterwarp || bloom || gl_bloom->modified_count != gl_bloom_modified) {
         if (glr.fd.width != glr.framebuffer_width || glr.fd.height != glr.framebuffer_height ||
-            gl_bloom->modified_count != gl_bloom_modified || gl_bloom_height->modified_count != gl_bloom_height_modified) {
+            gl_bloom->modified_count != gl_bloom_modified) {
             glr.framebuffer_ok = GL_InitFramebuffers();
             glr.framebuffer_width = glr.fd.width;
             glr.framebuffer_height = glr.fd.height;
             gl_bloom_modified = gl_bloom->modified_count;
-            gl_bloom_height_modified = gl_bloom_height->modified_count;
         }
         if (!glr.framebuffer_ok)
             waterwarp = bloom = false;
@@ -979,7 +977,6 @@ static void GL_Register(void)
     gl_waterwarp = Cvar_Get("gl_waterwarp", "1", 0);
     gl_fog = Cvar_Get("gl_fog", "1", 0);
     gl_bloom = Cvar_Get("gl_bloom", "1", 0);
-    gl_bloom_height = Cvar_Get("gl_bloom_height", "540", 0);
     gl_swapinterval = Cvar_Get("gl_swapinterval", "1", CVAR_ARCHIVE);
     gl_swapinterval->changed = gl_swapinterval_changed;
 

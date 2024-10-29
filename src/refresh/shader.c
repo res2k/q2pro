@@ -449,12 +449,18 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
 // https://lisyarus.github.io/blog/posts/blur-coefficients-generator.html
 static void write_blur(sizebuf_t *buf)
 {
-    float sigma = Cvar_ClampValue(gl_bloom_sigma, 1, MAX_SIGMA);
+    float sigma = gl_static.bloom_sigma;
     int radius = min(sigma * 2 + 0.5f, MAX_RADIUS);
     int samples = radius + 1;
     int raw_samples = (radius * 2) + 1;
     float offsets[MAX_RADIUS + 1];
     float weights[(MAX_RADIUS * 2) + 1];
+
+    // should not really happen
+    if (radius < 1) {
+        GLSL(vec4 blur(sampler2D src, vec2 tc, vec2 dir) { return texture(src, tc); })
+        return;
+    }
 
     float sum = 0;
     for (int i = -radius, j = 0; i <= radius; i++, j++) {
@@ -1110,8 +1116,19 @@ static void shader_clear_state(void)
     shader_use_program(GLS_DEFAULT);
 }
 
-static void shader_blur_changed(cvar_t *self)
+void GL_UpdateBlurParams(void)
 {
+    if (!gl_static.programs)
+        return;
+
+    float sigma = Cvar_ClampValue(gl_bloom_sigma, 1, MAX_SIGMA) * glr.fd.height / 2160;
+
+    if (gl_static.bloom_sigma == sigma)
+        return;
+
+    gl_static.bloom_sigma = sigma;
+
+    bool changed = false;
     uint32_t map_size = HashMap_Size(gl_static.programs);
     for (int i = 0; i < map_size; i++) {
         glStateBits_t *bits = HashMap_GetKey(glStateBits_t, gl_static.programs, i);
@@ -1119,15 +1136,23 @@ static void shader_blur_changed(cvar_t *self)
             GLuint *prog = HashMap_GetValue(GLuint, gl_static.programs, i);
             qglDeleteProgram(*prog);
             *prog = create_and_use_program(*bits);
+            changed = true;
         }
     }
-    shader_use_program(gls.state_bits & GLS_SHADER_MASK);
+
+    if (changed)
+        shader_use_program(gls.state_bits & GLS_SHADER_MASK);
+}
+
+static void gl_bloom_sigma_changed(cvar_t *self)
+{
+    GL_UpdateBlurParams();
 }
 
 static void shader_init(void)
 {
     gl_bloom_sigma = Cvar_Get("gl_bloom_sigma", "8", 0);
-    gl_bloom_sigma->changed = shader_blur_changed;
+    gl_bloom_sigma->changed = gl_bloom_sigma_changed;
 
     gl_static.programs = HashMap_TagCreate(glStateBits_t, GLuint, HashInt32, NULL, TAG_RENDERER);
 

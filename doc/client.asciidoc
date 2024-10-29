@@ -697,12 +697,8 @@ gl_bloom::
     filter iterations (typical value is 1).
 
 gl_bloom_sigma::
-    Specifies sigma parameter of gaussian blur filter for the bloom effect.
-    Default value is 6.
-
-gl_bloom_radius::
-    Specifies radius parameter of gaussian blur filter for the bloom effect.
-    Default value is 16. Should not be higher than _3 * sigma_.
+    Specifies strength parameter of gaussian blur filter used for the bloom
+    effect. Default value is 8.
 
 gl_flarespeed::
     Specifies flare fading effect speed. Default value is 8. Set this to 0

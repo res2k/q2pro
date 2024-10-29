@@ -726,7 +726,7 @@ void R_RenderFrame(const refdef_t *fd)
     }
 
     bool waterwarp = (glr.fd.rdflags & RDF_UNDERWATER) && gl_static.use_shaders && gl_waterwarp->integer;
-    bool bloom = gl_static.use_shaders && gl_bloom->integer;
+    bool bloom = !(glr.fd.rdflags & RDF_NOWORLDMODEL) && gl_static.use_shaders && gl_bloom->integer;
 
     if (waterwarp || bloom || gl_bloom->modified_count != gl_bloom_modified) {
         if (glr.fd.width != glr.framebuffer_width || glr.fd.height != glr.framebuffer_height ||

@@ -151,9 +151,8 @@ extern sndstarted_t     s_started;
 extern bool             s_active;
 extern const sndapi_t   *s_api;
 
-#define MAX_CHANNELS            32
-extern channel_t    s_channels[MAX_CHANNELS];
-extern int          s_numchannels;
+extern channel_t    *s_channels;
+extern int          s_numchannels, s_maxchannels;
 
 extern int          s_paintedtime;
 extern list_t       s_pendingplays;
@@ -167,6 +166,7 @@ extern cvar_t       *s_show;
 #endif
 extern cvar_t       *s_underwater;
 extern cvar_t       *s_underwater_gain_hf;
+extern cvar_t       *s_num_channels;
 
 #define S_IsFullVolume(ch) \
     ((ch)->entnum == -1 || (ch)->entnum == listener_entnum || (ch)->dist_mult == 0)

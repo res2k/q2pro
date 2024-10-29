@@ -25,8 +25,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 unsigned    s_registration_sequence;
 
-channel_t   s_channels[MAX_CHANNELS];
-int         s_numchannels;
+channel_t   *s_channels;
+int         s_numchannels, s_maxchannels;
 
 sndstarted_t    s_started;
 bool            s_active;
@@ -62,6 +62,7 @@ cvar_t      *s_show;
 #endif
 cvar_t      *s_underwater;
 cvar_t      *s_underwater_gain_hf;
+cvar_t      *s_num_channels;
 
 static cvar_t   *s_enable;
 static cvar_t   *s_auto_focus;
@@ -152,6 +153,10 @@ void S_Init(void)
     s_auto_focus = Cvar_Get("s_auto_focus", "2", 0);
     s_underwater = Cvar_Get("s_underwater", "1", 0);
     s_underwater_gain_hf = Cvar_Get("s_underwater_gain_hf", "0.25", 0);
+    s_num_channels = Cvar_Get("s_num_channels", "64", CVAR_SOUND);
+
+    s_maxchannels = Cvar_ClampInteger(s_num_channels, 16, 256);
+    s_channels = Z_TagMalloc(sizeof(*s_channels) * s_maxchannels, TAG_SOUND);
 
     // start one of available sound engines
     s_started = SS_NOT;
@@ -236,6 +241,10 @@ void S_Shutdown(void)
     S_StopAllSounds();
     S_FreeAllSounds();
     OGG_Stop();
+
+    Z_Free(s_channels);
+    s_channels = NULL;
+    s_maxchannels = 0;
 
     s_api->shutdown();
     s_api = NULL;

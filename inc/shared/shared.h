@@ -1352,6 +1352,11 @@ enum {
     CHAN_VOICE,
     CHAN_ITEM,
     CHAN_BODY,
+//[Paril-KEX]
+    CHAN_AUX,
+    CHAN_FOOTSTEP,
+    CHAN_AUX3,
+//[Paril-KEX]
 
     // modifier flags
     CHAN_NO_PHS_ADD     = BIT(3),   // send to all clients, not just ones in PHS (ATTN 0 will also do this)

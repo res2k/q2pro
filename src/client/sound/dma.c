@@ -629,7 +629,7 @@ static bool DMA_Init(void)
     s_volume->changed = s_volume_changed;
     s_volume_changed(s_volume);
 
-    s_numchannels = MAX_CHANNELS;
+    s_numchannels = s_maxchannels;
 
     Com_Printf("sound sampling rate: %i\n", dma.speed);
 

@@ -33,7 +33,8 @@ static cvar_t       *al_reverb_lerp_time;
 static cvar_t       *al_timescale;
 static cvar_t       *al_merge_looping;
 
-static ALuint       s_srcnums[MAX_CHANNELS];
+static ALuint       *s_srcnums;
+static int          s_numalsources;
 static ALuint       s_stream;
 static ALuint       s_stream_buffers;
 static ALboolean    s_loop_points;
@@ -706,12 +707,19 @@ static bool AL_Init(void)
     // generate source names
     qalGetError();
     qalGenSources(1, &s_stream);
-    for (i = 0; i < MAX_CHANNELS; i++) {
+
+    s_srcnums = Z_TagMalloc(sizeof(*s_srcnums) * s_maxchannels, TAG_SOUND);
+
+    for (i = 0; i < s_maxchannels; i++) {
         qalGenSources(1, &s_srcnums[i]);
         if (qalGetError() != AL_NO_ERROR) {
             break;
         }
+        s_numalsources++;
     }
+
+    if (s_numalsources != s_maxchannels)
+        s_srcnums = Z_Realloc(s_srcnums, sizeof(*s_srcnums) * s_numalsources);
 
     Com_DPrintf("Got %d AL sources\n", i);
 
@@ -776,7 +784,9 @@ static void AL_Shutdown(void)
     if (s_numchannels) {
         // delete source names
         qalDeleteSources(s_numchannels, s_srcnums);
-        memset(s_srcnums, 0, sizeof(s_srcnums));
+        Z_Free(s_srcnums);
+        s_srcnums = NULL;
+        s_numalsources = 0;
         s_numchannels = 0;
     }
 

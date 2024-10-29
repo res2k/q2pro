@@ -26,7 +26,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define GLSP(...)   shader_printf(buf, __VA_ARGS__)
 
 static cvar_t *gl_bloom_sigma;
-static cvar_t *gl_bloom_radius;
 cvar_t *gl_per_pixel_lighting;
 
 q_printf(2, 3)
@@ -444,14 +443,14 @@ static void write_vertex_shader(sizebuf_t *buf, glStateBits_t bits)
     GLSF("}\n");
 }
 
-#define MAX_SIGMA   30
+#define MAX_SIGMA   25
 #define MAX_RADIUS  50
 
 // https://lisyarus.github.io/blog/posts/blur-coefficients-generator.html
 static void write_blur(sizebuf_t *buf)
 {
     float sigma = Cvar_ClampValue(gl_bloom_sigma, 1, MAX_SIGMA);
-    int radius = Cvar_ClampInteger(gl_bloom_radius, 1, MAX_RADIUS);
+    int radius = min(sigma * 2 + 0.5f, MAX_RADIUS);
     int samples = radius + 1;
     int raw_samples = (radius * 2) + 1;
     float offsets[MAX_RADIUS + 1];
@@ -1128,9 +1127,7 @@ static void shader_blur_changed(cvar_t *self)
 static void shader_init(void)
 {
     gl_bloom_sigma = Cvar_Get("gl_bloom_sigma", "8", 0);
-    gl_bloom_radius = Cvar_Get("gl_bloom_radius", "15", 0);
     gl_bloom_sigma->changed = shader_blur_changed;
-    gl_bloom_radius->changed = shader_blur_changed;
 
     gl_static.programs = HashMap_TagCreate(glStateBits_t, GLuint, HashInt32, NULL, TAG_RENDERER);
 
@@ -1170,7 +1167,6 @@ static void shader_shutdown(void)
     qglUseProgram(0);
 
     gl_bloom_sigma->changed = NULL;
-    gl_bloom_radius->changed = NULL;
 
     if (gl_static.programs) {
         uint32_t map_size = HashMap_Size(gl_static.programs);

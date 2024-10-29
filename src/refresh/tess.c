@@ -142,13 +142,13 @@ static void GL_FlushBeamSegments(void)
     glArrayBits_t array = GLA_VERTEX | GLA_COLOR;
     GLuint texnum = TEXNUM_BEAM;
 
-    if (gl_beamstyle->integer) {
+    if (gl_beamstyle->integer)
         texnum = TEXNUM_WHITE;
-        if (glr.framebuffer_bound && gl_bloom->integer)
-            state |= GLS_BLOOM_GENERATE | GLS_BLOOM_SHELL;
-    } else {
+    else
         array |= GLA_TC;
-    }
+
+    if (glr.framebuffer_bound && gl_bloom->integer)
+        state |= GLS_BLOOM_GENERATE | GLS_BLOOM_SHELL;
 
     GL_BindTexture(TMU_TEXTURE, texnum);
     GL_StateBits(state);

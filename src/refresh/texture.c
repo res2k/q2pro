@@ -1185,9 +1185,10 @@ bool GL_InitFramebuffers(void)
         return false;
     }
 
+    // keep blur buffer size small and resolution independent
     if (gl_bloom->integer) {
         float aspect = (float)glr.fd.width / glr.fd.height;
-        h = Cvar_ClampInteger(gl_bloom_height, 1, 2048);
+        h = Cvar_ClampInteger(gl_bloom_height, 128, 2160);
         w = h * aspect;
         GL_ClampTextureSize(&w, &h);
     }

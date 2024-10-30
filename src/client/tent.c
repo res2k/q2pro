@@ -757,6 +757,7 @@ typedef struct {
     int         endtime;
     vec3_t      offset;
     vec3_t      start, end;
+    int         soundtime;
 } beam_t;
 
 static beam_t   cl_beams[MAX_BEAMS];
@@ -789,6 +790,12 @@ override:
             VectorCopy(te.pos1, b->start);
             VectorCopy(te.pos2, b->end);
             VectorCopy(te.offset, b->offset);
+
+            if (model == cl_mod_lightning && b->soundtime < cl.time) {
+                S_StartSound(NULL, te.entity1, CHAN_WEAPON, cl_sfx_lightning, 1, ATTN_NORM, 0);
+                b->soundtime = cl.time + 500;
+            }
+
             return;
         }
     }
@@ -1552,7 +1559,6 @@ void CL_ParseTEnt(void)
         break;
 
     case TE_LIGHTNING:
-        S_StartSound(NULL, te.entity1, CHAN_WEAPON, cl_sfx_lightning, 1, ATTN_NORM, 0);
         VectorClear(te.offset);
         CL_ParseBeam(cl_mod_lightning);
         break;

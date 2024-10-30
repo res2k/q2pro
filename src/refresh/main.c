@@ -693,7 +693,6 @@ static void GL_DrawBloom(bool waterwarp)
 }
 
 static int32_t gl_bloom_modified = 0;
-static int32_t gl_bloom_height_modified = 0;
 
 void R_RenderFrame(const refdef_t *fd)
 {

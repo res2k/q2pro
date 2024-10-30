@@ -43,7 +43,6 @@ static bool     dotshading;
 static float    celscale;
 
 static drawshadow_t drawshadow;
-static mat4_t       m_shadow_view;
 static mat4_t       m_shadow_model;     // fog hack
 
 static const model_t *m_model;
@@ -548,7 +547,6 @@ static void setup_shadow(void)
     GL_RotationMatrix(m_rot);
 
     GL_MultMatrix(m_shadow_model, m_proj, m_rot);
-    //GL_MultMatrix(m_shadow_view, glr.viewmatrix, m_shadow_model);
 }
 
 static void draw_shadow(const uint16_t *indices, int num_indices)

@@ -160,6 +160,7 @@ cdlight_t *CL_AllocDlight(int key)
         for (i = 0; i < MAX_DLIGHTS; i++, dl++) {
             if (dl->key == key) {
                 memset(dl, 0, sizeof(*dl));
+                dl->start = cl.time;
                 dl->key = key;
                 return dl;
             }
@@ -171,6 +172,7 @@ cdlight_t *CL_AllocDlight(int key)
     for (i = 0; i < MAX_DLIGHTS; i++, dl++) {
         if (dl->die < cl.time) {
             memset(dl, 0, sizeof(*dl));
+            dl->start = cl.time;
             dl->key = key;
             return dl;
         }
@@ -178,6 +180,7 @@ cdlight_t *CL_AllocDlight(int key)
 
     dl = &cl_dlights[0];
     memset(dl, 0, sizeof(*dl));
+    dl->start = cl.time;
     dl->key = key;
     return dl;
 }
@@ -196,7 +199,7 @@ void CL_AddDLights(void)
     for (i = 0; i < MAX_DLIGHTS; i++, dl++) {
         if (dl->die < cl.time)
             continue;
-        V_AddLight(dl->origin, dl->radius,
+        V_AddLight(dl->origin, dl->die ? (dl->radius * (1.0f - ((float) (cl.time - dl->start) / (dl->die - dl->start)))) : dl->radius,
                    dl->color[0], dl->color[1], dl->color[2]);
     }
 }
@@ -1453,6 +1456,17 @@ void CL_OldRailTrail(void)
 
     VectorCopy(te.pos1, move);
     VectorSubtract(te.pos2, te.pos1, vec);
+
+    // N64 dlight end light
+    cdlight_t *dl = CL_AllocDlight(0);
+    VectorCopy(te.pos2, dl->origin);
+    dl->die = cl.time + 2000;
+    dl->radius = 150;
+    dl->color[0] = 0.25f;
+    dl->color[1] = 0.25f;
+    dl->color[2] = 1.0f;
+    dl->fade = true;
+
     len = VectorNormalize(vec);
 
     MakeNormalVectors(vec, right, up);

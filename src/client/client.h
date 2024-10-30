@@ -1013,6 +1013,8 @@ typedef struct {
     vec3_t  origin;
     float   radius;
     int     die;        // stop lighting after this time
+    int     start;
+    bool    fade;
 } cdlight_t;
 
 typedef enum {

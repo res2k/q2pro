@@ -791,7 +791,7 @@ void S_StopAllSounds(void)
     s_api->stop_all_sounds();
 
     // clear all the channels
-    memset(s_channels, 0, sizeof(s_channels));
+    memset(s_channels, 0, sizeof(*s_channels) * s_numchannels);
 }
 
 void S_RawSamples(int samples, int rate, int width, int channels, const byte *data)

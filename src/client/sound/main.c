@@ -198,6 +198,8 @@ void S_Init(void)
     // start the cd track
     if (cls.state >= ca_precached)
         OGG_Play();
+    else
+        OGG_Restart();
 
 fail:
     Cvar_SetInteger(s_enable, s_started, FROM_CODE);
@@ -240,7 +242,7 @@ void S_Shutdown(void)
 
     S_StopAllSounds();
     S_FreeAllSounds();
-    OGG_Stop();
+    OGG_Stop(false);
 
     Z_Free(s_channels);
     s_channels = NULL;

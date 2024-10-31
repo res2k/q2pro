@@ -73,7 +73,7 @@ static void init_formats(void)
     Com_DPrintf("Supported music formats: %#x\n", supported);
 }
 
-static void ogg_stop(void)
+static void ogg_stop(bool clear_track)
 {
     avcodec_free_context(&ogg.dec_ctx);
     avformat_close_input(&ogg.fmt_ctx);
@@ -83,6 +83,9 @@ static void ogg_stop(void)
     swr_free(&ogg.swr_ctx);
 
     memset(&ogg, 0, sizeof(ogg));
+
+    if (clear_track)
+        currenttrack[0] = '\0';
 }
 
 static AVFormatContext *ogg_open(const char *name, bool autoplay)
@@ -232,7 +235,7 @@ static void ogg_play(AVFormatContext *fmt_ctx)
     ogg.fmt_ctx = fmt_ctx;
 
     if (!ogg_try_play())
-        ogg_stop();
+        ogg_stop(true);
 }
 
 static void shuffle(void)
@@ -243,7 +246,7 @@ static void shuffle(void)
     }
 }
 
-void OGG_Play(void)
+static void ogg_play_internal(const char *s, bool force)
 {
     if (!s_started)
         return;
@@ -251,13 +254,12 @@ void OGG_Play(void)
     if (!ogg_enable->integer)
         return;
 
-    const char *s = cl.configstrings[CS_CDTRACK];
     if (!*s || !strcmp(s, "0")) {
-        ogg_stop();
+        ogg_stop(true);
         return;
     }
 
-    if (ogg_shuffle->integer && trackcount) {
+    if (!force && ogg_shuffle->integer && trackcount) {
         if (trackindex == 0)
             shuffle();
         s = tracklist[trackindex];
@@ -266,57 +268,35 @@ void OGG_Play(void)
         s = va("track%02d", Q_atoi(s));
     }
 
-    // don't restart the current track
-    if (strcmp(s, currenttrack) == 0) {
+    // don't restart the current track if we're
+    // currently playing it
+    if (ogg.fmt_ctx && strcmp(s, currenttrack) == 0) {
         return;
     }
     
     Q_strlcpy(currenttrack, s, sizeof(currenttrack));
 
-    ogg_stop();
+    ogg_stop(false);
 
     ogg_play(ogg_open(s, true));
 
     if (s_api)
         s_api->drop_raw_samples();
+}
+
+void OGG_Play(void)
+{
+    ogg_play_internal(cl.configstrings[CS_CDTRACK], false);
 }
 
 void OGG_PlayMenu(void)
 {
-    if (!s_started)
-        return;
-
-    if (!ogg_enable->integer)
-        return;
-
-    const char *s = ogg_menu_track->string;
-    if (!*s || !strcmp(s, "0")) {
-        ogg_stop();
-        return;
-    }
-
-    if (COM_IsUint(s)) {
-        s = va("track%02d", Q_atoi(s));
-    }
-
-    // don't restart the current track
-    if (strcmp(s, currenttrack) == 0) {
-        return;
-    }
-    
-    Q_strlcpy(currenttrack, s, sizeof(currenttrack));
-
-    ogg_stop();
-
-    ogg_play(ogg_open(s, true));
-
-    if (s_api)
-        s_api->drop_raw_samples();
+    ogg_play_internal(ogg_menu_track->string, true);
 }
 
-void OGG_Stop(void)
+void OGG_Stop(bool clear_track)
 {
-    ogg_stop();
+    ogg_stop(clear_track);
 
     if (s_api)
         s_api->drop_raw_samples();
@@ -456,7 +436,7 @@ void OGG_Update(void)
 
         if (ret < 0) {
             Com_EPrintf("Error converting audio: %s\n", av_err2str(ret));
-            OGG_Stop();
+            OGG_Stop(false);
             break;
         }
     }
@@ -732,7 +712,7 @@ static void OGG_Play_f(void)
     if (!fmt_ctx)
         return;
 
-    OGG_Stop();
+    OGG_Stop(false);
 
     ogg_play(fmt_ctx);
 }
@@ -773,7 +753,7 @@ static void OGG_Cmd_f(void)
     else if (!strcmp(cmd, "play"))
         OGG_Play_f();
     else if (!strcmp(cmd, "stop"))
-        OGG_Stop();
+        OGG_Stop(true);
     else if (!strcmp(cmd, "next"))
         OGG_Play();
     else
@@ -787,7 +767,7 @@ static void ogg_enable_changed(cvar_t *self)
     if (self->integer)
         OGG_Play();
     else
-        OGG_Stop();
+        OGG_Stop(true);
 }
 
 static void ogg_volume_changed(cvar_t *self)
@@ -799,6 +779,16 @@ static const cmdreg_t c_ogg[] = {
     { "ogg", OGG_Cmd_f, OGG_Cmd_c },
     { NULL }
 };
+
+void OGG_Restart(void)
+{
+    if (*currenttrack) {
+        ogg_play(ogg_open(currenttrack, true));
+
+        if (s_api)
+            s_api->drop_raw_samples();
+    }
+}
 
 void OGG_Init(void)
 {
@@ -814,11 +804,13 @@ void OGG_Init(void)
     init_formats();
 
     OGG_LoadTrackList();
+
+    OGG_Restart();
 }
 
 void OGG_Shutdown(void)
 {
-    ogg_stop();
+    ogg_stop(false);
 
     FS_FreeList(tracklist);
     tracklist = NULL;

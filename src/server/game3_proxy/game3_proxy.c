@@ -642,7 +642,7 @@ static void sync_single_edict_game_to_server(int index)
 
     if (game_edict->client) {
         if(!server_edict->client) {
-            server_edict->client = Z_Malloc(sizeof(struct gclient_s));
+            server_edict->client = Z_Mallocz(sizeof(struct gclient_s));
         }
         if (IS_NEW_GAME_API) {
             game_client_new_to_server(server_edict->client, game_edict->client);

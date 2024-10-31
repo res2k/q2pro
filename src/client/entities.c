@@ -635,9 +635,9 @@ static void CL_AddPacketEntities(void)
         if (renderfx & RF_BEAM) {
             // interpolate start and end points for beams
             LerpVector(cent->prev.origin, cent->current.origin,
-                       cl.lerpfrac, ent.origin);
+                        cl.lerpfrac, ent.origin);
             LerpVector(cent->prev.old_origin, cent->current.old_origin,
-                       cl.lerpfrac, ent.oldorigin);
+                        cl.lerpfrac, ent.oldorigin);
         } else {
             if (s1->number == cl.frame.clientNum + 1) {
                 // use predicted origin
@@ -715,7 +715,8 @@ static void CL_AddPacketEntities(void)
                     ent.skin = cl.image_precache[s1->frame];
                 if (!ent.skin)
                     ent.skin = cl_img_flare;
-                ent.scale = s1->scale ? s1->scale : 1;
+                float s = s1->scale ? s1->scale : 1;
+                VectorSet(ent.scale, s, s, s);
                 ent.flags = renderfx | RF_TRANSLUCENT;
                 if (!s1->skinnum)
                     ent.rgba.u32 = U32_WHITE;
@@ -740,7 +741,7 @@ static void CL_AddPacketEntities(void)
             }
 
             if ((renderfx & RF_BEAM) && s1->modelindex > 1) {
-                CL_DrawBeam(ent.oldorigin, ent.origin, cl.model_draw[s1->modelindex]);
+                CL_DrawBeam(ent.origin, ent.oldorigin, ent.frame, cl.model_draw[s1->modelindex]);
                 goto skip;
             }
         }
@@ -909,7 +910,7 @@ static void CL_AddPacketEntities(void)
             has_alpha = true;
         }
 
-        ent.scale = s1->scale;
+        VectorSet(ent.scale, s1->scale, s1->scale, s1->scale);
 
         if (IS_TRACKER(effects))
             ent.flags |= RF_TRACKER;
@@ -1032,7 +1033,8 @@ static void CL_AddPacketEntities(void)
                 VectorAdd(ent.origin, mid, ent.origin);
                 AngleVectors(ent.angles, forward, NULL, NULL);
                 VectorMA(ent.origin, cent->maxs[0], forward, ent.origin);
-                ent.scale = cent->radius * 0.8f;
+                float s = cent->radius * 0.8f;
+                VectorSet(ent.scale, s, s, s);
                 ent.flags |= RF_FULLBRIGHT;
                 V_AddEntity(&ent);
                 VectorCopy(tmp, ent.origin);
@@ -1314,7 +1316,7 @@ static void CL_AddViewWeapon(void)
     gun.alpha = 1.0f;
     gun.model = cl.weapon.muzzle.model;
     gun.skinnum = 0;
-    gun.scale = cl.weapon.muzzle.scale;
+    VectorSet(gun.scale, cl.weapon.muzzle.scale, cl.weapon.muzzle.scale, cl.weapon.muzzle.scale);
     gun.backlerp = 0.0f;
     gun.frame = gun.oldframe = 0;
     gun.backlerp = 0.f;

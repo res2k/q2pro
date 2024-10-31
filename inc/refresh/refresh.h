@@ -65,7 +65,7 @@ typedef struct entity_s {
     uint64_t    flags;
 
     qhandle_t   skin;           // NULL for inline skin
-    float       scale;
+    vec3_t      scale;
     float       bottom_z; // for shadows
 } entity_t;
 

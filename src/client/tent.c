@@ -469,7 +469,7 @@ void CL_AddMuzzleFX(const vec3_t origin, const vec3_t angles, cl_muzzlefx_t fx, 
     ex->start = cl.servertime - CL_FRAMETIME;
     ex->ent.model = cl_mod_muzzles[fx];
     ex->ent.skinnum = skin;
-    ex->ent.scale = scale;
+    VectorSet(ex->ent.scale, scale, scale, scale);
     if (fx != MFLASH_BOOMER)
         ex->ent.angles[2] = Q_rand() % 360;
 }
@@ -499,7 +499,7 @@ void CL_AddHelpPath(const vec3_t origin, const vec3_t dir, bool first)
     ex->ent.alpha = 1.0f;
     ex->start = cl.servertime - CL_FRAMETIME;
     ex->ent.model = cl_mod_marker;
-    ex->ent.scale = 2.5f;
+    VectorSet(ex->ent.scale, 2.5f, 2.5f, 2.5f);
 }
 
 /*
@@ -758,6 +758,7 @@ typedef struct {
     vec3_t      offset;
     vec3_t      start, end;
     int         soundtime;
+    float       model_len; // for custom beams
 } beam_t;
 
 static beam_t   cl_beams[MAX_BEAMS];
@@ -796,6 +797,8 @@ override:
                 b->soundtime = cl.time + 500;
             }
 
+            b->model_len = 0;
+
             return;
         }
     }
@@ -807,37 +810,31 @@ static void CL_ParsePlayerBeam(qhandle_t model)
     int     i;
 
 // override any beam with the same entity
-    for (i = 0, b = cl_playerbeams; i < MAX_BEAMS; i++, b++) {
-        if (b->entity == te.entity1) {
-            b->model = model;
-            b->endtime = cl.time + 200;
-            VectorCopy(te.pos1, b->start);
-            VectorCopy(te.pos2, b->end);
-            VectorCopy(te.offset, b->offset);
-            return;
-        }
-    }
+    for (i = 0, b = cl_playerbeams; i < MAX_BEAMS; i++, b++)
+        if (b->entity == te.entity1)
+            goto override;
 
 // find a free beam
     for (i = 0, b = cl_playerbeams; i < MAX_BEAMS; i++, b++) {
         if (!b->model || b->endtime < cl.time) {
+override:
             b->entity = te.entity1;
             b->model = model;
             b->endtime = cl.time + 100;     // PMM - this needs to be 100 to prevent multiple heatbeams
             VectorCopy(te.pos1, b->start);
             VectorCopy(te.pos2, b->end);
             VectorCopy(te.offset, b->offset);
+            b->model_len = 0;
             return;
         }
     }
 }
 
-void CL_DrawBeam(const vec3_t start, const vec3_t end, qhandle_t model)
+void CL_DrawBeam(const vec3_t start, const vec3_t end, float model_length, qhandle_t model)
 {
-    int         i, steps;
     vec3_t      dist, angles;
     entity_t    ent;
-    float       d, len, model_length;
+    float       d;
 
     // calculate pitch and yaw
     VectorSubtract(end, start, dist);
@@ -845,37 +842,19 @@ void CL_DrawBeam(const vec3_t start, const vec3_t end, qhandle_t model)
 
     // add new entities for the beams
     d = VectorNormalize(dist);
-    if (model == cl_mod_lightning) {
-        model_length = 35.0f;
-        d -= 20.0f; // correction so it doesn't end in middle of tesla
-    } else {
-        model_length = 30.0f;
+    if (!model_length) {
+        // old, hardcoded lengths
+        if (model == cl_mod_lightning)
+            model_length = 35.0;
+        else
+            model_length = 30.0;
     }
-    steps = ceilf(d / model_length);
 
     memset(&ent, 0, sizeof(ent));
     ent.model = model;
 
-    // PMM - special case for lightning model .. if the real length is shorter than the model,
-    // flip it around & draw it from the end to the start.  This prevents the model from going
-    // through the tesla mine (instead it goes through the target)
-    if ((model == cl_mod_lightning) && (steps <= 1)) {
-        VectorCopy(end, ent.origin);
-        ent.flags = RF_FULLBRIGHT;
-        ent.angles[0] = angles[0];
-        ent.angles[1] = angles[1];
-        ent.angles[2] = Com_SlowRand() % 360;
-        V_AddEntity(&ent);
-        return;
-    }
-
-    if (steps > 1) {
-        len = (d - model_length) / (steps - 1);
-        VectorScale(dist, len, dist);
-    }
-
     VectorCopy(start, ent.origin);
-    for (i = 0; i < steps; i++) {
+    while (d > 0.0f) {
         if (model == cl_mod_lightning) {
             ent.flags = RF_FULLBRIGHT;
             ent.angles[0] = -angles[0];
@@ -887,8 +866,27 @@ void CL_DrawBeam(const vec3_t start, const vec3_t end, qhandle_t model)
             ent.angles[2] = Com_SlowRand() % 360;
         }
 
+        // nb: re-release randomizes the frames but we can't
+        // access the model frame count here in q2pro...
+        ent.flags |= EF_ANIM_ALLFAST;
+
+        VectorSet(ent.scale, 1.f, 1.f, 1.f);
+
+        bool stretch = d < model_length;
+        float stretch_len = min(d, model_length);
+
+        if (stretch)
+            VectorSet(ent.scale, d / model_length, 1.f, 1.f);
+
+        if (model != cl_mod_lightning)
+            VectorMA(ent.origin, 0.5f * stretch_len, dist, ent.origin);
+
         V_AddEntity(&ent);
-        VectorAdd(ent.origin, dist, ent.origin);
+
+        float s = ((model != cl_mod_lightning) ? 0.5f : 1.0f) * model_length;
+
+        VectorMA(ent.origin, s, dist, ent.origin);
+        d -= model_length;
     }
 }
 
@@ -914,7 +912,7 @@ static void CL_AddBeams(void)
         else
             VectorAdd(b->start, b->offset, org);
 
-        CL_DrawBeam(org, b->end, b->model);
+        CL_DrawBeam(org, b->end, b->model_len, b->model);
     }
 }
 
@@ -1493,7 +1491,7 @@ void CL_ParseTEnt(void)
     case TE_EXPLOSION1_BIG:
         ex = CL_PlainExplosion();
         ex->ent.model = cl_mod_explo4;
-        ex->ent.scale = 2.0f;
+        VectorSet(ex->ent.scale, 2.0f, 2.0f, 2.0f);
         S_StartSound(te.pos1, 0, 0, cl_sfx_rockexp, 1, ATTN_NORM, 0);
         break;
 
@@ -1656,7 +1654,7 @@ void CL_ParseTEnt(void)
         ex->type = ex_misc;
         ex->ent.model = cl_mod_explode;
         ex->ent.flags = RF_FULLBRIGHT | RF_TRANSLUCENT;
-        ex->ent.scale = 3;
+        VectorSet(ex->ent.scale, 3.0f, 3.0f, 3.0f);
         ex->ent.skinnum = 2;
         ex->start = cl.servertime - CL_FRAMETIME;
         ex->light = 550;

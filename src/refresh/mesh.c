@@ -559,8 +559,9 @@ static void draw_shadow(const uint16_t *indices, int num_indices)
     if (gl_shadows_fade->integer && glr.ent->bottom_z) {
         float dist = glr.ent->bottom_z - glr.lightpoint.position[2];
 
+        float scale = max(glr.ent->scale[0], max(glr.ent->scale[1], glr.ent->scale[2]));
         float radius = LERP2(m_model->frames[newframenum].radius, m_model->frames[oldframenum].radius,
-            backlerp, frontlerp) * 5.0f * (glr.ent->scale ? glr.ent->scale : 1.0f);
+            backlerp, frontlerp) * 5.0f * (scale ? scale : 1.0f);
 
         dist = dist / radius;
 

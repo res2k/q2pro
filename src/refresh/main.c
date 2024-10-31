@@ -285,12 +285,14 @@ void GL_SetEntityAxis(void)
         glr.entrotated = true;
     }
 
-    if (e->scale && e->scale != 1) {
-        VectorScale(glr.entaxis[0], e->scale, glr.entaxis[0]);
-        VectorScale(glr.entaxis[1], e->scale, glr.entaxis[1]);
-        VectorScale(glr.entaxis[2], e->scale, glr.entaxis[2]);
+    if ((e->scale[0] && e->scale[0] != 1) ||
+        (e->scale[1] && e->scale[1] != 1) ||
+        (e->scale[2] && e->scale[2] != 1)) {
+        VectorScale(glr.entaxis[0], e->scale[0], glr.entaxis[0]);
+        VectorScale(glr.entaxis[1], e->scale[1], glr.entaxis[1]);
+        VectorScale(glr.entaxis[2], e->scale[2], glr.entaxis[2]);
         glr.entrotated = true;
-        glr.entscale = e->scale;
+        glr.entscale = max(e->scale[0], max(e->scale[1], e->scale[2]));
     }
 }
 

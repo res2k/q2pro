@@ -92,6 +92,7 @@ typedef int qhandle_t;
 #define MAX_IMAGES          512     // FIXME: Q2PRO extended protocol raises this to 2048
 #endif // !defined(GAME3_INCLUDE)
 
+#define MODELINDEX_WORLD    1
 #define MODELINDEX_PLAYER   (MAX_MODELS_OLD - 1)
 
 #if !defined(GAME3_INCLUDE)

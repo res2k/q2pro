@@ -1199,7 +1199,7 @@ static void shader_init(void)
     
     qglGenBuffers(1, &gl_static.dlight_buffer);
     GL_BindBuffer(GL_UNIFORM_BUFFER, gl_static.dlight_buffer);
-    qglBindBufferBase(GL_UNIFORM_BUFFER, UBO_DLIGHTS, gl_static.dlight_buffer);
+    GL_BindBufferBase(GL_UNIFORM_BUFFER, UBO_DLIGHTS, gl_static.dlight_buffer);
     qglBufferData(GL_UNIFORM_BUFFER, sizeof(gls.u_dlights), NULL, GL_DYNAMIC_DRAW);
 
     // precache common shader

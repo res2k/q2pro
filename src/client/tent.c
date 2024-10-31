@@ -1390,11 +1390,13 @@ void CL_ParseTEnt(void)
         dirtoangles(ex->ent.angles);
         ex->type = ex_misc;
         ex->ent.flags = RF_FULLBRIGHT | RF_TRANSLUCENT;
+        ex->light = 150;
         switch (te.type) {
         case TE_BLASTER:
             CL_BlasterParticles(te.pos1, te.dir);
             ex->lightcolor[0] = 1;
             ex->lightcolor[1] = 1;
+            ex->light = 200;
             break;
         case TE_BLASTER2:
             CL_BlasterParticles2(te.pos1, te.dir, 0xd0);
@@ -1413,7 +1415,6 @@ void CL_ParseTEnt(void)
             break;
         }
         ex->start = cl.servertime - CL_FRAMETIME;
-        ex->light = 150;
         ex->ent.model = cl_mod_explode;
         ex->frames = 4;
         S_StartSound(te.pos1,  0, 0, cl_sfx_lashit, 1, ATTN_NORM, 0);

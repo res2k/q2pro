@@ -1255,7 +1255,7 @@ static void SCR_DrawStats(void)
     stat_state.y = 24;
     stat_state.key_id = 0;
 
-    SCR_StatTableSize(31, 32);
+    SCR_StatTableSize(24, 32);
 
     stat_active->cb();
 }

@@ -3436,17 +3436,27 @@ bool CL_ProcessEvents(void)
 
 /*
 ====================
-CL_Init
+CL_Client_Timings_stat
 ====================
 */
-static void CL_Client_stat(void)
+static void CL_Client_Timings_stat(void)
 {
-    SCR_StatKeyValue("realtime", va("%u", cls.realtime));
-    SCR_StatKeyValue("com_localTime", va("%u", com_localTime));
-    SCR_StatKeyValue("com_localTime2", va("%u", com_localTime2));
-    SCR_StatKeyValue("time", va("%u", cl.time));
-    SCR_StatKeyValue("servertime", va("%u", cl.servertime));
-    SCR_StatKeyValue("frametime", va("%f", cls.frametime));
+    SCR_StatKeyValueu("realtime", cls.realtime);
+    SCR_StatKeyValueu("com_localTime", com_localTime);
+    SCR_StatKeyValueu("com_localTime2", com_localTime2);
+    SCR_StatKeyValueu("time", cl.time);
+    SCR_StatKeyValueu("servertime", cl.servertime);
+    SCR_StatKeyValuef("frametime", cls.frametime);
+}
+
+/*
+====================
+CL_Client_Timings_stat
+====================
+*/
+static void CL_Client_Prediction_stat(void)
+{
+    SCR_StatKeyValuev("error", cl.prediction_error);
 }
 
 /*
@@ -3499,7 +3509,8 @@ void CL_Init(void)
     cl_cmdbuf.maxsize = sizeof(cl_cmdbuf_text);
     cl_cmdbuf.exec = exec_server_string;
     
-    SCR_RegisterStat("client", CL_Client_stat);
+    SCR_RegisterStat("client.timings", CL_Client_Timings_stat);
+    SCR_RegisterStat("client.prediction", CL_Client_Prediction_stat);
 
     Cvar_Set("cl_running", "1");
 }

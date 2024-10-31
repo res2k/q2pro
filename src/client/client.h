@@ -1253,6 +1253,15 @@ void    SCR_UnregisterStat(const char *name);
 void    SCR_StatTableSize(int key_width, int value_width);
 void    SCR_StatKeyValue(const char *key, const char *value);
 
+#define SCR_StatKeyValuei(key, value) \
+    SCR_StatKeyValue((key), va("%i", (value)))
+#define SCR_StatKeyValueu(key, value) \
+    SCR_StatKeyValue((key), va("%u", (value)))
+#define SCR_StatKeyValuef(key, value) \
+    SCR_StatKeyValue((key), va("%f", (value)))
+#define SCR_StatKeyValuev(key, value) \
+    SCR_StatKeyValue((key), va("%f %f %f", (value)[0], (value)[1], (value)[2]))
+
 //
 // cin.c
 //

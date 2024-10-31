@@ -1505,13 +1505,6 @@ void CL_CalcViewValues(void)
         cl.viewheight_change_time = cl.time;
     }
 
-    // Smooth out view height over 100ms
-    float viewheight_lerp = (cl.time - cl.viewheight_change_time);
-    viewheight_lerp = 100 - min(viewheight_lerp, 100);
-    viewheight = cl.current_viewheight + (float)(cl.prev_viewheight - cl.current_viewheight) * viewheight_lerp * 0.01f;
-
-    cl.refdef.vieworg[2] += viewheight;
-
     // if not running a demo or on a locked frame, add the local angle movement
     if (cls.demo.playback) {
         if (cls.key_dest == KEY_GAME && Key_IsDown(K_SHIFT)) {
@@ -1579,6 +1572,13 @@ void CL_CalcViewValues(void)
     cl.playerEntityAngles[PITCH] = cl.playerEntityAngles[PITCH] / 3;
 
     VectorAdd(cl.refdef.vieworg, viewoffset, cl.refdef.vieworg);
+
+    // Smooth out view height over 100ms
+    float viewheight_lerp = (cl.time - cl.viewheight_change_time);
+    viewheight_lerp = 100 - min(viewheight_lerp, 100);
+    viewheight = cl.current_viewheight + (float)(cl.prev_viewheight - cl.current_viewheight) * viewheight_lerp * 0.01f;
+
+    cl.refdef.vieworg[2] += viewheight;
 
     VectorCopy(cl.refdef.vieworg, listener_origin);
     VectorCopy(cl.v_forward, listener_forward);

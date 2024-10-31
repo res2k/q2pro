@@ -292,13 +292,6 @@ void CL_PredictMovement(void)
     Vector4Copy(pm.screen_blend, cl.predicted_screen_blend);
     cl.predicted_rdflags = pm.rdflags;
 
-    // Record viewheight changes
-    if (cl.current_viewheight != pm.s.viewheight) {
-        cl.prev_viewheight = cl.current_viewheight;
-        cl.current_viewheight = pm.s.viewheight;
-        cl.viewheight_change_time = cl.time;
-    }
-
     cl.last_groundplane = pm.groundplane;
     cl.last_groundentity = pm.groundentity;
 }

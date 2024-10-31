@@ -1474,6 +1474,8 @@ void CL_CalcViewValues(void)
 
     lerp = cl.lerpfrac;
 
+    float viewheight;
+
     // calculate the origin
     if (!cls.demo.playback && cl_predict->integer && !(ps->pmove.pm_flags & PMF_NO_PREDICTION)) {
         // use predicted values
@@ -1494,8 +1496,21 @@ void CL_CalcViewValues(void)
             cl.refdef.vieworg[i] = ops->pmove.origin[i] +
                 lerp * (ps->pmove.origin[i] - ops->pmove.origin[i]);
         }
-        cl.refdef.vieworg[2] += ops->pmove.viewheight;
     }
+    
+    // Record viewheight changes
+    if (cl.current_viewheight != ps->pmove.viewheight) {
+        cl.prev_viewheight = cl.current_viewheight;
+        cl.current_viewheight = ps->pmove.viewheight;
+        cl.viewheight_change_time = cl.time;
+    }
+
+    // Smooth out view height over 100ms
+    float viewheight_lerp = (cl.time - cl.viewheight_change_time);
+    viewheight_lerp = 100 - min(viewheight_lerp, 100);
+    viewheight = cl.current_viewheight + (float)(cl.prev_viewheight - cl.current_viewheight) * viewheight_lerp * 0.01f;
+
+    cl.refdef.vieworg[2] += viewheight;
 
     // if not running a demo or on a locked frame, add the local angle movement
     if (cls.demo.playback) {
@@ -1551,12 +1566,6 @@ void CL_CalcViewValues(void)
     cl.fov_y = V_CalcFov(cl.fov_x, 4, 3);
 
     LerpVector(ops->viewoffset, ps->viewoffset, lerp, viewoffset);
-
-    // Smooth out view height over 100ms
-    float viewheight_lerp = (cl.time - cl.viewheight_change_time);
-    viewheight_lerp = 100 - min(viewheight_lerp, 100);
-    float predicted_viewheight = cl.current_viewheight + (float)(cl.prev_viewheight - cl.current_viewheight) * viewheight_lerp * 0.01f;
-    viewoffset[2] += predicted_viewheight;
 
     AngleVectors(cl.refdef.viewangles, cl.v_forward, cl.v_right, cl.v_up);
 

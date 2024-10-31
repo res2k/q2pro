@@ -60,7 +60,7 @@ void OGG_Restart(void);
 #define OGG_LoadTrackList() (void)0
 #define OGG_Init()          (void)0
 #define OGG_Shutdown()      (void)0
-#define OGG_Restart         (void)0
+#define OGG_Restart()       (void)0
 #endif
 
 extern vec3_t   listener_origin;

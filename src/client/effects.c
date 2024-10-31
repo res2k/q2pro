@@ -1905,5 +1905,5 @@ void CL_InitEffects(void)
     cl_lerp_lightstyles = Cvar_Get("cl_lerp_lightstyles", "1", 0);
     cl_rerelease_effects = Cvar_Get("cl_rerelease_effects", "1", 0);
     cl_muzzlelight_time = Cvar_Get("cl_muzzlelight_time", "100", 0);
-    cl_shadowlights = Cvar_Get("cl_shadowlights", "0", 0);
+    cl_shadowlights = Cvar_Get("cl_shadowlights", "1", 0);
 }

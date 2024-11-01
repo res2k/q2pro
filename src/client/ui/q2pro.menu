@@ -221,13 +221,23 @@ begin multiplayer
     action "start server" pushmenu startserver
 end
 
+begin skill_select
+    banner m_banner_game
+    action easy "forcemenuoff; skill 0; deathmatch 0; coop 0; maxclients 1; _mapdb_run"
+    action medium "forcemenuoff; skill 1; deathmatch 0; coop 0; maxclients 1; _mapdb_run"
+    action hard "forcemenuoff; skill 2; deathmatch 0; coop 0; maxclients 1; _mapdb_run"
+    action nightmare "forcemenuoff; skill 3; deathmatch 0; coop 0; maxclients 1; _mapdb_run"
+end
+
 begin singleplayer
     banner m_banner_game
-    action easy "skill 0; deathmatch 0; coop 0; maxclients 1; newgame"
-    action medium "skill 1; deathmatch 0; coop 0; maxclients 1; newgame"
-    action hard "skill 2; deathmatch 0; coop 0; maxclients 1; newgame"
-    action nightmare "skill 3; deathmatch 0; coop 0; maxclients 1; newgame"
+	episode_selector episode _mapdb_episode
+	action "start episode" "set _mapdb_type episode; pushmenu skill_select"
     blank
+	unit_selector level _mapdb_level
+	blank
+	action "start level" "set _mapdb_type level; pushmenu skill_select"
+	blank
     action "load game..." pushmenu loadgame
     action "save game..." pushmenu savegame
 end

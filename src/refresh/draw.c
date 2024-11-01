@@ -468,8 +468,17 @@ int R_DrawString(int x, int y, int flags, size_t maxlen, const char *s, qhandle_
 {
     const image_t *image = IMG_ForHandle(font);
 
+    int sx = x;
+
     while (maxlen-- && *s) {
         byte c = *s++;
+
+        if ((flags & UI_MULTILINE) && c == '\n') {
+            y += CHAR_HEIGHT;
+            x = sx;
+            continue;
+        }
+
         draw_char(x, y, CHAR_WIDTH, CHAR_HEIGHT, flags, c, image);
         x += CHAR_WIDTH;
     }

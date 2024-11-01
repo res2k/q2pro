@@ -637,6 +637,9 @@ void UI_Init(void)
 
     strcpy(uis.weaponModel, "w_railgun.md2");
 
+    // load mapdb
+    MapDB_Init();
+
     // load custom menus
     UI_LoadScript();
 
@@ -671,6 +674,8 @@ void UI_Shutdown(void)
     Cmd_Deregister(c_ui);
 
     memset(&uis, 0, sizeof(uis));
+
+    MapDB_Shutdown();
 
     Z_LeakTest(TAG_UI);
 }

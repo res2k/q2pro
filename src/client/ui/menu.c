@@ -565,6 +565,26 @@ void SpinControl_Init(menuSpinControl_t *s)
 
 /*
 =================
+EpisodeControl_Init
+=================
+*/
+void EpisodeControl_Init(menuEpisodeSelector_t *s)
+{
+    SpinControl_Init(&s->spin);
+}
+
+/*
+=================
+EpisodeControl_Init
+=================
+*/
+void UnitControl_Init(menuEpisodeSelector_t *s)
+{
+    SpinControl_Init(&s->spin);
+}
+
+/*
+=================
 SpinControl_DoEnter
 =================
 */
@@ -723,6 +743,7 @@ void ImageSpinControl_Init(menuSpinControl_t *s)
 
     // find the selected value
     const char *val = s->cvar->string;
+    size_t val_len = strlen(val);
 
     s->curvalue = -1;
 
@@ -733,7 +754,7 @@ void ImageSpinControl_Init(menuSpinControl_t *s)
         const char *dot = strchr(file_value, '.');
         size_t file_name_length = dot - file_value;
 
-        if (!Q_strncasecmp(val, file_value, file_name_length)) {
+        if (!Q_strncasecmp(val, file_value, max(val_len, file_name_length))) {
             s->curvalue = i;
             break;
         }
@@ -869,6 +890,38 @@ static void Toggle_Pop(menuSpinControl_t *s)
 {
     if (s->curvalue == 0 || s->curvalue == 1)
         Cvar_SetInteger(s->cvar, s->curvalue ^ s->negate, FROM_MENU);
+}
+
+// Episode selector
+
+static void Episode_Push(menuEpisodeSelector_t *s)
+{
+    s->spin.curvalue = 0;
+}
+
+static void Episode_Pop(menuEpisodeSelector_t *s)
+{
+    if (s->spin.curvalue >= 0 && s->spin.curvalue < s->spin.numItems)
+        Cvar_SetInteger(s->spin.cvar, s->spin.curvalue, FROM_MENU);
+}
+
+// Unit selector
+
+static void Unit_Free(menuUnitSelector_t *s)
+{
+    Z_Free(s->itemindices);
+    SpinControl_Free(&s->spin);
+}
+
+static void Unit_Push(menuUnitSelector_t *s)
+{
+    s->spin.curvalue = 0;
+}
+
+static void Unit_Pop(menuUnitSelector_t *s)
+{
+    if (s->spin.curvalue >= 0 && s->spin.curvalue < s->spin.numItems)
+        Cvar_SetInteger(s->spin.cvar, s->itemindices[s->spin.curvalue], FROM_MENU);
 }
 
 /*
@@ -1919,6 +1972,12 @@ void Menu_Init(menuFrameWork_t *menu)
         case MTYPE_TOGGLE:
             SpinControl_Init(item);
             break;
+        case MTYPE_EPISODE:
+            EpisodeControl_Init(item);
+            break;
+        case MTYPE_UNIT:
+            UnitControl_Init(item);
+            break;
         case MTYPE_IMAGESPINCONTROL:
             ImageSpinControl_Init(item);
             break;
@@ -2301,6 +2360,8 @@ void Menu_Draw(menuFrameWork_t *menu)
         case MTYPE_VALUES:
         case MTYPE_STRINGS:
         case MTYPE_TOGGLE:
+        case MTYPE_EPISODE:
+        case MTYPE_UNIT:
             SpinControl_Draw(item);
             break;
         case MTYPE_ACTION:
@@ -2358,6 +2419,8 @@ menuSound_t Menu_SelectItem(menuFrameWork_t *s)
     case MTYPE_STRINGS:
     case MTYPE_TOGGLE:
     case MTYPE_IMAGESPINCONTROL:
+    case MTYPE_EPISODE:
+    case MTYPE_UNIT:
         return SpinControl_DoEnter((menuSpinControl_t *)item);
     case MTYPE_KEYBIND:
         return Keybind_DoEnter((menuKeybind_t *)item);
@@ -2391,6 +2454,8 @@ menuSound_t Menu_SlideItem(menuFrameWork_t *s, int dir)
     case MTYPE_STRINGS:
     case MTYPE_TOGGLE:
     case MTYPE_IMAGESPINCONTROL:
+    case MTYPE_EPISODE:
+    case MTYPE_UNIT:
         return SpinControl_DoSlide((menuSpinControl_t *)item, dir);
     default:
         return QMS_NOTHANDLED;
@@ -2587,6 +2652,12 @@ bool Menu_Push(menuFrameWork_t *menu)
         case MTYPE_IMAGESPINCONTROL:
             ImageSpinControl_Push(item);
             break;
+        case MTYPE_EPISODE:
+            Episode_Push(item);
+            break;
+        case MTYPE_UNIT:
+            Unit_Push(item);
+            break;
         default:
             break;
         }
@@ -2630,6 +2701,12 @@ void Menu_Pop(menuFrameWork_t *menu)
         case MTYPE_IMAGESPINCONTROL:
             ImageSpinControl_Pop(item);
             break;
+        case MTYPE_EPISODE:
+            Episode_Pop(item);
+            break;
+        case MTYPE_UNIT:
+            Unit_Pop(item);
+            break;
         default:
             break;
         }
@@ -2662,7 +2739,11 @@ void Menu_Free(menuFrameWork_t *menu)
             break;
         case MTYPE_SPINCONTROL:
         case MTYPE_STRINGS:
+        case MTYPE_EPISODE:
             SpinControl_Free(item);
+            break;
+        case MTYPE_UNIT:
+            Unit_Free(item);
             break;
         case MTYPE_KEYBIND:
             Keybind_Free(item);

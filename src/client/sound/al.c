@@ -18,7 +18,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "sound.h"
 #include "qal.h"
-#include "common/jsmn.h"
+#include "common/json.h"
 
 // translates from AL coordinate system to quake
 #define AL_UnpackVector(v)  -v[1],v[2],-v[0]
@@ -334,131 +334,44 @@ static void AL_UpdateReverb(void)
     }
 }
 
-// skips the current token entirely, making sure that
-// current_token will point to the actual next logical
-// token to be parsed.
-static void JSON_SkipToken(jsmntok_t *tokens, size_t num_tokens, jsmntok_t **current_token)
+static void AL_LoadReverbEntry(json_parse_t *parser, al_reverb_entry_t *out_entry)
 {
-    // just in case...
-    if ((*current_token - tokens) >= num_tokens) {
-        return;
-    }
-
-    size_t num_to_parse;
-
-    switch ((*current_token)->type) {
-    case JSMN_UNDEFINED:
-    case JSMN_STRING:
-    case JSMN_PRIMITIVE:
-        (*current_token)++;
-        break;
-    case JSMN_ARRAY: {
-        size_t num_to_parse = (*current_token)->size;
-        (*current_token)++;
-        for (size_t i = 0; i < num_to_parse; i++) {
-            JSON_SkipToken(tokens, num_tokens, current_token);
-        }
-        break;
-    }
-    case JSMN_OBJECT:
-        num_to_parse = (*current_token)->size;
-        (*current_token)++;
-        for (size_t i = 0; i < num_to_parse; i++) {
-            (*current_token)++;
-            JSON_SkipToken(tokens, num_tokens, current_token);
-        }
-        break;
-    }
-}
-
-static inline bool JSON_Load(const char *filename, const char **buffer, jsmntok_t **tokens, size_t *num_tokens)
-{
-    *tokens = NULL;
-
-    int64_t buffer_len;
-
-    if ((buffer_len = FS_LoadFile(filename, (void **) buffer)) < 0)
-        return false;
-    
-    // calculate the total token size so we can grok all of them.
-    jsmn_parser p;
-        
-    jsmn_init(&p);
-    *num_tokens = jsmn_parse(&p, *buffer, buffer_len, NULL, 0);
-        
-    *tokens = Z_Malloc(sizeof(jsmntok_t) * (*num_tokens));
-
-    if (!*tokens)
-        goto fail;
-
-    // decode all tokens
-    jsmn_init(&p);
-    jsmn_parse(&p, *buffer, buffer_len, *tokens, (*num_tokens));
-
-    return true;
-
-fail:
-    return false;
-}
-
-static inline void JSON_Free(jsmntok_t *tokens)
-{
-    Z_Free(tokens);
-}
-
-#define JSON_ENSURE(id) \
-    if ((t - tokens) >= num_tokens) { ret = Q_ERR_INVALID_FORMAT; goto fail; } \
-    if (t->type != id) { ret = Q_ERR_INVALID_FORMAT; goto fail; }
-
-#define JSON_ENSURE_NEXT(id) \
-    JSON_ENSURE(id); t++;
-
-#define JSON_STRCMP(s) \
-    strncmp(buffer + t->start, s, t->end - t->start)
-
-static int AL_LoadReverbEntry(const char *buffer, jsmntok_t *tokens, size_t num_tokens, jsmntok_t **t_out, al_reverb_entry_t *out_entry)
-{
-    int ret = 0;
-    jsmntok_t *t = *t_out;
-
-    size_t fields = t->size;
-    JSON_ENSURE_NEXT(JSMN_OBJECT);
+    size_t fields = parser->pos->size;
+    Json_EnsureNext(parser, JSMN_OBJECT);
 
     for (size_t i = 0; i < fields; i++) {
-        if (!JSON_STRCMP("materials")) {
-            t++;
+        if (!Json_Strcmp(parser, "materials")) {
+            parser->pos++;
 
-            if (t->type == JSMN_STRING) {
+            if (parser->pos->type == JSMN_STRING) {
+                if (parser->buffer[parser->pos->start] != '*')
+                    Json_Error(parser, parser->pos, "expected string to start with *\n");
 
-                if (buffer[t->start] != '*') {
-                    ret = -1;
-                    goto fail;
-                }
-
-                t++;
+                parser->pos++;
             } else {
-                size_t n = t->size;
-                JSON_ENSURE_NEXT(JSMN_ARRAY);
+                size_t n = parser->pos->size;
+                Json_EnsureNext(parser, JSMN_ARRAY);
                 out_entry->num_materials = n;
                 out_entry->materials = Z_TagMalloc(sizeof(*out_entry->materials) * n, TAG_SOUND);
 
-                for (size_t m = 0; m < n; m++, t++) {
-                    JSON_ENSURE(JSMN_STRING);
-                    Q_strnlcpy(out_entry->materials[m].material, buffer + t->start, t->end - t->start, sizeof(out_entry->materials[m].material));
+                for (size_t m = 0; m < n; m++, parser->pos++) {
+                    Json_Ensure(parser, JSMN_STRING);
+                    Q_strnlcpy(out_entry->materials[m].material,
+                        parser->buffer + parser->pos->start,
+                        parser->pos->end - parser->pos->start,
+                        sizeof(out_entry->materials[m].material));
                 }
             }
 
-        } else if (!JSON_STRCMP("preset")) {
-            t++;
+        } else if (!Json_Strcmp(parser, "preset")) {
+            parser->pos++;
 
-            JSON_ENSURE(JSMN_STRING);
+            Json_Ensure(parser, JSMN_STRING);
             size_t p = 0;
 
-            for (; p < q_countof(s_reverb_names); p++) {
-                if (!JSON_STRCMP(s_reverb_names[p])) {
+            for (; p < q_countof(s_reverb_names); p++)
+                if (!Json_Strcmp(parser, s_reverb_names[p]))
                     break;
-                }
-            }
 
             if (p == q_countof(s_reverb_names)) {
                 Com_WPrintf("missing sound environment preset\n");
@@ -467,54 +380,41 @@ static int AL_LoadReverbEntry(const char *buffer, jsmntok_t *tokens, size_t num_
                 out_entry->preset = p;
             }
 
-            t++;
+            parser->pos++;
         } else {
-            t++;
-            JSON_SkipToken(tokens, num_tokens, &t);
+            parser->pos++;
+            Json_SkipToken(parser);
         }
     }
-
-fail:
-    *t_out = t;
-    return ret;
 }
 
-static int AL_LoadReverbEnvironment(const char *buffer, jsmntok_t *tokens, size_t num_tokens, jsmntok_t **t_out, al_reverb_environment_t *out_environment)
+static void AL_LoadReverbEnvironment(json_parse_t *parser, al_reverb_environment_t *out_environment)
 {
     int ret = 0;
-    jsmntok_t *t = *t_out;
 
-    size_t fields = t->size;
-    JSON_ENSURE_NEXT(JSMN_OBJECT);
+    size_t fields = parser->pos->size;
+    Json_EnsureNext(parser, JSMN_OBJECT);
 
     for (size_t i = 0; i < fields; i++) {
-        if (!JSON_STRCMP("dimension")) {
-            t++;
-            JSON_ENSURE(JSMN_PRIMITIVE);
-            out_environment->dimension = atof(buffer + t->start);
-            t++;
-        } else if (!JSON_STRCMP("reverbs")) {
-            t++;
+        if (!Json_Strcmp(parser, "dimension")) {
+            Json_Next(parser);
+            Json_Ensure(parser, JSMN_PRIMITIVE);
+            out_environment->dimension = atof(parser->buffer + parser->pos->start);
+            parser->pos++;
+        } else if (!Json_Strcmp(parser, "reverbs")) {
+            Json_Next(parser);
 
-            out_environment->num_reverbs = t->size;
-            JSON_ENSURE_NEXT(JSMN_ARRAY);
+            out_environment->num_reverbs = parser->pos->size;
+            Json_EnsureNext(parser, JSMN_ARRAY);
             out_environment->reverbs = Z_TagMallocz(sizeof(al_reverb_entry_t) * out_environment->num_reverbs, TAG_SOUND);
 
-            for (size_t r = 0; r < out_environment->num_reverbs; r++) {
-                ret = AL_LoadReverbEntry(buffer, tokens, num_tokens, &t, &out_environment->reverbs[r]);
-
-                if (ret < 0)
-                    goto fail;
-            }
+            for (size_t r = 0; r < out_environment->num_reverbs; r++)
+                AL_LoadReverbEntry(parser, &out_environment->reverbs[r]);
         } else {
-            t++;
-            JSON_SkipToken(tokens, num_tokens, &t);
+            parser->pos++;
+            Json_SkipToken(parser);
         }
     }
-
-fail:
-    *t_out = t;
-    return ret;
 }
 
 static void AL_FreeReverbEnvironments(al_reverb_environment_t *environments, size_t num_environments)
@@ -565,61 +465,43 @@ static void AL_SetReverbStepIDs(void)
 
 static void AL_LoadReverbEnvironments(void)
 {
-    const char *buffer;
-    jsmntok_t *tokens;
-    size_t num_tokens;
-    int ret = 0;
+    json_parse_t parser = {0};
     al_reverb_environment_t *environments = NULL;
     size_t n = 0;
 
-    if (!JSON_Load("sound/default.environments", &buffer, &tokens, &num_tokens)) {
-        ret = Q_ERR_INVALID_FORMAT;
-        goto fail;
+    if (Json_ErrorHandler(parser)) {
+        Com_WPrintf("Couldn't load sound/default.environments[%s]; %s\n", parser.error_loc, parser.error);
+        AL_FreeReverbEnvironments(environments, n);
+        return;
     }
 
-    jsmntok_t *t = tokens;
+    Json_Load("sound/default.environments", &parser);
 
-    JSON_ENSURE_NEXT(JSMN_OBJECT);
+    Json_EnsureNext(&parser, JSMN_OBJECT);
 
-    if (JSON_STRCMP("environments")) {
-        ret = Q_ERR_INVALID_FORMAT;
-        goto fail;
-    }
+    if (Json_Strcmp(&parser, "environments")) 
+        Json_Error(&parser, parser.pos, "expected \"environments\" key\n");
 
-    t++;
+    Json_Next(&parser);
 
-    n = t->size;
+    n = parser.pos->size;
     if (n == 0) {
         s_reverb_environments = NULL;
         s_num_reverb_environments = 0;
-        goto free_temp;
+        Json_Free(&parser);
+        return;
     }
-    JSON_ENSURE_NEXT(JSMN_ARRAY);
+    Json_EnsureNext(&parser, JSMN_ARRAY);
 
     environments = Z_TagMallocz(sizeof(al_reverb_environment_t) * n, TAG_SOUND);
 
-    for (size_t i = 0; i < n; i++) {
-        ret = AL_LoadReverbEnvironment(buffer, tokens, num_tokens, &t, &environments[i]);
-
-        if (ret < 0)
-            goto fail;
-    }
+    for (size_t i = 0; i < n; i++)
+        AL_LoadReverbEnvironment(&parser, &environments[i]);
 
     s_reverb_environments = environments;
     s_num_reverb_environments = n;
 
-    goto free_temp;
-
-fail:
-    if (ret < 0) {
-        Com_WPrintf("Couldn't load sound/default.environments; invalid JSON\n");
-    }
-
-    AL_FreeReverbEnvironments(environments, n);
-
-free_temp:
-    FS_FreeFile((void *) buffer);
-    JSON_Free(tokens);
+    Json_Free(&parser);
 }
 
 static void AL_Reverb_stat(void)

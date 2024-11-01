@@ -155,6 +155,61 @@ static void Parse_Spin(menuFrameWork_t *menu, menuType_t type)
     Menu_AddItem(menu, s);
 }
 
+static void Parse_EpisodeSelector(menuFrameWork_t *menu)
+{
+    menuEpisodeSelector_t *s;
+    int c;
+    char *status = NULL;
+
+    while ((c = Cmd_ParseOptions(o_common)) != -1) {
+        switch (c) {
+        case 's':
+            status = cmd_optarg;
+            break;
+        default:
+            return;
+        }
+    }
+
+    s = UI_Mallocz(sizeof(*s));
+    s->spin.generic.type = MTYPE_EPISODE;
+    s->spin.generic.name = UI_CopyString(Cmd_Argv(cmd_optind));
+    s->spin.generic.status = UI_CopyString(status);
+    s->spin.cvar = Cvar_WeakGet(Cmd_Argv(cmd_optind + 1));
+
+    MapDB_FetchEpisodes(&s->spin.itemnames, &s->spin.numItems);
+
+    Menu_AddItem(menu, s);
+}
+
+static void Parse_UnitSelector(menuFrameWork_t *menu)
+{
+    menuUnitSelector_t *s;
+    int c;
+    char *status = NULL;
+
+    while ((c = Cmd_ParseOptions(o_common)) != -1) {
+        switch (c) {
+        case 's':
+            status = cmd_optarg;
+            break;
+        default:
+            return;
+        }
+    }
+
+    s = UI_Mallocz(sizeof(*s));
+    s->spin.generic.type = MTYPE_UNIT;
+    s->spin.generic.name = UI_CopyString(Cmd_Argv(cmd_optind));
+    s->spin.generic.status = UI_CopyString(status);
+    s->spin.cvar = Cvar_WeakGet(Cmd_Argv(cmd_optind + 1));
+    s->spin.generic.uiFlags |= UI_MULTILINE;
+
+    MapDB_FetchUnits(&s->spin.itemnames, &s->itemindices, &s->spin.numItems);
+
+    Menu_AddItem(menu, s);
+}
+
 static void Parse_ImageSpin(menuFrameWork_t *menu, menuType_t type)
 {
     menuSpinControl_t *s;
@@ -711,6 +766,10 @@ static bool parse_string(char *data, int depth)
                     Parse_Blank(menu);
                 } else if (!strcmp(cmd, "imagevalues")) {
                     Parse_ImageSpin(menu, MTYPE_IMAGESPINCONTROL);
+                } else if (!strcmp(cmd, "episode_selector")) {
+                    Parse_EpisodeSelector(menu);
+                } else if (!strcmp(cmd, "unit_selector")) {
+                    Parse_UnitSelector(menu);
                 } else {
                     Com_WPrintf("Unknown keyword '%s'\n", cmd);
                 }

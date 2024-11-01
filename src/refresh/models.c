@@ -736,9 +736,7 @@ static void MOD_PrintError(const char *path, int err)
 
 #include <setjmp.h>
 
-#define JSMN_STATIC
-#define JSMN_PARENT_LINKS
-#include "jsmn.h"
+#include "common/json.h"
 
 static jmp_buf md5_jmpbuf;
 
@@ -796,7 +794,7 @@ static uint32_t MD5_ParseUint(const char **buffer, uint32_t min_v, uint32_t max_
         MD5_ParseError(va("Value out of range: %lu", v));
 
     return v;
-    }
+}
 
 static int32_t MD5_ParseInt(const char **buffer, int32_t min_v, int32_t max_v)
 {
@@ -818,7 +816,7 @@ static void MD5_ParseVector(const char **buffer, vec3_t output)
     output[0] = MD5_ParseFloat(buffer);
     output[1] = MD5_ParseFloat(buffer);
     output[2] = MD5_ParseFloat(buffer);
-        MD5_ParseExpect(buffer, ")");
+    MD5_ParseExpect(buffer, ")");
 }
 
 typedef struct {

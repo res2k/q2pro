@@ -58,7 +58,9 @@ typedef enum {
     MTYPE_BITMAP,
     MTYPE_SAVEGAME,
     MTYPE_LOADGAME,
-    MTYPE_IMAGESPINCONTROL
+    MTYPE_IMAGESPINCONTROL,
+    MTYPE_EPISODE,
+    MTYPE_UNIT,
 } menuType_t;
 
 #define QMF_LEFT_JUSTIFY    BIT(0)
@@ -234,6 +236,15 @@ typedef struct {
 } menuSpinControl_t;
 
 typedef struct {
+    menuSpinControl_t   spin;
+} menuEpisodeSelector_t;
+
+typedef struct {
+    menuSpinControl_t   spin;
+    int                 *itemindices;
+} menuUnitSelector_t;
+
+typedef struct {
     menuCommon_t generic;
     char *cmd;
 } menuAction_t;
@@ -365,3 +376,8 @@ void        Menu_Free(menuFrameWork_t *menu);
 void M_Menu_PlayerConfig(void);
 void M_Menu_Demos(void);
 void M_Menu_Servers(void);
+
+void MapDB_Init(void);
+void MapDB_FetchEpisodes(char ***items, int *num_items);
+void MapDB_FetchUnits(char ***items, int **item_indices, int *num_items);
+void MapDB_Shutdown(void);

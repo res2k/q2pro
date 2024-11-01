@@ -154,6 +154,7 @@ ui_src = [
   'src/client/ui/playermodels.c',
   'src/client/ui/script.c',
   'src/client/ui/servers.c',
+  'src/client/ui/mapdb.c',
   'src/client/ui/ui.c',
   'src/client/ui/ui.h',
 ]

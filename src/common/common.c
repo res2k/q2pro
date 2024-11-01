@@ -55,6 +55,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include <setjmp.h>
 
+#include "common/jsmn.h"
+
 static jmp_buf  com_abortframe;    // an ERR_DROP occured, exit the entire frame
 
 static void     (*com_abort_func)(void *);

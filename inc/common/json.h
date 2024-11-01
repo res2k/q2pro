@@ -35,13 +35,13 @@ typedef struct {
     int         num_tokens;
 } json_parse_t;
 
-static void Json_Free(json_parse_t *parser)
+static inline void Json_Free(json_parse_t *parser)
 {
     Z_Free(parser->tokens);
     FS_FreeFile(parser->buffer);
 }
 
-static void Json_ErrorLocation(json_parse_t *parser, jsmntok_t *tok)
+static inline void Json_ErrorLocation(json_parse_t *parser, jsmntok_t *tok)
 {
     if (!tok || tok < parser->tokens || tok >= parser->tokens + parser->num_tokens) {
         Q_strlcpy(parser->error_loc, "unknown location", sizeof(parser->error_loc));
@@ -65,14 +65,14 @@ static void Json_ErrorLocation(json_parse_t *parser, jsmntok_t *tok)
     Q_snprintf(parser->error_loc, sizeof(parser->error_loc), "%i:%i", col, row);
 }
 
-q_noreturn static void Json_Error(json_parse_t *parser, jsmntok_t *tok, const char *err)
+q_noreturn static inline void Json_Error(json_parse_t *parser, jsmntok_t *tok, const char *err)
 {
     Json_ErrorLocation(parser, tok);
     Q_strlcpy(parser->error, err, sizeof(parser->error));
     longjmp(parser->exception, -1);
 }
 
-q_noreturn static void Json_Errorno(json_parse_t *parser, jsmntok_t *tok, int err)
+q_noreturn static inline void Json_Errorno(json_parse_t *parser, jsmntok_t *tok, int err)
 {
     Json_ErrorLocation(parser, tok);
     Q_strlcpy(parser->error, Q_ErrorString(err), sizeof(parser->error));
@@ -86,7 +86,7 @@ q_noreturn static void Json_Errorno(json_parse_t *parser, jsmntok_t *tok, int er
 // will return false if a failure occurs (and it jumps to
 // that location as well). always run this with a 
 // zeroed parser.
-static void Json_Load(const char *filename, json_parse_t *parser)
+static inline void Json_Load(const char *filename, json_parse_t *parser)
 {
     jsmn_parser p;
 
@@ -117,7 +117,7 @@ static void Json_Load(const char *filename, json_parse_t *parser)
 // skips the current token entirely, making sure that
 // current_token will point to the actual next logical
 // token to be parsed.
-static void Json_SkipToken(json_parse_t *parser)
+static inline void Json_SkipToken(json_parse_t *parser)
 {
     // just in case...
     if ((parser->pos - parser->tokens) >= parser->num_tokens)
@@ -144,7 +144,7 @@ static void Json_SkipToken(json_parse_t *parser)
     }
 }
 
-static jsmntok_t *Json_Ensure(json_parse_t *parser, jsmntype_t id)
+static inline jsmntok_t *Json_Ensure(json_parse_t *parser, jsmntype_t id)
 {
     if ((parser->pos - parser->tokens) >= parser->num_tokens)
         Json_Error(parser, parser->pos, "tried to read past the end of the JSON token list");
@@ -153,26 +153,26 @@ static jsmntok_t *Json_Ensure(json_parse_t *parser, jsmntype_t id)
     return parser->pos;
 }
 
-static jsmntok_t *Json_EnsureNext(json_parse_t *parser, jsmntype_t id)
+static inline jsmntok_t *Json_EnsureNext(json_parse_t *parser, jsmntype_t id)
 {
     jsmntok_t *tok = Json_Ensure(parser, id);
     parser->pos++;
     return tok;
 }
 
-static bool Json_Strcmp(json_parse_t *parser, const char *s)
+static inline bool Json_Strcmp(json_parse_t *parser, const char *s)
 {
     Json_Ensure(parser, JSMN_STRING);
     return strncmp(parser->buffer + parser->pos->start, s, parser->pos->end - parser->pos->start);
 }
 
-static size_t Json_Strlen(json_parse_t *parser)
+static inline size_t Json_Strlen(json_parse_t *parser)
 {
     Json_Ensure(parser, JSMN_STRING);
     return parser->pos->end - parser->pos->start;
 }
 
-static jsmntok_t *Json_Next(json_parse_t *parser)
+static inline jsmntok_t *Json_Next(json_parse_t *parser)
 {
     jsmntok_t *t = parser->pos;
     parser->pos++;

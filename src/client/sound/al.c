@@ -390,8 +390,6 @@ static void AL_LoadReverbEntry(json_parse_t *parser, al_reverb_entry_t *out_entr
 
 static void AL_LoadReverbEnvironment(json_parse_t *parser, al_reverb_environment_t *out_environment)
 {
-    int ret = 0;
-
     size_t fields = parser->pos->size;
     Json_EnsureNext(parser, JSMN_OBJECT);
 

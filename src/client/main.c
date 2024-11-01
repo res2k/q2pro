@@ -1275,7 +1275,7 @@ static void CL_ConnectionlessPacket(void)
             }
             parse_err = q2proto_parse_challenge(Cmd_Args(), &accepted_protocol, 1, &challenge);
         } else {
-            parse_err = q2proto_parse_challenge(Cmd_Args(), q2proto_vanilla_protocols, q2proto_num_vanilla_protocols, &challenge);
+            parse_err = q2proto_parse_challenge(Cmd_Args(), q2proto_get_vanilla_protocols(), q2proto_get_num_vanilla_protocols(), &challenge);
         }
         if (parse_err != Q2P_ERR_SUCCESS) {
             Com_DPrintf("Challenge parse error %d.  Ignored.\n", parse_err);

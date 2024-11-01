@@ -605,7 +605,7 @@ static void SVC_GetChallenge(void)
     }
 
     char challenge_extra[64];
-    q2proto_get_challenge_extras(challenge_extra, sizeof(challenge_extra), q2proto_vanilla_protocols, q2proto_num_vanilla_protocols);
+    q2proto_get_challenge_extras(challenge_extra, sizeof(challenge_extra), q2proto_get_vanilla_protocols(), q2proto_get_num_vanilla_protocols());
 
     // send it back
     Netchan_OutOfBand(NS_SERVER, &net_from,
@@ -1037,7 +1037,7 @@ static void SVC_DirectConnect(void)
     char            *reason;
 
     q2proto_connect_t parsed_connect;
-    q2proto_error_t parse_err = q2proto_parse_connect(Cmd_Args(), q2proto_vanilla_protocols, q2proto_num_vanilla_protocols, &svs.server_info, &parsed_connect);
+    q2proto_error_t parse_err = q2proto_parse_connect(Cmd_Args(), q2proto_get_vanilla_protocols(), q2proto_get_num_vanilla_protocols(), &svs.server_info, &parsed_connect);
     if (parse_err != Q2P_ERR_SUCCESS) {
         if (parse_err == Q2P_ERR_PROTOCOL_NOT_SUPPORTED) {
             reject_printf("Unsupported protocol %d.\n", parsed_connect.protocol);
@@ -2304,11 +2304,11 @@ static void SV_FinalMessage(const char *message, error_type_t type)
         q2proto_svc_message_t print_msg = {.type = Q2P_SVC_PRINT, .print = {0}};
         print_msg.print.level = PRINT_HIGH;
         print_msg.print.string = q2proto_make_string(message);
-        q2proto_server_multicast_write(&svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &print_msg);
+        q2proto_server_multicast_write(Q2P_PROTOCOL_Q2PRO, &svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &print_msg);
     }
 
     q2proto_svc_message_t goodbye_msg = {.type = type == ERR_RECONNECT ? Q2P_SVC_RECONNECT : Q2P_SVC_DISCONNECT};
-    q2proto_server_multicast_write(&svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &goodbye_msg);
+    q2proto_server_multicast_write(Q2P_PROTOCOL_Q2PRO, &svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &goodbye_msg);
 
     // send it twice
     // stagger the packets to crutch operating system limited buffers

@@ -173,7 +173,7 @@ void SV_BroadcastPrintf(int level, const char *fmt, ...)
     q2proto_svc_message_t message = {.type = Q2P_SVC_PRINT, .print = {0}};
     message.print.level = level;
     message.print.string = q2proto_make_string(string);
-    q2proto_server_multicast_write(&svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &message);
+    q2proto_server_multicast_write(Q2P_PROTOCOL_Q2PRO, &svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &message);
 
     FOR_EACH_CLIENT(client) {
         if (client->state != cs_spawned)

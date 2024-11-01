@@ -83,6 +83,8 @@ const void* q2protoio_read_raw(uintptr_t io_arg, size_t size, size_t* readcount)
     return io_read_data(io_arg, size, readcount);
 }
 
+bool nonfatal_client_read_errors = false;
+
 q2proto_error_t q2protoerr_client_read(uintptr_t io_arg, q2proto_error_t err, const char *msg, ...)
 {
     char buf[256];
@@ -92,7 +94,11 @@ q2proto_error_t q2protoerr_client_read(uintptr_t io_arg, q2proto_error_t err, co
     Q_vsnprintf(buf, sizeof(buf), msg, argptr);
     va_end(argptr);
 
-    Com_Error(ERR_DROP, "%s", buf);
+    if (nonfatal_client_read_errors)
+        Com_WPrintf("%s\n", buf);
+    else
+        Com_Error(ERR_DROP, "%s", buf);
+    return err;
 }
 
 #if Q2PROTO_SHOWNET

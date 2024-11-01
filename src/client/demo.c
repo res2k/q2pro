@@ -800,6 +800,8 @@ static void CL_PlayDemo_f(void)
     Con_Popup(true);
     SCR_UpdateScreen();
 
+    q2proto_init_clientcontext(&cls.q2proto_ctx);
+
     // parse the first message just read
     CL_ParseServerMessage();
 
@@ -1177,11 +1179,9 @@ done:
     cls.demo.seeking = false;
 }
 
-static void parse_info_string(demoInfo_t *info, int clientNum, int index, const cs_remap_t *csr)
+static void parse_info_string(demoInfo_t *info, int clientNum, int index, const char* string, const cs_remap_t *csr)
 {
-    char string[MAX_QPATH], *p;
-
-    MSG_ReadString(string, sizeof(string));
+    char *p;
 
     if (index >= csr->playerskins && index < csr->playerskins + MAX_CLIENTS) {
         if (index - csr->playerskins == clientNum) {
@@ -1213,6 +1213,8 @@ bool CL_GetDemoInfo(const char *path, demoInfo_t *info)
         return false;
     }
 
+    nonfatal_client_read_errors = true;
+
     type = read_first_message(f);
     if (type < 0) {
         goto fail;
@@ -1221,50 +1223,45 @@ bool CL_GetDemoInfo(const char *path, demoInfo_t *info)
     info->mvd = type;
 
     if (type == 0) {
-        if (MSG_ReadByte() != svc_serverdata) {
-            goto fail;
-        }
-        int protocol = MSG_ReadLong();
-        if (protocol == PROTOCOL_VERSION_RERELEASE) {
-            // Don't futz anything
-        } else if (EXTENDED_SUPPORTED(protocol)) {
-            csr = &cs_remap_q2pro_new;
-        } else if (protocol < PROTOCOL_VERSION_OLD || protocol > PROTOCOL_VERSION_DEFAULT) {
-            goto fail;
-        }
-        MSG_ReadLong();
-        MSG_ReadByte();
-        MSG_ReadString(NULL, 0);
-        clientNum = MSG_ReadShort();
-        MSG_ReadString(NULL, 0);
+        q2proto_clientcontext_t demo_context;
+        q2proto_init_clientcontext(&demo_context);
 
-        if (protocol == PROTOCOL_VERSION_RERELEASE) {
-            MSG_ReadWord();
-            MSG_ReadByte();
-            int protocol_flags = MSG_ReadWord();
-            if (protocol_flags & Q2PRO_PF_EXTENSIONS)
-                csr = &cs_remap_q2pro_new;
-            if (!(protocol_flags & Q2PRO_PF_GAME3_COMPAT))
-                csr = &cs_remap_rerelease;
-            MSG_ReadByte();
+        q2proto_svc_message_t message;
+        if (q2proto_client_read(&demo_context, Q2PROTO_IOARG_CLIENT_READ, &message) != Q2P_ERR_SUCCESS)
+            goto fail;
+
+        if (message.type != Q2P_SVC_SERVERDATA) {
+            goto fail;
         }
+        switch(demo_context.features.server_game_type)
+        {
+        case Q2PROTO_GAME_VANILLA:
+            break;
+        case Q2PROTO_GAME_Q2PRO_EXTENDED:
+        case Q2PROTO_GAME_Q2PRO_EXTENDED_V2:
+            csr = &cs_remap_q2pro_new;
+            break;
+        case Q2PROTO_GAME_RERELEASE:
+            csr = &cs_remap_rerelease;
+            break;
+        }
+        clientNum = message.serverdata.clientnum;
 
         while (1) {
-            c = MSG_ReadByte();
-            if (c == -1) {
+            q2proto_error_t err = q2proto_client_read(&demo_context, Q2PROTO_IOARG_CLIENT_READ, &message);
+            if (err == Q2P_ERR_NO_MORE_INPUT) {
                 if (read_next_message(f) <= 0) {
                     break;
                 }
                 continue; // parse new message
             }
-            if (c != svc_configstring) {
+            if (message.type != Q2P_SVC_CONFIGSTRING) {
                 break;
             }
-            index = MSG_ReadWord();
-            if (index < 0 || index >= csr->end) {
+            if (message.configstring.index < 0 || message.configstring.index >= csr->end) {
                 goto fail;
             }
-            parse_info_string(info, clientNum, index, csr);
+            parse_info_string(info, clientNum, message.configstring.index, message.configstring.value.str, csr);
         }
     } else {
         c = MSG_ReadByte();
@@ -1293,13 +1290,16 @@ bool CL_GetDemoInfo(const char *path, demoInfo_t *info)
             if (index < 0 || index >= csr->end) {
                 goto fail;
             }
-            parse_info_string(info, clientNum, index, csr);
+            char string[MAX_QPATH];
+            MSG_ReadString(string, sizeof(string));
+            parse_info_string(info, clientNum, index, string, csr);
         }
     }
     res = true;
 
 fail:
     FS_CloseFile(f);
+    nonfatal_client_read_errors = false;
     return res;
 }
 

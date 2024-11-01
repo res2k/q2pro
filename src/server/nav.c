@@ -402,7 +402,7 @@ typedef struct nav_ctx_s {
     // TODO: min-heap or priority queue ordered by f_score?
     // currently using linked list which is a bit slow for insertion
     nav_open_t     *open_set;
-    list_t          open_set_head, open_set_free;
+    list_t          open_set_open, open_set_free;
 
     // TODO: figure out a way to get rid of "came_from"
     // and track start -> end off the bat
@@ -435,7 +435,7 @@ void Nav_FreeCtx(nav_ctx_t *ctx)
 // built-in path functions
 static float Nav_Heuristic(const nav_path_t *path, const nav_node_t *node)
 {
-    return VectorDistanceSquared(path->goal->origin, node->origin);
+    return VectorDistance(path->goal->origin, node->origin);
 }
 
 static float Nav_Weight(const nav_path_t *path, const nav_node_t *node, const nav_link_t *link)
@@ -443,7 +443,7 @@ static float Nav_Weight(const nav_path_t *path, const nav_node_t *node, const na
     if (link->type == NavLinkType_Teleport)
         return 1.0f;
 
-    return VectorDistanceSquared(node->origin, link->target->origin);
+    return VectorDistance(node->origin, link->target->origin) * nav_data.heuristic;
 }
 
 static bool Nav_NodeAccessible(const nav_path_t *path, const nav_node_t *node)
@@ -488,7 +488,7 @@ static nav_node_t *Nav_ClosestNodeTo(const vec3_t p)
     nav_node_t *c = NULL;
 
     for (int i = 0; i < nav_data.num_nodes; i++) {
-        float l = VectorDistanceSquared(nav_data.nodes[i].origin, p);
+        float l = VectorDistance(nav_data.nodes[i].origin, p);
 
         if (l < w) {
             w = l;
@@ -499,7 +499,7 @@ static nav_node_t *Nav_ClosestNodeTo(const vec3_t p)
     return c;
 }
 
-const float PATH_POINT_TOO_CLOSE = 64.f * 64.f;
+const float PATH_POINT_TOO_CLOSE = 64.f;
 
 static const nav_link_t *Nav_GetLink(const nav_node_t *a, const nav_node_t *b)
 {
@@ -528,9 +528,9 @@ static inline void Nav_PushOpenSet(nav_ctx_t *ctx, const nav_node_t *node, float
     o->node = node;
     o->f_score = f;
 
-    nav_open_t *open_where = LIST_FIRST(nav_open_t, &ctx->open_set_head, entry);
+    nav_open_t *open_where = LIST_FIRST(nav_open_t, &ctx->open_set_open, entry);
 
-    while (!LIST_TERM(open_where, &ctx->open_set_head, entry)) {
+    while (!LIST_TERM(open_where, &ctx->open_set_open, entry)) {
 
         if (f < open_where->f_score) {
             List_Insert(open_where->entry.prev, &o->entry);
@@ -540,7 +540,7 @@ static inline void Nav_PushOpenSet(nav_ctx_t *ctx, const nav_node_t *node, float
         open_where = LIST_NEXT(nav_open_t, open_where, entry);
     }
 
-    List_Insert(&ctx->open_set_head, &o->entry);
+    List_Append(&ctx->open_set_open, &o->entry);
 }
 
 static PathInfo Nav_Path_(nav_path_t *path)
@@ -602,7 +602,7 @@ static PathInfo Nav_Path_(nav_path_t *path)
     for (int i = 0; i < nav_data.num_nodes; i++)
         ctx->g_score[i] = INFINITY;
     
-    List_Init(&ctx->open_set_head);
+    List_Init(&ctx->open_set_open);
     List_Init(&ctx->open_set_free);
 
     for (int i = 0; i < nav_data.num_nodes; i++)
@@ -613,10 +613,10 @@ static PathInfo Nav_Path_(nav_path_t *path)
     Nav_PushOpenSet(ctx, path->start, heuristic_func(path, path->start));
 
     while (true) {
-        nav_open_t *cursor = LIST_FIRST(nav_open_t, &ctx->open_set_head, entry);
+        nav_open_t *cursor = LIST_FIRST(nav_open_t, &ctx->open_set_open, entry);
 
         // end of open set
-        if (LIST_TERM(cursor, &ctx->open_set_head, entry))
+        if (LIST_TERM(cursor, &ctx->open_set_open, entry))
             break;
 
         // shift off the head, insert into free
@@ -670,7 +670,7 @@ static PathInfo Nav_Path_(nav_path_t *path)
             // store resulting path for compass, etc
             if (request->pathPoints.count) {
                 // if we're too far from the first node, add in our current position.
-                float dist = VectorDistanceSquared(request->start, nav_data.nodes[ctx->went_to[first_point]].origin);
+                float dist = VectorDistance(request->start, nav_data.nodes[ctx->went_to[first_point]].origin);
 
                 if (dist > PATH_POINT_TOO_CLOSE) {
                     if (info.numPathPoints < request->pathPoints.count)
@@ -688,7 +688,7 @@ static PathInfo Nav_Path_(nav_path_t *path)
                 }
 
                 // add the end point if we have room
-                dist = VectorDistanceSquared(request->goal, nav_data.nodes[ctx->went_to[current]].origin);
+                dist = VectorDistance(request->goal, nav_data.nodes[ctx->went_to[current]].origin);
 
                 if (dist > PATH_POINT_TOO_CLOSE) {
                     if (info.numPathPoints < request->pathPoints.count)
@@ -1303,6 +1303,7 @@ void Nav_Init(void)
 
 void Nav_Shutdown(void)
 {
+    Z_LeakTest(TAG_NAV);
 }
 
 void Nav_RegisterEdict(const edict_t *edict)

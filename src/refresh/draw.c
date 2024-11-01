@@ -474,7 +474,7 @@ int R_DrawString(int x, int y, int flags, size_t maxlen, const char *s, qhandle_
         byte c = *s++;
 
         if ((flags & UI_MULTILINE) && c == '\n') {
-            y += CHAR_HEIGHT;
+            y += CHAR_HEIGHT + (1.0 / draw.scale);
             x = sx;
             continue;
         }

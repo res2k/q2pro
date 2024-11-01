@@ -3554,7 +3554,8 @@ void CL_Shutdown(void)
     CL_WriteConfig();
     CG_Unload();
     
-    SCR_UnregisterStat("client");
+    SCR_UnregisterStat("client.timings");
+    SCR_UnregisterStat("client.prediction");
 
     memset(&cls, 0, sizeof(cls));
 

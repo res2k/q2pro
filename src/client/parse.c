@@ -104,6 +104,7 @@ static void CL_ParseDeltaEntity(server_frame_t           *frame,
     frame->numEntities++;
 
     *state = *old;
+    state->event = 0; // events reset automatically, unless explicitly given
     if (delta_state)
         apply_entity_delta(state, newnum, delta_state);
 

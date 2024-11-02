@@ -457,11 +457,13 @@ static bool Nav_NodeAccessible(const nav_path_t *path, const nav_node_t *node)
             return false;
         }
     } else {
-        if (node->flags & (NodeFlag_NoMonsters | NodeFlag_Crouch | NodeFlag_Ladder | NodeFlag_Elevator | NodeFlag_Pusher | NodeFlag_Teleporter)) {
+        if (node->flags & (NodeFlag_NoMonsters | NodeFlag_Crouch | NodeFlag_Ladder | NodeFlag_Pusher | NodeFlag_Teleporter)) {
             return false;
         } else if ((node->flags & NodeFlag_UnderWater) && (path->request->pathFlags & (PathFlags_Walk | PathFlags_Water)) == PathFlags_Walk) {
             return false;
         } else if (!(node->flags & NodeFlag_UnderWater) && (path->request->pathFlags & (PathFlags_Walk | PathFlags_Water)) == PathFlags_Water) {
+            return false;
+        } else if (!(path->request->pathFlags & PathFlags_Elevator) && (node->flags & NodeFlag_Elevator)) {
             return false;
         }
     }
@@ -472,10 +474,43 @@ static bool Nav_NodeAccessible(const nav_path_t *path, const nav_node_t *node)
 static bool Nav_LinkAccessible(const nav_path_t *path, const nav_node_t *node, const nav_link_t *link)
 {
     if (!path->request->nodeSearch.ignoreNodeFlags) {
-        if (link->type == NavLinkType_LongJump || link->type == NavLinkType_Teleport ||
-            link->type == NavLinkType_Pusher || link->type == NavLinkType_Elevator ||
-            link->type == NavLinkType_Train || link->type == NavLinkType_Crouch ||
-            link->type == NavLinkType_Ladder || link->type == NavLinkType_RocketJump)
+        bool entity_traversal = false;
+
+        // can only path to walk in water
+        if (path->request->pathFlags == PathFlags_Water) {
+            if (link->type != NavLinkType_Walk)
+                return false;
+        } else if (link->type == NavLinkType_Elevator) {
+            // only use elevators if we asked for it
+            if (!(path->request->pathFlags & PathFlags_Elevator))
+                return false;
+
+            entity_traversal = true;
+        } else if (link->type == NavLinkType_WalkOffLedge) {
+            // did we ask for it
+            if (!(path->request->pathFlags & PathFlags_WalkOffLedge))
+                return false;
+
+            // check drop height
+            if (path->request->traversals.dropHeight > 0.0f &&
+                link->target->origin[2] < node->origin[2] - path->request->traversals.dropHeight)
+                return false;
+        } else if (link->type == NavLinkType_LongJump) {
+            // did we ask for it
+            if (!(path->request->pathFlags & PathFlags_LongJump))
+                return false;
+        } else if (link->type == NavLinkType_BarrierJump) {
+            // did we ask for it
+            if (!(path->request->pathFlags & NavLinkType_BarrierJump))
+                return false;
+
+            // check drop height
+            if (path->request->traversals.jumpHeight > 0.0f &&
+                link->target->origin[2] > node->origin[2] + path->request->traversals.jumpHeight)
+                return false;
+        }
+
+        if (link->edict && !entity_traversal)
             return false;
     }
 

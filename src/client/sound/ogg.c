@@ -351,6 +351,8 @@ static bool decode_next_frame(void)
         Com_EPrintf("Error decoding audio: %s\n", av_err2str(ret));
 
     // play next file
+    // clear current track so it actually restarts
+    currenttrack[0] = '\0';
     OGG_Play();
 
     return ogg.dec_ctx && decode_frame() >= 0;

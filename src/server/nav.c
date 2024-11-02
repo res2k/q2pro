@@ -482,18 +482,62 @@ static bool Nav_LinkAccessible(const nav_path_t *path, const nav_node_t *node, c
     return Nav_NodeAccessible(path, link->target);
 }
 
-static nav_node_t *Nav_ClosestNodeTo(const vec3_t p)
+#define Nav_ParamSupplied(x, def) \
+    x > 0.0f ? x : def
+
+static nav_node_t *Nav_ClosestNodeTo(const vec3_t p, const PathRequest *request)
 {
     float w = INFINITY;
     nav_node_t *c = NULL;
+    float minHeight = Nav_ParamSupplied(request->nodeSearch.minHeight, 64.0f);
+    float maxHeight = Nav_ParamSupplied(request->nodeSearch.maxHeight, 64.0f);
+    float radius = Nav_ParamSupplied(request->nodeSearch.maxHeight, 512.0f); 
+    bool waterOnly = request->pathFlags == PathFlags_Water;
+
+    float bz = p[2] - minHeight;
+    float tz = p[2] + maxHeight;
 
     for (int i = 0; i < nav_data.num_nodes; i++) {
-        float l = VectorDistance(nav_data.nodes[i].origin, p);
+        nav_node_t *node = &nav_data.nodes[i];
 
-        if (l < w) {
-            w = l;
-            c = &nav_data.nodes[i];
+        if (!request->nodeSearch.ignoreNodeFlags) {
+            // these nodes should never be considered for
+            // closest walkable nodes, they're transitional
+            // or not for monsters
+            if (node->flags & (NodeFlag_Disabled | NodeFlag_Pusher | NodeFlag_Teleporter | NodeFlag_Ladder | NodeFlag_Crouch | NodeFlag_NoMonsters))
+                continue;
+
+            // swimmies?
+            if (waterOnly && !(node->flags & NodeFlag_UnderWater))
+                continue;
         }
+
+        // check Z distance
+        if (node->origin[2] < bz || node->origin[2] > tz)
+            continue;
+
+        // check XY distance
+        vec2_t d;
+        Vector2Subtract(p, node->origin, d);
+
+        float l = Vector2Length(d);
+
+        if (l > radius)
+            continue;
+
+        if (l > w)
+            continue;
+
+        // check visibility
+        vec3_t end = { 0.f, 0.f, 32.f };
+        VectorAdd(end, node->origin, end);
+        trace_t tr = SV_Trace(p, vec3_origin, vec3_origin, end, NULL, MASK_SOLID | CONTENTS_PLAYERCLIP | CONTENTS_MONSTERCLIP);
+
+        if (tr.fraction < 1.0f)
+            continue;
+
+        w = l;
+        c = node;
     }
 
     return c;
@@ -513,10 +557,20 @@ static const nav_link_t *Nav_GetLink(const nav_node_t *a, const nav_node_t *b)
 
 static bool Nav_TouchingNode(const vec3_t pos, float move_dist, const nav_node_t *node)
 {
-    float touch_radius = node->radius + move_dist;
-    return fabsf(pos[0] - node->origin[0]) < touch_radius &&
-           fabsf(pos[1] - node->origin[1]) < touch_radius &&
-           fabsf(pos[2] - node->origin[2]) < touch_radius * 4;
+    return VectorDistance(pos, node->origin) <= move_dist;
+}
+
+static bool Nav_NodeReached(const vec3_t pos, const nav_node_t *node)
+{
+    vec3_t d;
+    VectorSubtract(node->origin, pos, d);
+
+    if (Vector2Length(d) > node->radius)
+        return false;
+    else if (fabsf(d[2]) > 64.f)
+        return false;
+
+    return true;
 }
 
 static inline void Nav_PushOpenSet(nav_ctx_t *ctx, const nav_node_t *node, float f)
@@ -559,14 +613,14 @@ static PathInfo Nav_Path_(nav_path_t *path)
 
     const PathRequest *request = path->request;
 
-    path->start = Nav_ClosestNodeTo(request->start);
+    path->start = Nav_ClosestNodeTo(request->start, path->request);
 
     if (!path->start) {
         info.returnCode = PathReturnCode_NoStartNode;
         return info;
     }
 
-    path->goal = Nav_ClosestNodeTo(request->goal);
+    path->goal = Nav_ClosestNodeTo(request->goal, path->request);
 
     if (!path->goal) {
         info.returnCode = PathReturnCode_NoGoalNode;
@@ -615,7 +669,8 @@ static PathInfo Nav_Path_(nav_path_t *path)
     while (true) {
         nav_open_t *cursor = LIST_FIRST(nav_open_t, &ctx->open_set_open, entry);
 
-        // end of open set
+        // end of open set; this is probably a bug
+        // or there's bad nav data?
         if (LIST_TERM(cursor, &ctx->open_set_open, entry))
             break;
 
@@ -660,8 +715,22 @@ static PathInfo Nav_Path_(nav_path_t *path)
                     // to skip the first node if we're either past it
                     // or touching it
                     if (link->type == NavLinkType_Walk || link->type == NavLinkType_Crouch) {
-                        if (Nav_TouchingNode(request->start, request->moveDist, &nav_data.nodes[ctx->went_to[0]])) {
+                        if (Nav_NodeReached(request->start, &nav_data.nodes[ctx->went_to[0]])) {
                             first_point++;
+                        } else {
+                            // check if we're in line for the node
+                            vec3_t d = { 0.f, 0.f, 0.f };
+                            Vector2Subtract(nav_data.nodes[ctx->went_to[1]].origin, nav_data.nodes[ctx->went_to[0]].origin, d);
+                            Vector2Normalize(d);
+
+                            vec3_t origin;
+                            VectorMA(nav_data.nodes[ctx->went_to[0]].origin, nav_data.nodes[ctx->went_to[0]].radius, d, origin);
+
+                            vec3_t path = { 0.f, 0.f, 0.f };
+                            Vector2Subtract(nav_data.nodes[ctx->went_to[1]].origin, origin, path);
+
+                            if (DotProduct(d, path) > 0.f)
+                                first_point++;
                         }
                     }
                 }

@@ -295,6 +295,9 @@ static inline float VectorDistanceSquared(const vec3_t a, const vec3_t b)
     
 
 #define Dot2Product(x,y)         ((x)[0]*(y)[0]+(x)[1]*(y)[1])
+#define Vector2Subtract(a,b,c) \
+        ((c)[0]=(a)[0]-(b)[0], \
+         (c)[1]=(a)[1]-(b)[1])
 #define Vector2Length(v)     (sqrtf(Dot2Product((v),(v))))
 #define Vector2LengthSquared(v)      (Dot2Product((v),(v)))
 #define Vector2Clear(a)       ((a)[0]=(a)[1]=0)
@@ -303,6 +306,7 @@ static inline float VectorDistanceSquared(const vec3_t a, const vec3_t b)
         ((out)[0]=(in)[0]*(scale), \
          (out)[1]=(in)[1]*(scale))
 #define Vector2Copy(a, b)   ((b)[0]=(a)[0],(b)[1]=(a)[1])
+vec_t Vector2Normalize(vec2_t v);        // returns vector length
 
 #define Vector4Subtract(a,b,c)      ((c)[0]=(a)[0]-(b)[0],(c)[1]=(a)[1]-(b)[1],(c)[2]=(a)[2]-(b)[2],(c)[3]=(a)[3]-(b)[3])
 #define Vector4Add(a,b,c)           ((c)[0]=(a)[0]+(b)[0],(c)[1]=(a)[1]+(b)[1],(c)[2]=(a)[2]+(b)[2],(c)[3]=(a)[3]+(b)[3])

@@ -74,6 +74,21 @@ vec_t VectorNormalize2(const vec3_t v, vec3_t out)
     return VectorNormalize(out);
 }
 
+vec_t Vector2Normalize(vec2_t v)
+{
+    float    length, ilength;
+
+    length = Vector2Length(v);
+
+    if (length) {
+        ilength = 1 / length;
+        v[0] *= ilength;
+        v[1] *= ilength;
+    }
+
+    return length;
+}
+
 void ClearBounds(vec3_t mins, vec3_t maxs)
 {
     mins[0] = mins[1] = mins[2] = 99999;

@@ -604,8 +604,10 @@ static void SVC_GetChallenge(void)
         svs.challenges[i].time = com_eventTime;
     }
 
+    q2proto_protocol_t accepted_protocols[Q2P_NUM_PROTOCOLS];
+    size_t num_accepted_protocols = q2proto_get_protocols_for_gametypes(accepted_protocols, q_countof(accepted_protocols), &svs.server_info.game_type, 1);
     char challenge_extra[64];
-    q2proto_get_challenge_extras(challenge_extra, sizeof(challenge_extra), q2proto_get_vanilla_protocols(), q2proto_get_num_vanilla_protocols());
+    q2proto_get_challenge_extras(challenge_extra, sizeof(challenge_extra), accepted_protocols, num_accepted_protocols);
 
     // send it back
     Netchan_OutOfBand(NS_SERVER, &net_from,
@@ -1036,8 +1038,11 @@ static void SVC_DirectConnect(void)
     qboolean        allow;
     char            *reason;
 
+    q2proto_protocol_t accepted_protocols[Q2P_NUM_PROTOCOLS];
+    size_t num_accepted_protocols = q2proto_get_protocols_for_gametypes(accepted_protocols, q_countof(accepted_protocols), &svs.server_info.game_type, 1);
+
     q2proto_connect_t parsed_connect;
-    q2proto_error_t parse_err = q2proto_parse_connect(Cmd_Args(), q2proto_get_vanilla_protocols(), q2proto_get_num_vanilla_protocols(), &svs.server_info, &parsed_connect);
+    q2proto_error_t parse_err = q2proto_parse_connect(Cmd_Args(), accepted_protocols, num_accepted_protocols, &svs.server_info, &parsed_connect);
     if (parse_err != Q2P_ERR_SUCCESS) {
         if (parse_err == Q2P_ERR_PROTOCOL_NOT_SUPPORTED) {
             reject_printf("Unsupported protocol %d.\n", parsed_connect.protocol);

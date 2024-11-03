@@ -1264,19 +1264,26 @@ static void CL_ConnectionlessPacket(void)
         cls.connect_time -= CONNECT_INSTANT; // fire immediately
         //cls.connect_count = 0;
 
-        q2proto_challenge_t challenge;
-        q2proto_error_t parse_err;
+        q2proto_protocol_t accepted_protocols[Q2P_NUM_PROTOCOLS];
+        size_t num_accepted_protocols = 0;
+
         if (cls.serverProtocol != 0) {
             // Restrict accepted protocols if one was explicitly specified
-            q2proto_protocol_t accepted_protocol = q2proto_protocol_from_netver(cls.serverProtocol);
-            if (accepted_protocol == Q2P_PROTOCOL_INVALID) {
+            q2proto_protocol_t user_protocol = q2proto_protocol_from_netver(cls.serverProtocol);
+            if (user_protocol == Q2P_PROTOCOL_INVALID) {
                 Com_EPrintf("Invalid protocol %d\n", cls.serverProtocol);
                 return;
             }
-            parse_err = q2proto_parse_challenge(Cmd_Args(), &accepted_protocol, 1, &challenge);
+            accepted_protocols[0] = user_protocol;
+            num_accepted_protocols = 1;
         } else {
-            parse_err = q2proto_parse_challenge(Cmd_Args(), q2proto_get_vanilla_protocols(), q2proto_get_num_vanilla_protocols(), &challenge);
+            const q2proto_game_type_t supported_game_types[] = {Q2PROTO_GAME_VANILLA, Q2PROTO_GAME_Q2PRO_EXTENDED, Q2PROTO_GAME_Q2PRO_EXTENDED_V2};
+            num_accepted_protocols = q2proto_get_protocols_for_gametypes(accepted_protocols, q_countof(accepted_protocols), supported_game_types, q_countof(supported_game_types));
         }
+
+        q2proto_challenge_t challenge;
+        q2proto_error_t parse_err;
+        parse_err = q2proto_parse_challenge(Cmd_Args(), accepted_protocols, num_accepted_protocols, &challenge);
         if (parse_err != Q2P_ERR_SUCCESS) {
             Com_DPrintf("Challenge parse error %d.  Ignored.\n", parse_err);
             return;

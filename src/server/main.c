@@ -2309,11 +2309,11 @@ static void SV_FinalMessage(const char *message, error_type_t type)
         q2proto_svc_message_t print_msg = {.type = Q2P_SVC_PRINT, .print = {0}};
         print_msg.print.level = PRINT_HIGH;
         print_msg.print.string = q2proto_make_string(message);
-        q2proto_server_multicast_write(Q2P_PROTOCOL_Q2PRO, &svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &print_msg);
+        q2proto_server_multicast_write(svs.multicast_proto, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &print_msg);
     }
 
     q2proto_svc_message_t goodbye_msg = {.type = type == ERR_RECONNECT ? Q2P_SVC_RECONNECT : Q2P_SVC_DISCONNECT};
-    q2proto_server_multicast_write(Q2P_PROTOCOL_Q2PRO, &svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &goodbye_msg);
+    q2proto_server_multicast_write(svs.multicast_proto, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &goodbye_msg);
 
     // send it twice
     // stagger the packets to crutch operating system limited buffers

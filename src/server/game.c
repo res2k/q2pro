@@ -172,7 +172,7 @@ static void PF_bprintf(int level, const char *fmt, ...)
     message.print.level = level;
     message.print.string.str = string;
     message.print.string.len = len;
-    q2proto_server_multicast_write(Q2P_PROTOCOL_Q2PRO, &svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &message);
+    q2proto_server_multicast_write(svs.multicast_proto, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &message);
 
     // echo to console
     if (COM_DEDICATED) {
@@ -431,7 +431,7 @@ static void PF_configstring(int index, const char *val)
     message.configstring.index = index;
     message.configstring.value.str = val;
     message.configstring.value.len = len;
-    q2proto_server_multicast_write(Q2P_PROTOCOL_Q2PRO, &svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &message);
+    q2proto_server_multicast_write(svs.multicast_proto, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &message);
 
     FOR_EACH_CLIENT(client) {
         if (client->state < cs_primed) {
@@ -458,7 +458,7 @@ static void PF_WriteFloat(float f)
 
 static void PF_WritePos(const vec3_t pos)
 {
-    q2proto_server_write_pos(Q2P_PROTOCOL_Q2PRO, &svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, pos);
+    q2proto_server_write_pos(svs.multicast_proto, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, pos);
 }
 
 static qboolean PF_inVIS(const vec3_t p1, const vec3_t p2, vis_t vis)
@@ -584,7 +584,7 @@ static void SV_StartSound(const vec3_t origin, edict_t *edict,
     q2proto_svc_message_t sound_msg = {.type = Q2P_SVC_SOUND, .sound = {0}};
     q2proto_sound_encode_message(&snd, &sound_msg.sound);
 
-    q2proto_server_multicast_write(Q2P_PROTOCOL_Q2PRO, &svs.server_info, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &sound_msg);
+    q2proto_server_multicast_write(svs.multicast_proto, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &sound_msg);
 
     // if the sound doesn't attenuate, send it to everyone
     // (global radio chatter, voiceovers, etc)
@@ -1051,4 +1051,8 @@ void SV_InitGameProgs(void)
     else
         svs.server_info.game_type = Q2PROTO_GAME_VANILLA;
     svs.server_info.default_packet_length = MAX_PACKETLEN_WRITABLE_DEFAULT;
+
+    q2proto_protocol_t accepted_protocols[Q2P_NUM_PROTOCOLS];
+    size_t num_accepted_protocols = q2proto_get_protocols_for_gametypes(accepted_protocols, q_countof(accepted_protocols), &svs.server_info.game_type, 1);
+    svs.multicast_proto = q2proto_get_multicast_protocol(accepted_protocols, num_accepted_protocols, svs.server_info.game_type);
 }

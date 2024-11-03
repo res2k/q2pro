@@ -496,6 +496,7 @@ typedef struct {
 
     challenge_t     challenges[MAX_CHALLENGES]; // to prevent invalid IPs from connecting
 
+    q2proto_multicast_protocol_t multicast_proto;
     q2proto_server_info_t server_info;
 } server_static_t;
 

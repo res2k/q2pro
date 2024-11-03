@@ -439,7 +439,7 @@ static inline void draw_char(int x, int y, int w, int h, int flags, int c, const
     s = (c & 15) * 0.0625f;
     t = (c >> 4) * 0.0625f;
 
-    if (((flags & UI_DROPSHADOW) || gl_fontshadow->integer > 0) && c != 0x83) {
+    if (flags & UI_DROPSHADOW && c != 0x83) {
         uint32_t black = draw.colors[0].u32 & U32_ALPHA;
 
         GL_StretchPic(x + 1, y + 1, w, h, s, t,
@@ -456,6 +456,9 @@ static inline void draw_char(int x, int y, int w, int h, int flags, int c, const
 
 void R_DrawChar(int x, int y, int flags, int c, qhandle_t font)
 {
+    if (gl_fontshadow->integer > 0)
+        flags |= UI_DROPSHADOW;
+
     draw_char(x, y, CHAR_WIDTH, CHAR_HEIGHT, flags, c & 255, IMG_ForHandle(font));
 }
 
@@ -467,6 +470,9 @@ void R_DrawStretchChar(int x, int y, int w, int h, int flags, int c, qhandle_t f
 int R_DrawString(int x, int y, int flags, size_t maxlen, const char *s, qhandle_t font)
 {
     const image_t *image = IMG_ForHandle(font);
+
+    if (gl_fontshadow->integer > 0)
+        flags |= UI_DROPSHADOW;
 
     int sx = x;
 

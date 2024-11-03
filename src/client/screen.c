@@ -133,21 +133,28 @@ void SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen,
 {
     char    *p;
     size_t  len;
+    int     last_x = x;
+    int     last_y = y;
 
     while (*s && maxlen) {
         p = strchr(s, '\n');
         if (!p) {
-            SCR_DrawStringEx(x, y, flags, maxlen, s, font);
+            last_x = SCR_DrawStringEx(x, y, flags, maxlen, s, font);
+            last_y = y;
             break;
         }
 
         len = min(p - s, maxlen);
-        SCR_DrawStringEx(x, y, flags, len, s, font);
+        last_x = SCR_DrawStringEx(x, y, flags, len, s, font);
+        last_y = y;
         maxlen -= len;
 
         y += CHAR_HEIGHT;
         s = p + 1;
     }
+
+    if (flags & UI_DRAWCURSOR && com_localTime & BIT(8))
+        R_DrawChar(last_x, last_y, flags, 11, font);
 }
 
 

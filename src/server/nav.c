@@ -399,30 +399,34 @@ typedef struct nav_open_s {
 } nav_open_t;
 
 typedef struct nav_ctx_s {
+    list_t          open_set_open, open_set_free;
+    
     // TODO: min-heap or priority queue ordered by f_score?
     // currently using linked list which is a bit slow for insertion
     nav_open_t     *open_set;
-    list_t          open_set_open, open_set_free;
-
     // TODO: figure out a way to get rid of "came_from"
     // and track start -> end off the bat
-    int16_t     *came_from, *went_to;
-    float       *g_score;
+    int16_t         *came_from, *went_to;
+    float           *g_score;
 } nav_ctx_t;
+
+#define NAV_ALLOC(n) \
+    Z_TagMalloc(n, TAG_NAV)
+#define NAV_ALLOCZ(n) \
+    Z_TagMallocz(n, TAG_NAV)
 
 nav_ctx_t *Nav_AllocCtx(void)
 {
     size_t size = sizeof(nav_ctx_t) +
-        (sizeof(float) * nav_data.num_nodes) +
-        (sizeof(float) * nav_data.num_nodes) +
+        (sizeof(nav_open_t) * nav_data.num_nodes) +
         (sizeof(int16_t) * nav_data.num_nodes) +
         (sizeof(int16_t) * nav_data.num_nodes) +
-        (sizeof(nav_open_t) * nav_data.num_nodes);
+        (sizeof(float) * nav_data.num_nodes);
     nav_ctx_t *ctx = Z_TagMalloc(size, TAG_NAV);
-    ctx->g_score = (float *) (ctx + 1);
-    ctx->came_from = (int16_t *) (ctx->g_score + nav_data.num_nodes);
+    ctx->open_set = (nav_open_t *) (ctx + 1);
+    ctx->came_from = (int16_t *) (ctx->open_set + nav_data.num_nodes);
     ctx->went_to = (int16_t *) (ctx->came_from + nav_data.num_nodes);
-    ctx->open_set = (nav_open_t *) (ctx->went_to + nav_data.num_nodes);
+    ctx->g_score = (float *) (ctx->went_to + nav_data.num_nodes);
 
     return ctx;
 }
@@ -632,6 +636,112 @@ static inline void Nav_PushOpenSet(nav_ctx_t *ctx, const nav_node_t *node, float
     List_Append(&ctx->open_set_open, &o->entry);
 }
 
+static inline void Nav_PushPathPoint(PathInfo *info, const PathRequest *request, const vec3_t p)
+{
+    if (info->numPathPoints < request->pathPoints.count)
+        VectorCopy(p, request->pathPoints.posArray[info->numPathPoints]);
+    info->numPathPoints++;
+}
+
+static inline void Nav_ReachedGoal(nav_path_t *path, PathInfo *info, const PathRequest *request, nav_ctx_t *ctx, int current)
+{
+    int64_t num_points = 0;
+
+    // reverse the order of came_from into went_to
+    // to make stuff below a bit easier to work with
+    int16_t n = current;
+    while (ctx->came_from[n] != -1) {
+        num_points++;
+        n = ctx->came_from[n];
+    }
+
+    n = current;
+    int64_t p = 0;
+    while (ctx->came_from[n] != -1) {
+        n = ctx->went_to[num_points - p - 1] = ctx->came_from[n];
+        p++;
+    }
+
+    // num_points now contains points between start
+    // and current; it will be at least 1, since start can't
+    // be the same as end, but may be less once we start clipping.
+    Q_assert(num_points >= 1);
+    Q_assert(ctx->went_to[0] != -1);
+
+    int64_t first_point = 0;
+    const nav_link_t *link = NULL;
+            
+    if (num_points > 1) {
+        link = Nav_GetLink(&nav_data.nodes[ctx->went_to[0]], &nav_data.nodes[ctx->went_to[1]]);
+
+        if (!path->request->nodeSearch.ignoreNodeFlags) {
+            // if the node isn't a traversal, we may want
+            // to skip the first node if we're either past it
+            // or touching it
+            if (link->type == NavLinkType_Walk || link->type == NavLinkType_Crouch) {
+                if (Nav_NodeReached(request->start, &nav_data.nodes[ctx->went_to[0]])) {
+                    first_point++;
+                } else {
+                    // check if we're in line for the node
+                    vec3_t d = { 0.f, 0.f, 0.f };
+                    Vector2Subtract(nav_data.nodes[ctx->went_to[1]].origin, nav_data.nodes[ctx->went_to[0]].origin, d);
+                    Vector2Normalize(d);
+
+                    vec3_t origin;
+                    VectorMA(nav_data.nodes[ctx->went_to[0]].origin, nav_data.nodes[ctx->went_to[0]].radius, d, origin);
+
+                    vec3_t path = { 0.f, 0.f, 0.f };
+                    Vector2Subtract(nav_data.nodes[ctx->went_to[1]].origin, origin, path);
+
+                    if (DotProduct(d, path) > 0.f)
+                        first_point++;
+                }
+            }
+        }
+    }
+
+    // store resulting path for compass, etc
+    if (request->pathPoints.count) {
+        // if we're too far from the first node, add in our current position.
+        float dist = VectorDistance(request->start, nav_data.nodes[ctx->went_to[first_point]].origin);
+
+        if (dist > PATH_POINT_TOO_CLOSE)
+            Nav_PushPathPoint(info, request, request->start);
+
+        // crawl forwards and add nodes
+        for (p = first_point; p < num_points; p++)
+            Nav_PushPathPoint(info, request, nav_data.nodes[ctx->went_to[p]].origin);
+
+        // add the end point if we have room
+        dist = VectorDistance(request->goal, nav_data.nodes[ctx->went_to[num_points - 1]].origin);
+
+        if (dist > PATH_POINT_TOO_CLOSE)
+            Nav_PushPathPoint(info, request, request->goal);
+    }
+
+    // we don't care about traversals
+    if (path->request->nodeSearch.ignoreNodeFlags) {
+        info->returnCode = PathReturnCode_RawPathFound;
+        return;
+    }
+
+    // store move point info; check if we have
+    // a traversal pending first
+    if (link && link->traversal != NULL) {
+        VectorCopy(link->traversal->start, info->firstMovePoint);
+        VectorCopy(link->traversal->end, info->secondMovePoint);
+        info->returnCode = PathReturnCode_TraversalPending;
+        return;
+    }
+
+    VectorCopy(nav_data.nodes[ctx->went_to[first_point]].origin, info->firstMovePoint);
+    if (first_point + 1 < num_points)
+        VectorCopy(nav_data.nodes[ctx->went_to[first_point + 1]].origin, info->secondMovePoint);
+    else
+        VectorCopy(path->request->goal, info->secondMovePoint);
+    info->returnCode = PathReturnCode_InProgress;
+}
+
 static PathInfo Nav_Path_(nav_path_t *path)
 {
     PathInfo info = { 0 };
@@ -701,11 +811,13 @@ static PathInfo Nav_Path_(nav_path_t *path)
     ctx->g_score[start_id] = 0;
     Nav_PushOpenSet(ctx, path->start, heuristic_func(path, path->start));
 
+    info.returnCode = PathReturnCode_NoPathFound;
+
     while (true) {
         nav_open_t *cursor = LIST_FIRST(nav_open_t, &ctx->open_set_open, entry);
 
-        // end of open set; this is probably a bug
-        // or there's bad nav data?
+        // end of open set; can't reach the goal, or something
+        // weird happened
         if (LIST_TERM(cursor, &ctx->open_set_open, entry))
             break;
 
@@ -716,111 +828,8 @@ static PathInfo Nav_Path_(nav_path_t *path)
         int16_t current = cursor->node->id;
 
         if (current == goal_id) {
-            int64_t num_points = 0;
-
-            // reverse the order of came_from into went_to
-            // to make stuff below a bit easier to work with
-            int16_t n = current;
-            while (ctx->came_from[n] != -1) {
-                num_points++;
-                n = ctx->came_from[n];
-            }
-
-            n = current;
-            int64_t p = 0;
-            while (ctx->came_from[n] != -1) {
-                n = ctx->went_to[num_points - p - 1] = ctx->came_from[n];
-                p++;
-            }
-
-            // num_points now contains points between start
-            // and current; it will be at least 1, since start can't
-            // be the same as end, but may be less once we start clipping.
-            Q_assert(num_points >= 1);
-            Q_assert(ctx->went_to[0] != -1);
-
-            int64_t first_point = 0;
-            const nav_link_t *link = NULL;
-            
-            if (num_points > 1) {
-                link = Nav_GetLink(&nav_data.nodes[ctx->went_to[0]], &nav_data.nodes[ctx->went_to[1]]);
-
-                if (!path->request->nodeSearch.ignoreNodeFlags) {
-                    // if the node isn't a traversal, we may want
-                    // to skip the first node if we're either past it
-                    // or touching it
-                    if (link->type == NavLinkType_Walk || link->type == NavLinkType_Crouch) {
-                        if (Nav_NodeReached(request->start, &nav_data.nodes[ctx->went_to[0]])) {
-                            first_point++;
-                        } else {
-                            // check if we're in line for the node
-                            vec3_t d = { 0.f, 0.f, 0.f };
-                            Vector2Subtract(nav_data.nodes[ctx->went_to[1]].origin, nav_data.nodes[ctx->went_to[0]].origin, d);
-                            Vector2Normalize(d);
-
-                            vec3_t origin;
-                            VectorMA(nav_data.nodes[ctx->went_to[0]].origin, nav_data.nodes[ctx->went_to[0]].radius, d, origin);
-
-                            vec3_t path = { 0.f, 0.f, 0.f };
-                            Vector2Subtract(nav_data.nodes[ctx->went_to[1]].origin, origin, path);
-
-                            if (DotProduct(d, path) > 0.f)
-                                first_point++;
-                        }
-                    }
-                }
-            }
-
-            // store resulting path for compass, etc
-            if (request->pathPoints.count) {
-                // if we're too far from the first node, add in our current position.
-                float dist = VectorDistance(request->start, nav_data.nodes[ctx->went_to[first_point]].origin);
-
-                if (dist > PATH_POINT_TOO_CLOSE) {
-                    if (info.numPathPoints < request->pathPoints.count)
-                        VectorCopy(request->start, request->pathPoints.posArray[info.numPathPoints]);
-                    info.numPathPoints++;
-                }
-
-                // crawl forwards and add nodes
-                for (p = first_point; p < num_points; p++) {
-
-                    if (info.numPathPoints < request->pathPoints.count)
-                        VectorCopy(nav_data.nodes[ctx->went_to[p]].origin, request->pathPoints.posArray[info.numPathPoints]);
-
-                    info.numPathPoints++;
-                }
-
-                // add the end point if we have room
-                dist = VectorDistance(request->goal, nav_data.nodes[ctx->went_to[current]].origin);
-
-                if (dist > PATH_POINT_TOO_CLOSE) {
-                    if (info.numPathPoints < request->pathPoints.count)
-                        VectorCopy(request->goal, request->pathPoints.posArray[info.numPathPoints]);
-                    info.numPathPoints++;
-                }
-            }
-
-            if (path->request->nodeSearch.ignoreNodeFlags) {
-                info.returnCode = PathReturnCode_RawPathFound;
-                return info;
-            }
-
-            // store move point info
-            if (link && link->traversal != NULL) {
-                VectorCopy(link->traversal->start, info.firstMovePoint);
-                VectorCopy(link->traversal->end, info.secondMovePoint);
-                info.returnCode = PathReturnCode_TraversalPending;
-            } else {
-                VectorCopy(nav_data.nodes[ctx->went_to[first_point]].origin, info.firstMovePoint);
-                if (first_point + 1 < num_points)
-                    VectorCopy(nav_data.nodes[ctx->went_to[first_point + 1]].origin, info.secondMovePoint);
-                else
-                    VectorCopy(path->request->goal, info.secondMovePoint);
-                info.returnCode = PathReturnCode_InProgress;
-            }
-
-            return info;
+            Nav_ReachedGoal(path, &info, request, ctx, current);
+            break;
         }
 
         const nav_node_t *current_node = &nav_data.nodes[current];
@@ -842,8 +851,7 @@ static PathInfo Nav_Path_(nav_path_t *path)
             Nav_PushOpenSet(ctx, link->target, temp_g_score + heuristic_func(path, link->target));
         }
     }
-    
-    info.returnCode = PathReturnCode_NoPathFound;
+
     return info;
 }
 
@@ -924,11 +932,11 @@ void Nav_Load(const char *map_name)
     NAV_VERIFY_READ(nav_data.num_traversals);
     NAV_VERIFY_READ(nav_data.heuristic);
 
-    NAV_VERIFY(nav_data.nodes = Z_TagMallocz(sizeof(nav_node_t) * nav_data.num_nodes, TAG_NAV), "out of memory");
+    NAV_VERIFY(nav_data.nodes = NAV_ALLOCZ(sizeof(nav_node_t) * nav_data.num_nodes), "out of memory");
     if (nav_data.num_links)
-        NAV_VERIFY(nav_data.links = Z_TagMallocz(sizeof(nav_link_t) * nav_data.num_links, TAG_NAV), "out of memory");
+        NAV_VERIFY(nav_data.links = NAV_ALLOCZ(sizeof(nav_link_t) * nav_data.num_links), "out of memory");
     if (nav_data.num_traversals)
-        NAV_VERIFY(nav_data.traversals = Z_TagMallocz(sizeof(nav_traversal_t) * nav_data.num_traversals, TAG_NAV), "out of memory");
+        NAV_VERIFY(nav_data.traversals = NAV_ALLOCZ(sizeof(nav_traversal_t) * nav_data.num_traversals), "out of memory");
 
     nav_data.num_conditional_nodes = 0;
 
@@ -949,7 +957,7 @@ void Nav_Load(const char *map_name)
     }
 
     if (nav_data.num_conditional_nodes)
-        NAV_VERIFY(nav_data.conditional_nodes = Z_TagMallocz(sizeof(nav_node_t *) * nav_data.num_conditional_nodes, TAG_NAV), "out of memory");
+        NAV_VERIFY(nav_data.conditional_nodes = NAV_ALLOCZ(sizeof(nav_node_t *) * nav_data.num_conditional_nodes), "out of memory");
 
     for (int i = 0, c = 0; i < nav_data.num_nodes; i++) {
         nav_node_t *node = nav_data.nodes + i;
@@ -1001,7 +1009,7 @@ void Nav_Load(const char *map_name)
     NAV_VERIFY_READ(nav_data.num_edicts);
 
     if (nav_data.num_edicts) {
-        NAV_VERIFY(nav_data.edicts = Z_TagMallocz(sizeof(nav_edict_t) * nav_data.num_edicts, TAG_NAV), "out of memory");
+        NAV_VERIFY(nav_data.edicts = NAV_ALLOCZ(sizeof(nav_edict_t) * nav_data.num_edicts), "out of memory");
 
         for (int i = 0; i < nav_data.num_edicts; i++) {
             nav_edict_t *edict = nav_data.edicts + i;
@@ -1020,7 +1028,7 @@ void Nav_Load(const char *map_name)
     }
 
     nav_data.node_link_bitmap_size = (nav_data.num_nodes + CHAR_BIT - 1) / CHAR_BIT;
-    NAV_VERIFY(nav_data.node_link_bitmap = Z_TagMallocz(nav_data.node_link_bitmap_size * nav_data.num_nodes, TAG_NAV), "out of memory");
+    NAV_VERIFY(nav_data.node_link_bitmap = NAV_ALLOCZ(nav_data.node_link_bitmap_size * nav_data.num_nodes), "out of memory");
 
     for (int i = 0; i < nav_data.num_nodes; i++) {
         nav_node_t *node = nav_data.nodes + i;

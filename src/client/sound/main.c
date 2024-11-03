@@ -213,7 +213,7 @@ fail:
 
 static void S_FreeSound(sfx_t *sfx)
 {
-    if (s_api->delete_sfx)
+    if (s_started && s_api->delete_sfx)
         s_api->delete_sfx(sfx);
     Z_Free(sfx->cache);
     Z_Free(sfx->truename);
@@ -514,7 +514,7 @@ void S_EndRegistration(void)
             continue;
         }
         // make sure it is paged in
-        if (s_api->page_in_sfx)
+        if (s_started && s_api->page_in_sfx)
             s_api->page_in_sfx(sfx);
     }
 
@@ -525,7 +525,7 @@ void S_EndRegistration(void)
         S_LoadSound(sfx);
     }
 
-    if (s_api->end_registration)
+    if (s_started && s_api->end_registration)
         s_api->end_registration();
 
     s_registering = false;

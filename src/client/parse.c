@@ -85,6 +85,12 @@ static void apply_entity_delta(entity_state_t *to, int number, const q2proto_ent
 
     if (delta_state->delta_bits & Q2P_ESD_SOLID)
         to->solid = delta_state->solid;
+
+    if (delta_state->delta_bits & Q2P_ESD_ALPHA)
+        to->alpha = delta_state->alpha / 255.f;
+
+    if (delta_state->delta_bits & Q2P_ESD_SCALE)
+        to->scale = delta_state->scale / 16.f;
 }
 
 static void CL_ParseDeltaEntity(server_frame_t           *frame,

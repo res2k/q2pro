@@ -161,6 +161,7 @@ static void AL_LoadEffect(const EFXEAXREVERBPROPERTIES *reverb)
 }
 
 static const vec3_t             s_reverb_probes[] = {
+    { 0.00000000f,    0.00000000f,     -1.00000000f },
     { 0.00000000f,    0.00000000f,     1.00000000f },
     { 0.707106769f,   0.00000000f,     0.707106769f },
     { 0.353553385f,   0.612372458f,    0.707106769f },
@@ -182,6 +183,8 @@ static float                    s_reverb_probe_avg;
 
 static const al_reverb_environment_t  *s_reverb_active_environment;
 
+#include "refresh/refresh.h"
+
 static bool AL_EstimateDimensions(void)
 {
     if (!s_reverb_environments)
@@ -195,11 +198,13 @@ static bool AL_EstimateDimensions(void)
     VectorMA(listener_origin, 8192.0f, s_reverb_probes[s_reverb_probe_index], end);
 
     trace_t tr;
-    CL_Trace(&tr, listener_origin, vec3_origin, vec3_origin, end, NULL, MASK_SOLID);
+    CL_Trace(&tr, listener_origin, end, vec3_origin, vec3_origin, NULL, MASK_SOLID);
 
     VectorSubtract(tr.endpos, listener_origin, s_reverb_probe_results[s_reverb_probe_index]);
 
-    if (s_reverb_probe_index == 0 && (tr.surface->flags & SURF_SKY)) {
+    R_AddDebugArrow(listener_origin, tr.endpos, 8.0f, U32_GREEN, U32_BLUE, 13, true);
+
+    if (s_reverb_probe_index == 1 && (tr.surface->flags & SURF_SKY)) {
         s_reverb_probe_results[s_reverb_probe_index][2] += 4096.f;
     }
 
@@ -233,6 +238,14 @@ static bool AL_EstimateDimensions(void)
     }
 
     return changed;
+}
+
+static inline float AL_CalculateReverbFrac()
+{
+    float frac = (cl.time - (float) s_reverb_lerp_start) / (s_reverb_lerp_time - (float) s_reverb_lerp_start);
+    float bfrac = 1.0f - frac;
+    float f = Q_clipf(1.0f - (bfrac * bfrac * bfrac), 0.0f, 1.0f);
+    return f;
 }
 
 static void AL_UpdateReverb(void)
@@ -296,7 +309,7 @@ static void AL_UpdateReverb(void)
             memcpy(&s_active_reverb, &s_reverb_lerp_to, sizeof(s_active_reverb));
             AL_LoadEffect(&s_active_reverb);
         } else {
-            float f = Q_clipf((cl.time - (float) s_reverb_lerp_start) / (s_reverb_lerp_time - (float) s_reverb_lerp_start), 0.0f, 1.0f);
+            float f = AL_CalculateReverbFrac();
 
 #define AL_LERP(prop) \
                 s_reverb_lerp_result.prop = FASTLERP(s_active_reverb.prop, s_reverb_lerp_to.prop, f)
@@ -533,7 +546,7 @@ static void AL_Reverb_stat(void)
     AL_STATF(flRoomRolloffFactor);
     AL_STATI(iDecayHFLimit);
 
-    SCR_StatKeyValue("lerp", !s_reverb_lerp_time ? "none" : va("%g", Q_clipf((cl.time - (float) s_reverb_lerp_start) / (s_reverb_lerp_time - (float) s_reverb_lerp_start), 0.0f, 1.0f)));
+    SCR_StatKeyValue("lerp", !s_reverb_lerp_time ? "none" : va("%g", AL_CalculateReverbFrac()));
 }
 
 static void AL_StreamStop(void);

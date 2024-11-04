@@ -236,7 +236,7 @@ static bool AL_EstimateDimensions(void)
     return changed;
 }
 
-static inline float AL_CalculateReverbFrac()
+static inline float AL_CalculateReverbFrac(void)
 {
     float frac = (cl.time - (float) s_reverb_lerp_start) / (s_reverb_lerp_time - (float) s_reverb_lerp_start);
     float bfrac = 1.0f - frac;

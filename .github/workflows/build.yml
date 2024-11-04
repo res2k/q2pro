@@ -7,40 +7,42 @@ on:
     branches: [rerelease-game]
 
 env:
+  # FIXME: Re-add '--fatal-meson-warnings' when meson fixed 'CMake Toolchain: Failed to determine CMake compilers state' w/ openal
   MESON_ARGS: >-
-    --auto-features=enabled
-    --fatal-meson-warnings
     -Davcodec=disabled
     -Danticheat-server=true
     -Dpacketdup-hack=true
     -Dtests=true
     -Dwerror=true
+    -Dlibcurl=enabled
+    -Dlibjpeg=enabled
+    -Dlibpng=enabled
+    -Dopenal=enabled
+    -Dopenal-soft:werror=false
+    -Dsoftware-sound=enabled
+    -Dzlib=enabled
 
   MESON_ARGS_WIN: >-
-    -Dsdl2=disabled
-    -Dwayland=disabled
+    -Dicmp-errors=enabled
     -Dwrap_mode=forcefallback
-    -Dx11=disabled
+    -Dwindows-crash-dumps=enabled
 
   MESON_ARGS_LINUX: >-
-    -Dwindows-crash-dumps=disabled
     -Dwrap_mode=nofallback
     --force-fallback-for=fmt,jsoncpp
+    -Dsdl2=enabled
+    -Dwayland=enabled
+    -Dx11=enabled
 
   MESON_ARGS_MACOS: >-
-    -Dicmp-errors=disabled
     -Dpkg_config_path=/opt/homebrew/opt/openal-soft/lib/pkgconfig
-    -Dwayland=disabled
-    -Dwindows-crash-dumps=disabled
     -Dwrap_mode=nofallback
     -Dx11=disabled
     --force-fallback-for=fmt,jsoncpp
 
   MESON_ARGS_FREEBSD: >-
-    -Dicmp-errors=disabled
-    -Dwindows-crash-dumps=disabled
     -Dwrap_mode=nofallback
-    --force-fallback-for=fmt,jsoncpp
+    --force-fallback-for=fmt,jsoncpp,openal-soft
 
 jobs:
   mingw:
@@ -63,10 +65,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-mingw-w64 g++-mingw-w64 nasm meson ninja-build
 
-      - name: Build
+      - name: Build - meson setup
         run: |
           meson setup --cross-file=.ci/${{ matrix.arch }}-w64-mingw32.txt \
-          ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_WIN }} builddir
+            ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_WIN }} builddir
+
+      - name: Build info - meson configure
+        run: |
+          meson configure builddir
+
+      - name: Build - meson compile
+        run: |
           meson compile -C builddir
 
   msvc:
@@ -93,9 +102,16 @@ jobs:
       - name: Install dependencies
         run: pip3 install --no-input meson ninja
 
-      - name: Build
+      - name: Build - meson setup
         run: |
           meson setup ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_WIN }} builddir
+
+      - name: Build info - meson configure
+        run: |
+          meson configure builddir
+
+      - name: Build - meson compile
+        run: |
           meson compile -C builddir
           meson install -C builddir --tags runtime --destdir ${{ github.workspace }}/installdir
 
@@ -132,14 +148,21 @@ jobs:
           libcurl4-gnutls-dev libx11-dev libxi-dev \
           libwayland-dev wayland-protocols libdecor-0-dev
 
-      - name: Build
+      - name: Build - meson setup
         run: |
           meson setup ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_LINUX }} builddir
-          meson compile -C builddir
-          meson install -C builddir --tags runtime --destdir ${{ github.workspace }}/installdir
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
+
+      - name: Build info - meson configure
+        run: |
+          meson configure builddir
+
+      - name: Build - meson compile
+        run: |
+          meson compile -C builddir
+          meson install -C builddir --tags runtime --destdir ${{ github.workspace }}/installdir
 
       - name: Setup variables
         uses: actions/github-script@v7
@@ -164,9 +187,16 @@ jobs:
           brew update
           brew install meson sdl2 openal-soft libpng jpeg-turbo
 
-      - name: Build
+      - name: Build - meson setup
         run: |
           meson setup ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_MACOS }} builddir
+
+      - name: Build info - meson configure
+        run: |
+          meson configure builddir
+
+      - name: Build - meson compile
+        run: |
           meson compile -C builddir
 
   freebsd:
@@ -185,7 +215,8 @@ jobs:
           version: '14.1'
           run: |
             sudo pkg update
-            sudo pkg install -y git meson pkgconf openal-soft \
+            sudo pkg install -y git meson pkgconf \
             sdl2 curl png jpeg-turbo libx11 libdecor evdev-proto wayland-protocols
             meson setup ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_FREEBSD }} builddir
+            meson configure builddir
             meson compile -C builddir

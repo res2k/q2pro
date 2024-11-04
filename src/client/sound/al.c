@@ -183,8 +183,6 @@ static float                    s_reverb_probe_avg;
 
 static const al_reverb_environment_t  *s_reverb_active_environment;
 
-#include "refresh/refresh.h"
-
 static bool AL_EstimateDimensions(void)
 {
     if (!s_reverb_environments)
@@ -201,8 +199,6 @@ static bool AL_EstimateDimensions(void)
     CL_Trace(&tr, listener_origin, end, vec3_origin, vec3_origin, NULL, MASK_SOLID);
 
     VectorSubtract(tr.endpos, listener_origin, s_reverb_probe_results[s_reverb_probe_index]);
-
-    R_AddDebugArrow(listener_origin, tr.endpos, 8.0f, U32_GREEN, U32_BLUE, 13, true);
 
     if (s_reverb_probe_index == 1 && (tr.surface->flags & SURF_SKY)) {
         s_reverb_probe_results[s_reverb_probe_index][2] += 4096.f;

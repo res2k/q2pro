@@ -18,7 +18,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #pragma once
 
-#define AL_NO_PROTOTYPES
+#define AL_ALEXT_PROTOTYPES
 
 #include <AL/al.h>
 #include <AL/alext.h>

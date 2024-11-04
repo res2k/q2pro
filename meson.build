@@ -452,13 +452,13 @@ if get_option('tga')
 endif
 
 openal = dependency('openal',
-  version:         '>= 1.18.0',
+  version:         '>= 1.23.1',
   required:        get_option('openal'),
   default_options: fallback_opt,
 )
 if openal.found()
   client_src += [ 'src/client/sound/al.c', 'src/client/sound/qal.c', 'inc/common/jsmn.h' ]
-  client_deps += openal.partial_dependency(compile_args: true, includes: true)
+  client_deps += openal
   config.set10('USE_OPENAL', true)
 endif
 

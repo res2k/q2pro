@@ -231,7 +231,8 @@ static void PF_Client_Print(edict_t *ent, int level, const char *msg)
 
     clientNum = NUM_FOR_EDICT(ent) - 1;
     if (clientNum < 0 || clientNum >= sv_maxclients->integer) {
-        Com_Error(ERR_DROP, "%s to a non-client %d", __func__, clientNum);
+        Com_WPrintf("%s to a non-client %d\n", __func__, clientNum);
+        return;
     }
 
     client = svs.client_pool + clientNum;

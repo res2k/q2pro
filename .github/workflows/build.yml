@@ -5,15 +5,17 @@ on:
     branches: [rerelease-game, ci]
   pull_request:
     branches: [rerelease-game]
+  workflow_dispatch:
 
 env:
   # FIXME: Re-add '--fatal-meson-warnings' when meson fixed 'CMake Toolchain: Failed to determine CMake compilers state' w/ openal
   MESON_ARGS: >-
-    -Davcodec=disabled
     -Danticheat-server=true
     -Dpacketdup-hack=true
     -Dtests=true
     -Dwerror=true
+    -Davcodec=enabled
+    -Dffmpeg:werror=false
     -Dlibcurl=enabled
     -Dlibjpeg=enabled
     -Dlibpng=enabled
@@ -29,7 +31,7 @@ env:
 
   MESON_ARGS_LINUX: >-
     -Dwrap_mode=nofallback
-    --force-fallback-for=fmt,jsoncpp
+    --force-fallback-for=fmt,jsoncpp,ffmpeg
     -Dsdl2=enabled
     -Dwayland=enabled
     -Dx11=enabled
@@ -37,12 +39,11 @@ env:
   MESON_ARGS_MACOS: >-
     -Dpkg_config_path=/opt/homebrew/opt/openal-soft/lib/pkgconfig
     -Dwrap_mode=nofallback
-    -Dx11=disabled
-    --force-fallback-for=fmt,jsoncpp
+    --force-fallback-for=fmt,jsoncpp,ffmpeg
 
   MESON_ARGS_FREEBSD: >-
     -Dwrap_mode=nofallback
-    --force-fallback-for=fmt,jsoncpp,openal-soft
+    --force-fallback-for=fmt,jsoncpp,openal-soft,ffmpeg
 
 jobs:
   mingw:
@@ -215,7 +216,7 @@ jobs:
           version: '14.1'
           run: |
             sudo pkg update
-            sudo pkg install -y git meson pkgconf \
+            sudo pkg install -y git meson pkgconf nasm python \
             sdl2 curl png jpeg-turbo libx11 libdecor evdev-proto wayland-protocols
             meson setup ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_FREEBSD }} builddir
             meson configure builddir

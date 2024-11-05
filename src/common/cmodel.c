@@ -1169,6 +1169,8 @@ void CM_Init(void)
     CM_InitBoxHull();
 
     map_noareas = Cvar_Get("map_noareas", "0", 0);
-    map_allsolid_bug = Cvar_Get("map_allsolid_bug", "1", 0);
+    // TODO: have this default to 'auto' (-1) which is set to 0 if running
+    // a re-release-enabled server/client, otherwise 1 to mimic vanilla
+    map_allsolid_bug = Cvar_Get("map_allsolid_bug", "0", 0);
     map_override_path = Cvar_Get("map_override_path", "", 0);
 }

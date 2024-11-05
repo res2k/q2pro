@@ -257,8 +257,9 @@ static void AL_UpdateReverb(void)
     trace_t tr;
     const vec3_t mins = { -16, -16, 0 };
     const vec3_t maxs = { 16, 16, 0 };
-    const vec3_t listener_down = { listener_origin[0], listener_origin[1], listener_origin[2] - 256.0f };
-    CL_Trace(&tr, listener_origin, mins, maxs, listener_down, NULL, MASK_SOLID);
+    const vec3_t listener_start = { listener_origin[0], listener_origin[1], listener_origin[2] + 1.0f };
+    const vec3_t listener_down = { listener_start[0], listener_start[1], listener_start[2] - 256.0f };
+    CL_Trace(&tr, listener_start, mins, maxs, listener_down, NULL, MASK_SOLID);
 
     uint8_t new_preset = s_reverb_current_preset;
 
@@ -285,6 +286,8 @@ static void AL_UpdateReverb(void)
             if (m != entry->num_materials)
                 break;
         }
+    } else {
+        new_preset = 19;
     }
 
     if (new_preset != s_reverb_current_preset) {

@@ -995,7 +995,8 @@ static void AL_AddMergeLoopSounds(void)
 
             // calculate stereo separation and distance attenuation
             vec3_t source_vec;
-            VectorSubtract(ent2->origin, listener_origin, source_vec);
+            CL_GetEntitySoundOrigin(ent2->number, source_vec);
+            VectorSubtract(source_vec, listener_origin, source_vec);
 
             float dist = VectorNormalize(source_vec);
             dist -= SOUND_FULLVOLUME;

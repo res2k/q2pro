@@ -894,7 +894,12 @@ void CM_ClipEntity(trace_t *dst, const trace_t *src, struct edict_s *ent)
         VectorCopy(src->endpos, dst->endpos);
         dst->plane = src->plane;
         dst->surface = src->surface;
-        dst->contents |= src->contents;
+        dst->contents = src->contents;
+        dst->ent = ent;
+    }
+
+    // [Paril-KEX] Q3A logic fix
+    if (src->allsolid || src->startsolid) {
         dst->ent = ent;
     }
 }

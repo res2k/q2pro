@@ -743,10 +743,6 @@ static void PF_FreeTags(int tag)
     Z_FreeTags(tag + TAG_MAX);
 }
 
-static void PF_DebugGraph(float value, int color)
-{
-}
-
 static int PF_LoadFile(const char *path, void **buffer, unsigned flags, unsigned tag)
 {
     if (tag > UINT16_MAX - TAG_MAX) {
@@ -955,7 +951,7 @@ static const game_import_t game_import = {
     .args = PF_RawArgs,
     .AddCommandString = PF_AddCommandString,
 
-    .DebugGraph = PF_DebugGraph,
+    .DebugGraph = SCR_DebugGraph,
     .SetAreaPortalState = PF_SetAreaPortalState,
     .AreasConnected = PF_AreasConnected,
     .GetExtension = PF_GetExtension,

@@ -1474,7 +1474,11 @@ static void CL_PacketEvent(void)
     cls.errorReceived = false; // don't drop
 #endif
 
+    cl.suppress_count = 0;
+
     CL_ParseServerMessage();
+
+    SCR_AddNetgraph();
 
     SCR_LagSample();
 

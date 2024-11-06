@@ -273,6 +273,7 @@ typedef struct {
 
     server_frame_t  frames[UPDATE_BACKUP];
     unsigned        frameflags;
+    int             suppress_count;
 
     server_frame_t  frame;                // received from server
     server_frame_t  oldframe;
@@ -1232,6 +1233,7 @@ void    SCR_ModeChanged(void);
 void    SCR_LagSample(void);
 void    SCR_LagClear(void);
 void    SCR_SetCrosshairColor(void);
+void    SCR_AddNetgraph(void);
 
 float   SCR_FadeAlpha(unsigned startTime, unsigned visTime, unsigned fadeTime);
 #define SCR_DrawString(x, y, flags, string) \

@@ -1354,13 +1354,17 @@ void CL_ParseTEnt(void)
         break;
 
     case TE_SPLASH:         // bullet hitting water
-        if (te.color < 0 || te.color > 6)
-            r = 0x00;
-        else
-            r = splash_color[te.color];
-        CL_ParticleEffect(te.pos1, te.dir, r, te.count);
+        if (cl.csr.extended && te.color == SPLASH_ELECTRIC_N64) {
+            CL_SparkParticleEffect(te.pos1, te.dir, 0x6c, 0xb0, te.count);
+        } else {
+            if (te.color < SPLASH_UNKNOWN || te.color > SPLASH_BLOOD)
+                r = 0x00;
+            else
+                r = splash_color[te.color];
+            CL_ParticleEffect(te.pos1, te.dir, r, te.count);
+        }
 
-        if (te.color == SPLASH_SPARKS) {
+        if (te.color == SPLASH_SPARKS || (cl.csr.extended && te.color == SPLASH_ELECTRIC_N64)) {
             r = Q_rand() & 3;
             if (r == 0)
                 S_StartSound(te.pos1, 0, 0, cl_sfx_spark5, 1, ATTN_STATIC, 0);

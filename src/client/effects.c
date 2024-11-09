@@ -1002,6 +1002,41 @@ void CL_ParticleEffect(const vec3_t org, const vec3_t dir, int color, int count)
     }
 }
 
+/*
+===============
+CL_SparkParticleEffect
+
+Wall impact puffs, two-toned
+===============
+*/
+void CL_SparkParticleEffect(const vec3_t org, const vec3_t dir, int colora, int colorb, int count)
+{
+    int         i, j;
+    cparticle_t *p;
+    float       d;
+
+    for (i = 0; i < count; i++) {
+        p = CL_AllocParticle();
+        if (!p)
+            return;
+
+        p->time = cl.time;
+        p->color = ((Q_rand() & 1) ? colora : colorb) + (Q_rand() & 7);
+
+        d = Q_rand() & 31;
+        for (j = 0; j < 3; j++) {
+            p->org[j] = org[j] + ((int)(Q_rand() & 7) - 4) + d * dir[j];
+            p->vel[j] = crand() * 20;
+        }
+
+        p->accel[0] = p->accel[1] = 0;
+        p->accel[2] = -PARTICLE_GRAVITY;
+        p->alpha = 1.0f;
+
+        p->alphavel = -1.0f / (0.5f + frand() * 0.3f);
+    }
+}
+
 
 /*
 ===============

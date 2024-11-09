@@ -95,8 +95,10 @@ static inline void Json_Load(const char *filename, json_parse_t *parser)
     Q_strlcpy(parser->error, "unknown error", sizeof(parser->error));
     Q_strlcpy(parser->error_loc, "unknown location", sizeof(parser->error_loc));
 
-    if ((parser->buffer_len = FS_LoadFile(filename, (void **) &parser->buffer)) < 0)
+    int buffer_len;
+    if ((buffer_len = FS_LoadFile(filename, (void **) &parser->buffer)) < 0)
         Json_Error(parser, NULL, va("Couldn't load file \"%s\"", filename));
+    parser->buffer_len = buffer_len;
     
     // calculate the total token size so we can grok all of them.
     jsmn_init(&p);

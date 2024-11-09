@@ -707,6 +707,9 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
             state |= GLS_BLOOM_SHELL;
     }
 
+    if (state & GLS_MESH_SHELL)
+        state &= ~GLS_DYNAMIC_LIGHTS;
+
     GL_StateBits(state);
 
     GL_BindTexture(TMU_TEXTURE, skin->texnum);

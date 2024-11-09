@@ -232,11 +232,11 @@ end
 begin singleplayer
     banner m_banner_game
 	episode_selector episode _mapdb_episode
-	action "start episode" "set _mapdb_type episode; pushmenu skill_select"
+	action --align "start episode" "set _mapdb_type episode; pushmenu skill_select"
     blank
 	unit_selector level _mapdb_level
 	blank
-	action "start level" "set _mapdb_type level; pushmenu skill_select"
+	action --align "start level" "set _mapdb_type level; pushmenu skill_select"
 	blank
     action "load game..." pushmenu loadgame
     action "save game..." pushmenu savegame

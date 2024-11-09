@@ -97,11 +97,9 @@ static void R_DrawPicShadow(int x, int y, qhandle_t pic, int shadow_offset)
 
 static void R_DrawStretchPicShadowAlpha(int x, int y, int w, int h, qhandle_t pic, int shadow_offset, float alpha)
 {
-    R_SetColor(U32_BLACK);
-    R_SetAlpha(alpha);
+    R_SetColorRGB(U32_BLACK);
     R_DrawStretchPic(x + shadow_offset, y + shadow_offset, w, h, pic);
-    R_SetColor(U32_WHITE);
-    R_SetAlpha(alpha);
+    R_SetColorRGB(U32_WHITE);
     R_DrawStretchPic(x, y, w, h, pic);
 }
 
@@ -188,7 +186,7 @@ void CL_Carousel_Input(void)
     }
 }
 
-void CL_Wheel_WeapNext(void)
+static void CL_Wheel_Cycle(int offset)
 {
     if (cl.wheel.state != WHEEL_OPEN) {
         CL_Carousel_Open();
@@ -197,32 +195,31 @@ void CL_Wheel_WeapNext(void)
         return;
     }
 
+    // TODO this is ugly :(
     for (int i = 0; i < cl.carousel.num_slots; i++)
         if (cl.carousel.slots[i].item_index == cl.carousel.selected) {
-            cl.carousel.selected = cl.carousel.slots[i == cl.carousel.num_slots - 1 ? 0 : (i + 1)].item_index;
+
+            for (int n = 0, o = i + offset; n < cl.carousel.num_slots - 1; n++, o += offset) {
+                if (o < 0)
+                    o = cl.carousel.num_slots - 1;
+                else if (o >= cl.carousel.num_slots)
+                    o = 0;
+
+                if (!cl.carousel.slots[o].has_ammo)
+                    continue;
+
+                cl.carousel.selected = cl.carousel.slots[o].item_index;
+                break;
+            }
+
             break;
         }
 
     cl.carousel.close_time = com_localTime3 + wc_timeout->integer;
 }
 
-void CL_Wheel_WeapPrev(void)
-{
-    if (cl.wheel.state != WHEEL_OPEN) {
-        CL_Carousel_Open();
-    } else if (!CL_Carousel_Populate()) {
-        CL_Carousel_Close();
-        return;
-    }
-
-    for (int i = 0; i < cl.carousel.num_slots; i++)
-        if (cl.carousel.slots[i].item_index == cl.carousel.selected) {
-            cl.carousel.selected = cl.carousel.slots[i == 0 ? cl.carousel.num_slots - 1 : (i - 1)].item_index;
-            break;
-        }
-
-    cl.carousel.close_time = com_localTime3 + wc_timeout->integer;
-}
+void CL_Wheel_WeapNext(void) { CL_Wheel_Cycle(1); }
+void CL_Wheel_WeapPrev(void) { CL_Wheel_Cycle(-1); }
 
 static cvar_t *ww_timer_speed;
 
@@ -471,6 +468,7 @@ void CL_Wheel_Draw(void)
         R_DrawStretchPicShadowAlpha(center_x + p[0] - size, center_y + p[1] - size, size * 2, size * 2, active ? slot->icons->selected : slot->icons->wheel, 4, alpha);
 
         int count = -1;
+        bool warn_low = false;
 
         if (slot->is_powerup) {
             if (!cl.wheel_data.powerups[slot->data_id].is_toggle)
@@ -478,12 +476,16 @@ void CL_Wheel_Draw(void)
             else if (cl.wheel_data.powerups[slot->data_id].ammo_index != -1)
                 count = cgame->GetWeaponWheelAmmoCount(&cl.frame.ps, cl.wheel_data.powerups[slot->data_id].ammo_index);
         } else {
-            if (cl.wheel_data.weapons[slot->data_id].ammo_index != -1)
+            if (cl.wheel_data.weapons[slot->data_id].ammo_index != -1) {
                 count = cgame->GetWeaponWheelAmmoCount(&cl.frame.ps, cl.wheel_data.weapons[slot->data_id].ammo_index);
+                warn_low = count <= cl.wheel_data.weapons[slot->data_id].quantity_warn;
+            }
         }
 
         if (count != -1) {
+            R_SetColorRGB(warn_low ? U32_RED : U32_WHITE);
             SCR_DrawString(center_x + p[0] + size, center_y + p[1] + size, UI_CENTER | UI_DROPSHADOW, va("%i", count));
+            R_SetColorRGB(U32_WHITE);
         }
 
         if (selected) {
@@ -517,13 +519,16 @@ void CL_Wheel_Draw(void)
                 R_DrawStretchPicShadowAlpha(center_x - (24 * 3) / 2, center_y - ((24 * 3) / 2), (24 * 3), (24 * 3), ammo->icons.wheel, 2, wheel_alpha);
 
                 R_SetScale(0.25f);
-                SCR_DrawString(center_x * 0.25f, (center_y * 0.25f) + 16, UI_CENTER | UI_DROPSHADOW, va("%i", cgame->GetWeaponWheelAmmoCount(&cl.frame.ps, ammo_index)));
+                R_SetColorRGB(warn_low ? U32_RED : U32_WHITE);
+                SCR_DrawString(center_x * 0.25f, (center_y * 0.25f) + 16, UI_CENTER | UI_DROPSHADOW, va("%i", count));
+                R_SetColorRGB(U32_WHITE);
                 R_SetScale(1);
             }
         }
     }
 
-    R_SetColor(MakeColor(255, 255, 255, 127));
+    R_SetColorRGB(U32_WHITE);
+    R_SetAlpha(wheel_alpha * 0.5f);
     R_DrawPic(center_x + (int) cl.wheel.position[0] - (scr.wheel_button_size / 2), center_y + (int) cl.wheel.position[1] - (scr.wheel_button_size / 2), scr.wheel_button);
 }
 

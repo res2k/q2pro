@@ -261,7 +261,7 @@ void R_SetColorRGB(uint32_t color)
 {
     uint8_t old_alpha = draw.colors[0].u8[3];
     draw.colors[0].u32 = color;
-    draw.colors[0].u8[3] = draw.colors[0].u8[3] = old_alpha;
+    draw.colors[0].u8[3] = draw.colors[1].u8[3] = old_alpha;
 }
 
 void R_SetClipRect(const clipRect_t *clip)

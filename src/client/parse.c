@@ -158,9 +158,6 @@ static void CL_ParsePacketEntities(const server_frame_t *oldframe, server_frame_
     }
 
     while (1) {
-#if USE_DEBUG
-        uint32_t readcount = msg_read.readcount;
-#endif
         q2proto_svc_message_t svc_message;
         q2proto_client_read(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_READ, &svc_message);
         if (svc_message.type != Q2P_SVC_FRAME_ENTITY_DELTA)
@@ -192,7 +189,6 @@ static void CL_ParsePacketEntities(const server_frame_t *oldframe, server_frame_
 
         if (svc_message.frame_entity_delta.remove) {
             // the entity present in oldframe is not in the current frame
-            SHOWNET(2, "%3u:remove:%i\n", readcount, newnum);
             if (oldnum != newnum) {
                 Com_DPrintf("U_REMOVE: oldnum != newnum\n");
             }
@@ -214,11 +210,7 @@ static void CL_ParsePacketEntities(const server_frame_t *oldframe, server_frame_
 
         if (oldnum == newnum) {
             // delta from previous state
-            SHOWNET(2, "%3u:delta:%i ", readcount, newnum);
             CL_ParseDeltaEntity(frame, newnum, oldstate, &svc_message.frame_entity_delta.entity_delta);
-            if (!svc_message.frame_entity_delta.entity_delta.delta_bits) {
-                SHOWNET(2, "\n");
-            }
 
             oldindex++;
 
@@ -234,11 +226,7 @@ static void CL_ParsePacketEntities(const server_frame_t *oldframe, server_frame_
 
         if (oldnum > newnum) {
             // delta from baseline
-            SHOWNET(2, "%3u:baseline:%i ", readcount, newnum);
             CL_ParseDeltaEntity(frame, newnum, &cl.baselines[newnum], &svc_message.frame_entity_delta.entity_delta);
-            if (!svc_message.frame_entity_delta.entity_delta.delta_bits) {
-                SHOWNET(2, "\n");
-            }
             continue;
         }
     }

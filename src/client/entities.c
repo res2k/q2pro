@@ -966,7 +966,7 @@ static void CL_AddPacketEntities(void)
         if (s1->modelindex2) {
             if (s1->modelindex2 == MODELINDEX_PLAYER) {
                 // custom weapon
-                if (cl.csr.extended) {
+                if (cl.game_type == Q2PROTO_GAME_RERELEASE) {
                     player_skinnum_t unpacked = { .skinnum = s1->skinnum };
                     ci = &cl.clientinfo[unpacked.client_num];
                     i = unpacked.vwep_index;

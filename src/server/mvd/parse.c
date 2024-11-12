@@ -525,13 +525,14 @@ static void MVD_ParseSound(mvd_t *mvd, int extrabits)
         msg = LIST_FIRST(message_packet_t, &cl->msg_free_list, entry);
 
         msg->cursize = SOUND_PACKET;
-        msg->flags = flags;
-        msg->index = index;
-        msg->volume = volume;
-        msg->attenuation = attenuation;
-        msg->timeofs = offset;
-        msg->sendchan = sendchan;
-        VectorCopy(origin, msg->pos);
+        msg->sound.flags = flags;
+        msg->sound.index = index;
+        msg->sound.volume = volume;
+        msg->sound.attenuation = attenuation;
+        msg->sound.timeofs = offset;
+        msg->sound.entity = entnum;
+        msg->sound.channel = sendchan & 0x7;
+        q2proto_var_coords_set_float(&msg->sound.pos, origin);
 
         List_Remove(&msg->entry);
         List_Append(&cl->msg_unreliable_list, &msg->entry);

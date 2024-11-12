@@ -19,6 +19,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "server.h"
 #include "client/input.h"
 #include "server/nav.h"
+#include "q2proto/q2proto.h"
 
 master_t    sv_masters[MAX_MASTERS];   // address of group servers
 
@@ -111,6 +112,8 @@ cvar_t  *sv_tick_rate;
 cvar_t  *g_features;
 
 static bool     sv_registered;
+
+static const q2proto_protocol_t q2repro_accepted_protocols[] = {Q2P_PROTOCOL_Q2REPRO};
 
 //============================================================================
 
@@ -230,7 +233,8 @@ void SV_DropClient(client_t *client, const char *reason)
         print_drop_reason(client, reason, oldstate);
 
     // add the disconnect
-    MSG_WriteByte(svc_disconnect);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_DISCONNECT};
+    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
     SV_ClientAddMessage(client, MSG_RELIABLE | MSG_CLEAR);
 
     if (oldstate == cs_spawned || (g_features->integer & GMF_WANT_ALL_DISCONNECTS)) {
@@ -605,9 +609,12 @@ static void SVC_GetChallenge(void)
         svs.challenges[i].time = com_eventTime;
     }
 
+    char challenge_extra[64];
+    q2proto_get_challenge_extras(challenge_extra, sizeof(challenge_extra), q2repro_accepted_protocols, q_countof(q2repro_accepted_protocols));
+
     // send it back
     Netchan_OutOfBand(NS_SERVER, &net_from,
-                      "challenge %u p=%d", challenge, PROTOCOL_VERSION_RERELEASE);
+                      "challenge %u %s", challenge, challenge_extra);
 }
 
 /*
@@ -640,11 +647,11 @@ typedef struct {
 #define reject(...) reject_printf(__VA_ARGS__), false
 #define reject_ptr(...) reject_printf(__VA_ARGS__), NULL
 
-static bool parse_basic_params(conn_params_t *p)
+static bool parse_basic_params(const q2proto_connect_t *parsed_connect, conn_params_t *p)
 {
-    p->protocol = Q_atoi(Cmd_Argv(1));
-    p->qport = Q_atoi(Cmd_Argv(2)) ;
-    p->challenge = Q_atoi(Cmd_Argv(3));
+    p->protocol = q2proto_get_protocol_netver(parsed_connect->protocol);
+    p->qport = parsed_connect->qport;
+    p->challenge = parsed_connect->challenge;
 
     /* Reject any client that doesn't support the rerelease features -
      * Old clients can't support certain things, particularly
@@ -730,24 +737,15 @@ static bool permit_connection(conn_params_t *p)
     return true;
 }
 
-static bool parse_packet_length(conn_params_t *p)
+static bool parse_packet_length(const q2proto_connect_t *parsed_connect, conn_params_t *p)
 {
-    char *s;
+    p->maxlength = parsed_connect->packet_length;
+    if (p->maxlength < 0 || p->maxlength > MAX_PACKETLEN_WRITABLE)
+        return reject("Invalid maximum message length.\n");
 
-    // set maximum packet length
-    p->maxlength = MAX_PACKETLEN_WRITABLE_DEFAULT;
-    if (p->protocol >= PROTOCOL_VERSION_R1Q2) {
-        s = Cmd_Argv(5);
-        if (*s) {
-            p->maxlength = Q_atoi(s);
-            if (p->maxlength < 0 || p->maxlength > MAX_PACKETLEN_WRITABLE)
-                return reject("Invalid maximum message length.\n");
-
-            // 0 means highest available
-            if (!p->maxlength)
-                p->maxlength = MAX_PACKETLEN_WRITABLE;
-        }
-    }
+    // 0 means highest available
+    if (!p->maxlength)
+        p->maxlength = MAX_PACKETLEN_WRITABLE;
 
     if (!NET_IsLocalAddress(&net_from) && net_maxmsglen->integer > 0) {
         // cap to server defined maximum value
@@ -762,18 +760,14 @@ static bool parse_packet_length(conn_params_t *p)
     return true;
 }
 
-static bool parse_enhanced_params(conn_params_t *p)
+static bool parse_enhanced_params(const q2proto_connect_t *parsed_connect, conn_params_t *p)
 {
-    char *s;
+    p->version = parsed_connect->version;
+    p->has_zlib = parsed_connect->has_zlib;
+    p->nctype = parsed_connect->q2pro_nctype;
 
-    p->nctype = NETCHAN_NEW;
-
-    // set zlib
-    s = Cmd_Argv(6);
-    p->has_zlib = !*s || atoi(s);
-
-    // set minor protocol version
-    p->version = PROTOCOL_VERSION_Q2PRO_EXTENDED_LIMITS_2;
+    if (p->nctype != NETCHAN_NEW)
+        return reject("Invalid netchan type.\n");
 
     return true;
 }
@@ -797,26 +791,28 @@ static const char *userinfo_ip_string(void)
     return NET_AdrToString(&net_from);
 }
 
-static bool parse_userinfo(conn_params_t *params, char *userinfo)
+static bool parse_userinfo(const q2proto_connect_t *parsed_connect, conn_params_t *params, char *userinfo)
 {
-    char *info, *s;
+    char *s;
     cvarban_t *ban;
 
     // validate userinfo
-    info = Cmd_Argv(4);
-    if (!info[0])
+    if (parsed_connect->userinfo.len == 0)
         return reject("Empty userinfo string.\n");
 
-    if (!Info_Validate(info))
+    // copy userinfo off
+    q2pslcpy(userinfo, MAX_INFO_STRING, &parsed_connect->userinfo);
+
+    if (!Info_Validate(userinfo))
         return reject("Malformed userinfo string.\n");
 
-    s = Info_ValueForKey(info, "name");
+    s = Info_ValueForKey(userinfo, "name");
     s[MAX_CLIENT_NAME - 1] = 0;
     if (COM_IsWhite(s))
         return reject("Please set your name before connecting.\n");
 
     // check password
-    s = Info_ValueForKey(info, "password");
+    s = Info_ValueForKey(userinfo, "password");
     if (sv_password->string[0]) {
         if (!s[0])
             return reject("Please set your password before connecting.\n");
@@ -837,9 +833,6 @@ static bool parse_userinfo(conn_params_t *params, char *userinfo)
         // anyone to access reserved slots at all
         params->reserved = sv_reserved_slots->integer;
     }
-
-    // copy userinfo off
-    Q_strlcpy(userinfo, info, MAX_INFO_STRING);
 
     // mvdspec, ip, etc are passed in extra userinfo if supported
     if (!(g_features->integer & GMF_EXTRA_USERINFO)) {
@@ -1009,18 +1002,30 @@ static void SVC_DirectConnect(void)
     qboolean        allow;
     char            *reason;
 
+    q2proto_connect_t parsed_connect;
+    q2proto_error_t parse_err = q2proto_parse_connect(Cmd_Args(), q2repro_accepted_protocols, q_countof(q2repro_accepted_protocols), &svs.server_info, &parsed_connect);
+    if (parse_err != Q2P_ERR_SUCCESS) {
+        if (parse_err == Q2P_ERR_PROTOCOL_NOT_SUPPORTED) {
+            reject_printf("Unsupported protocol %d.\n", parsed_connect.protocol);
+            return;
+        } else {
+            reject_printf("'connect' parse error %d.\n", parse_err);
+            return;
+        }
+    }
+
     memset(&params, 0, sizeof(params));
 
     // parse and validate parameters
-    if (!parse_basic_params(&params))
+    if (!parse_basic_params(&parsed_connect, &params))
         return;
     if (!permit_connection(&params))
         return;
-    if (!parse_packet_length(&params))
+    if (!parse_packet_length(&parsed_connect, &params))
         return;
-    if (!parse_enhanced_params(&params))
+    if (!parse_enhanced_params(&parsed_connect, &params))
         return;
-    if (!parse_userinfo(&params, userinfo))
+    if (!parse_userinfo(&parsed_connect, &params, userinfo))
         return;
 
     // find a free client slot
@@ -1038,7 +1043,6 @@ static void SVC_DirectConnect(void)
     newcl->challenge = params.challenge; // save challenge for checksumming
     newcl->protocol = params.protocol;
     newcl->version = params.version;
-    newcl->has_zlib = params.has_zlib;
     newcl->edict = EDICT_NUM(number + 1);
     newcl->gamedir = fs_game->string;
     newcl->mapname = sv.name;
@@ -1055,6 +1059,15 @@ static void SVC_DirectConnect(void)
     newcl->framediv = 1;
     newcl->settings[CLS_FPS] = sv.framerate;
 #endif
+    newcl->q2proto_deflate.z_buffer = svs.z_buffer;
+    newcl->q2proto_deflate.z_buffer_size = svs.z_buffer_size;
+    newcl->q2proto_deflate.z = &svs.z;
+
+    q2proto_error_t err = q2proto_init_servercontext(&newcl->q2proto_ctx, &svs.server_info, &parsed_connect);
+    if (err != Q2P_ERR_SUCCESS) {
+        Com_EPrintf("failed to initialize connection context: %d\n", err);
+        return;
+    }
 
     init_pmove_and_es_flags(newcl);
 
@@ -1080,6 +1093,10 @@ static void SVC_DirectConnect(void)
     Netchan_Setup(&newcl->netchan, NS_SERVER, params.nctype, &net_from,
                   params.qport, params.maxlength, params.protocol);
     newcl->numpackets = 1;
+
+    newcl->io_data.sz_read = &msg_read;
+    newcl->io_data.sz_write = &msg_write;
+    newcl->io_data.max_msg_len = newcl->netchan.maxpacketlen;
 
     // parse some info from the info strings
     Q_strlcpy(newcl->userinfo, userinfo, sizeof(newcl->userinfo));
@@ -2229,15 +2246,14 @@ static void SV_FinalMessage(const char *message, error_type_t type)
         return;
 
     if (message) {
-        MSG_WriteByte(svc_print);
-        MSG_WriteByte(PRINT_HIGH);
-        MSG_WriteString(message);
+        q2proto_svc_message_t print_msg = {.type = Q2P_SVC_PRINT, .print = {0}};
+        print_msg.print.level = PRINT_HIGH;
+        print_msg.print.string = q2proto_make_string(message);
+        q2proto_server_multicast_write(Q2P_PROTOCOL_MULTICAST_FLOAT, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &print_msg);
     }
 
-    if (type == ERR_RECONNECT)
-        MSG_WriteByte(svc_reconnect);
-    else
-        MSG_WriteByte(svc_disconnect);
+    q2proto_svc_message_t goodbye_msg = {.type = type == ERR_RECONNECT ? Q2P_SVC_RECONNECT : Q2P_SVC_DISCONNECT};
+    q2proto_server_multicast_write(Q2P_PROTOCOL_MULTICAST_FLOAT, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &goodbye_msg);
 
     // send it twice
     // stagger the packets to crutch operating system limited buffers

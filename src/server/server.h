@@ -38,6 +38,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/pmove.h"
 #include "common/prompt.h"
 #include "common/protocol.h"
+#include "common/q2proto_shared.h"
 #include "common/zone.h"
 
 #include "client/client.h"
@@ -48,7 +49,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "server/mvd/client.h"
 #endif
 
-#include "q2proto/q2proto_gametype.h"
+#include "q2proto/q2proto.h"
 
 #if USE_ZLIB
 #include <zlib.h>
@@ -207,8 +208,7 @@ typedef enum {
 
 #define MSG_RELIABLE        BIT(0)
 #define MSG_CLEAR           BIT(1)
-#define MSG_COMPRESS        BIT(2)
-#define MSG_COMPRESS_AUTO   BIT(3)
+#define MSG_COMPRESS_AUTO   BIT(2)
 
 #define ZPACKET_HEADER      5
 
@@ -220,15 +220,7 @@ typedef struct {
     uint16_t            cursize;    // zero means sound packet
     union {
         uint8_t         data[MSG_TRESHOLD];
-        struct {
-            uint16_t    index;
-            uint16_t    sendchan;
-            uint8_t     flags;
-            uint8_t     volume;
-            uint8_t     attenuation;
-            uint8_t     timeofs;
-            vec3_t      pos;     // saved in case entity is freed
-        };
+        q2proto_svc_sound_t sound;
     };
 } message_packet_t;
 
@@ -265,7 +257,6 @@ typedef struct client_s {
     // client flags
     bool            reconnected: 1;
     bool            nodata: 1;
-    bool            has_zlib: 1;
     bool            drop_hack: 1;
 #if USE_ICMP
     bool            unreachable: 1;
@@ -315,18 +306,23 @@ typedef struct client_s {
     unsigned        send_time, send_delta;          // used to rate drop async packets
 
     // current download
-    byte            *download;      // file being downloaded
-    int             downloadsize;   // total bytes (can't use EOF because of paks)
-    int             downloadcount;  // bytes sent
-    char            *downloadname;  // name of the file
-    int             downloadcmd;    // svc_(z)download
+    byte            *download;          // file being downloaded
+    const uint8_t   *download_ptr;      // pointer to remaining download data
+    size_t          download_remaining; // remaining bytes to download
+    char            *downloadname;      // name of the file
     bool            downloadpending;
+    q2proto_server_download_state_t download_state;
+#if USE_ZLIB
+    q2protoio_deflate_args_t q2proto_deflate;
+#endif
 
     // protocol stuff
     int             challenge;  // challenge of this user, randomly generated
     int             protocol;   // major version
     int             version;    // minor version
     int             settings[CLS_MAX];
+    q2proto_servercontext_t q2proto_ctx;
+    q2protoio_ioarg_t io_data;
 
     pmoveParams_t   pmp;        // spectator speed, etc
     msgEsFlags_t    esFlags;    // entity protocol flags
@@ -490,6 +486,8 @@ typedef struct {
     ratelimit_t     ratelimit_rcon;
 
     challenge_t     challenges[MAX_CHALLENGES]; // to prevent invalid IPs from connecting
+
+    q2proto_server_info_t server_info;
 } server_static_t;
 
 //=============================================================================
@@ -760,6 +758,7 @@ static inline void SV_CheckEntityNumber(edict_t *ent, int e, const char *func)
 void SV_BuildClientFrame(client_t *client);
 bool SV_WriteFrameToClient_Default(client_t *client, unsigned maxsize);
 bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize);
+bool SV_MakeEntityDelta(q2proto_entity_state_delta_t *delta, const entity_packed_t *from, const entity_packed_t *to, msgEsFlags_t flags);
 
 //
 // sv_game.c

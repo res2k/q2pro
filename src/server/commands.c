@@ -616,10 +616,11 @@ static void dump_downloads(void)
     FOR_EACH_CLIENT(client) {
         if (client->download) {
             name = client->downloadname;
-            size = client->downloadsize;
+            size_t downloadcount, size;
+            q2proto_server_download_get_progress(&client->download_state, &downloadcount, &size);
             if (!size)
                 size = 1;
-            percent = client->downloadcount * 100 / size;
+            percent = downloadcount * 100 / size;
         } else if (client->http_download) {
             name = "<HTTP download>";
             size = percent = 0;
@@ -681,7 +682,7 @@ static void dump_protocols(void)
         Com_Printf("%3i %-15.15s %5d %5d %6u  %s  %s\n",
                    cl->number, cl->name, cl->protocol, cl->version,
                    cl->netchan.maxpacketlen,
-                   cl->has_zlib ? "yes" : "no ",
+                   cl->q2proto_ctx.features.enable_deflate ? "yes" : "no ",
                    cl->netchan.type ? "new" : "old");
     }
 }
@@ -821,7 +822,7 @@ void SV_PrintMiscInfo(void)
     Com_Printf("protocol (maj/min)   %d/%d\n",
                sv_client->protocol, sv_client->version);
     Com_Printf("maxmsglen            %u\n", sv_client->netchan.maxpacketlen);
-    Com_Printf("zlib support         %s\n", sv_client->has_zlib ? "yes" : "no");
+    Com_Printf("zlib support         %s\n", sv_client->q2proto_ctx.features.enable_deflate ? "yes" : "no");
     Com_Printf("netchan type         %s\n", sv_client->netchan.type ? "new" : "old");
     Com_Printf("ping                 %d\n", sv_client->ping);
     Com_Printf("movement fps         %d\n", sv_client->moves_per_sec);

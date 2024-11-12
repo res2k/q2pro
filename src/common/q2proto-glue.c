@@ -44,12 +44,18 @@ static struct {
 
 // Sizebuf with inflated data
 static sizebuf_t msg_inflate;
+// Sizebuf to buffer data to deflate
+static sizebuf_t msg_deflate;
+static byte deflate_buf[MAX_DEFLATED_SIZE];
 
 q2protoio_ioarg_t default_q2protoio_ioarg = {.sz_read = &msg_read, .sz_write = &msg_write, .max_msg_len = 1384 /* conservative default */ };
-static q2protoio_ioarg_t inflate_q2protoio_ioarg = {.sz_read = &msg_inflate};
+static q2protoio_ioarg_t inflate_q2protoio_ioarg = {.sz_read = &msg_inflate, .sz_write = &msg_write};
+static q2protoio_ioarg_t deflate_q2protoio_ioarg = {.sz_write = &msg_deflate};
 
 // I/O arg: read from inflated data
 #define IOARG_INFLATE      ((uintptr_t)&inflate_q2protoio_ioarg)
+// I/O arg: write w/ deflate
+#define IOARG_DEFLATE      ((uintptr_t)&deflate_q2protoio_ioarg)
 
 static byte* io_read_data(uintptr_t io_arg, size_t len, size_t *readcount)
 {
@@ -176,49 +182,174 @@ q2proto_error_t q2protoio_inflate_end(uintptr_t inflate_io_arg)
     }
     return msg_inflate.readcount < msg_inflate.cursize ? Q2P_ERR_MORE_DATA_DEFLATED : Q2P_ERR_SUCCESS;
 }
-#endif
+
+static void reset_deflate_input(q2protoio_deflate_args_t* deflate_args)
+{
+    deflate_args->z->next_in = (Byte*)deflate_buf;
+    deflate_args->z->next_out = deflate_args->z_buffer;
+    deflate_args->z->avail_out = deflate_args->z_buffer_size;
+    deflate_args->z->total_in = 0;
+    deflate_args->z->total_out = 0;
+}
+
+q2proto_error_t q2protoio_deflate_begin(q2protoio_deflate_args_t* deflate_args, size_t max_deflated, uintptr_t *deflate_io_arg)
+{
+    Q_assert(!deflate_q2protoio_ioarg.deflate);
+
+    deflateReset(deflate_args->z);
+    reset_deflate_input(deflate_args);
+
+    SZ_InitWrite(&msg_deflate, deflate_buf, MAX_MSGLEN);
+
+    deflate_q2protoio_ioarg.max_msg_len = max_deflated;
+    deflate_q2protoio_ioarg.deflate = deflate_args;
+    *deflate_io_arg = IOARG_DEFLATE;
+
+    return Q2P_ERR_SUCCESS;
+}
+
+#define DEFLATE_OUTPUT_MARGIN   16
+
+q2proto_error_t q2protoio_deflate_get_data(uintptr_t deflate_io_arg, size_t* in_size, const void **out, size_t *out_size)
+{
+    q2protoio_ioarg_t *io_data = (q2protoio_ioarg_t *)deflate_io_arg;
+    q2protoio_deflate_args_t *deflate_args = io_data->deflate;
+
+    deflate_args->z->avail_in = msg_deflate.cursize - deflate_args->z->total_in;
+    int ret = deflate(deflate_args->z, Z_FINISH);
+    if (ret != Z_OK && ret != Z_STREAM_END) {
+        deflateEnd(deflate_args->z);
+        Com_Error(ERR_DROP, "%s: deflate() failed with error %d", __func__, ret);
+    }
+
+    if (in_size)
+        *in_size = deflate_args->z->total_in;
+    *out = deflate_args->z_buffer;
+    *out_size = deflate_args->z->total_out;
+    SZ_Clear(&msg_deflate);
+    reset_deflate_input(deflate_args);
+
+    return Q2P_ERR_SUCCESS;
+}
+
+q2proto_error_t q2protoio_deflate_end(uintptr_t deflate_io_arg)
+{
+    q2protoio_ioarg_t *io_data = (q2protoio_ioarg_t *)deflate_io_arg;
+
+    io_data->deflate = NULL;
+
+    return Q2P_ERR_SUCCESS;
+}
+#endif // USE_ZLIB
+
+static void* io_reserve_data(uintptr_t io_arg, size_t size)
+{
+    sizebuf_t *sz = ((q2protoio_ioarg_t*)io_arg)->sz_write;
+    return SZ_GetSpace(sz, size);
+}
 
 void q2protoio_write_u8(uintptr_t io_arg, uint8_t x)
 {
-    MSG_WriteByte(x);
+    byte* buf = io_reserve_data(io_arg, 1);
+    buf[0] = x;
 }
 
 void q2protoio_write_u16(uintptr_t io_arg, uint16_t x)
 {
-    MSG_WriteShort(x);
+    byte* buf = io_reserve_data(io_arg, 2);
+    WL16(buf, x);
 }
 
 void q2protoio_write_u32(uintptr_t io_arg, uint32_t x)
 {
-    MSG_WriteLong(x);
+    byte* buf = io_reserve_data(io_arg, 4);
+    WL32(buf, x);
 }
 
 void q2protoio_write_u64(uintptr_t io_arg, uint64_t x)
 {
-    MSG_WriteLong64(x);
+    byte* buf = io_reserve_data(io_arg, 8);
+    WL64(buf, x);
 }
 
 void* q2protoio_write_reserve_raw(uintptr_t io_arg, size_t size)
 {
-    return SZ_GetSpace(&msg_write, size);
+    return io_reserve_data(io_arg, size);
 }
 
 void q2protoio_write_raw(uintptr_t io_arg, const void* data, size_t size, size_t *written)
 {
-    size_t buf_remaining = msg_write.maxsize - msg_write.cursize;
-    size_t write_size = written ? min(buf_remaining, size) : size;
-    void* p = SZ_GetSpace(&msg_write, write_size);
-    memcpy(p, data, write_size);
-    if (written)
-        *written = write_size;
+    q2protoio_ioarg_t *io_data = (q2protoio_ioarg_t *)io_arg;
+    sizebuf_t *sz = io_data->sz_write;
+
+    if (io_data->deflate && written)
+    {
+        // Deflating as much as possble: write data in a loop
+        const byte *data_bytes = data;
+        size_t in_remaining = size;
+        size_t out_remaining = q2protoio_write_available(io_arg);
+        size_t in_consumed = 0;
+        while (in_remaining > 0 && out_remaining > 0)
+        {
+            size_t chunk_size = min(in_remaining, out_remaining);
+            void* p = SZ_GetSpace(sz, chunk_size);
+            memcpy(p, data_bytes, chunk_size);
+            in_consumed += chunk_size;
+            data_bytes += chunk_size;
+            in_remaining -= chunk_size;
+            out_remaining = q2protoio_write_available(io_arg);
+        }
+        *written = in_consumed;
+    }
+    else
+    {
+        // Simple case: not deflating, or requiring all data to be deflated
+        size_t buf_remaining = sz->maxsize - sz->cursize;
+        size_t write_size = written ? min(buf_remaining, size) : size;
+        void* p = SZ_GetSpace(sz, write_size);
+        memcpy(p, data, write_size);
+        if (written)
+            *written = write_size;
+    }
+}
+
+static void compress_accumulated(q2protoio_deflate_args_t *deflate_args)
+{
+    // Compress data accumulated in deflate_buf
+    deflate_args->z->avail_in = msg_deflate.cursize - deflate_args->z->total_in;
+
+    int ret = deflate(deflate_args->z, Z_PARTIAL_FLUSH);
+    if (ret != Z_OK && ret != Z_STREAM_END) {
+        deflateEnd(deflate_args->z);
+        Com_Error(ERR_DROP, "%s: deflate() failed with error %d", __func__, ret);
+    }
 }
 
 size_t q2protoio_write_available(uintptr_t io_arg)
 {
     const q2protoio_ioarg_t *io_data = (const q2protoio_ioarg_t *)io_arg;
     sizebuf_t *sz = io_data->sz_write;
-    // FIXME: does not take possibility of compression into account ... (see maybe_flush_msg)
-    return io_data->max_msg_len - min(sz->cursize, io_data->max_msg_len);
+    if (io_data->deflate)
+    {
+        size_t already_compressed = io_data->deflate->z->total_out;
+        size_t yet_uncompressed = sz->cursize - io_data->deflate->z->total_in;
+
+        size_t used_size = already_compressed + deflateBound(io_data->deflate->z, yet_uncompressed);
+        size_t max_msg_len = io_data->max_msg_len - DEFLATE_OUTPUT_MARGIN;
+        size_t write_available = max_msg_len - min(used_size, max_msg_len);
+        if (write_available == 0 && yet_uncompressed > 0)
+        {
+            // Actually compress yet-uncompressed data to get an "available" number closer to reality
+            compress_accumulated(io_data->deflate);
+            already_compressed = io_data->deflate->z->total_out;
+            write_available = max_msg_len - min(already_compressed, max_msg_len);
+        }
+        return write_available;
+    }
+    else
+    {
+        return io_data->max_msg_len - min(sz->cursize, io_data->max_msg_len);
+    }
 }
 
 bool nonfatal_client_read_errors = false;
@@ -249,6 +380,19 @@ q2proto_error_t q2protoerr_client_write(uintptr_t io_arg, q2proto_error_t err, c
     va_end(argptr);
 
     Com_EPrintf("client write error: %s\n", buf);
+    return err;
+}
+
+q2proto_error_t q2protoerr_server_write(uintptr_t io_arg, q2proto_error_t err, const char *msg, ...)
+{
+    char buf[256];
+    va_list argptr;
+
+    va_start(argptr, msg);
+    Q_vsnprintf(buf, sizeof(buf), msg, argptr);
+    va_end(argptr);
+
+    Com_EPrintf("server write error: %s\n", buf);
     return err;
 }
 

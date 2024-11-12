@@ -39,10 +39,11 @@ void SV_FlushRedirect(int redirected, const char *outputbuf, size_t len)
         memcpy(buffer + 10, outputbuf, len);
         NET_SendPacket(NS_SERVER, buffer, len + 10, &net_from);
     } else if (redirected == RD_CLIENT) {
-        MSG_WriteByte(svc_print);
-        MSG_WriteByte(PRINT_HIGH);
-        MSG_WriteData(outputbuf, len);
-        MSG_WriteByte(0);
+        q2proto_svc_message_t message = {.type = Q2P_SVC_PRINT, .print = {0}};
+        message.print.level = PRINT_HIGH;
+        message.print.string.str = outputbuf;
+        message.print.string.len = len;
+        q2proto_server_write(&sv_client->q2proto_ctx, (uintptr_t)&sv_client->io_data, &message);
         SV_ClientAddMessage(sv_client, MSG_RELIABLE | MSG_CLEAR);
     }
 }
@@ -137,9 +138,10 @@ void SV_ClientPrintf(client_t *client, int level, const char *fmt, ...)
         return;
     }
 
-    MSG_WriteByte(svc_print);
-    MSG_WriteByte(level);
-    MSG_WriteData(string, len + 1);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_PRINT, .print = {0}};
+    message.print.level = level;
+    message.print.string = q2proto_make_string(string);
+    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
 
     SV_ClientAddMessage(client, MSG_RELIABLE | MSG_CLEAR);
 }
@@ -168,9 +170,10 @@ void SV_BroadcastPrintf(int level, const char *fmt, ...)
         return;
     }
 
-    MSG_WriteByte(svc_print);
-    MSG_WriteByte(level);
-    MSG_WriteData(string, len + 1);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_PRINT, .print = {0}};
+    message.print.level = level;
+    message.print.string = q2proto_make_string(string);
+    q2proto_server_multicast_write(Q2P_PROTOCOL_MULTICAST_FLOAT, Q2PROTO_IOARG_SERVER_WRITE_MULTICAST, &message);
 
     FOR_EACH_CLIENT(client) {
         if (client->state != cs_spawned)
@@ -314,7 +317,7 @@ void SV_Multicast(const vec3_t origin, multicast_t to, bool reliable)
 #if USE_ZLIB
 static bool can_auto_compress(const client_t *client)
 {
-    if (!client->has_zlib)
+    if (!client->q2proto_ctx.features.enable_deflate)
         return false;
 
     // compress only sufficiently large layouts
@@ -324,43 +327,25 @@ static bool can_auto_compress(const client_t *client)
     return true;
 }
 
-static int compress_message(const client_t *client)
+static int compress_message(client_t *client)
 {
-    int     ret, len;
-    byte    *hdr;
-
-    if (!client->has_zlib)
-        return 0;
-
-    svs.z.next_in = msg_write.data;
-    svs.z.avail_in = msg_write.cursize;
-    svs.z.next_out = svs.z_buffer + ZPACKET_HEADER;
-    svs.z.avail_out = svs.z_buffer_size - ZPACKET_HEADER;
-
-    ret = deflate(&svs.z, Z_FINISH);
-    len = svs.z.total_out;
-
-    // prepare for next deflate()
-    deflateReset(&svs.z);
-
-    if (ret != Z_STREAM_END) {
-        Com_WPrintf("Error %d compressing %u bytes message for %s\n",
-                    ret, msg_write.cursize, client->name);
+    size_t uncompressed_size = msg_write.cursize;
+    msg_write.cursize = 0;
+    q2proto_error_t err = q2proto_server_write_zpacket(&client->q2proto_ctx, &client->q2proto_deflate, (uintptr_t)&client->io_data, msg_write.data, uncompressed_size);
+    if (err != Q2P_ERR_SUCCESS)
+    {
+        if (err != Q2P_ERR_ALREADY_COMPRESSED)
+            Com_WPrintf("Error %d compressing %zu bytes message for %s\n",
+                        err, uncompressed_size, client->name);
+        msg_write.cursize = uncompressed_size;
         return 0;
     }
-
-    // write the packet header
-    hdr = svs.z_buffer;
-    hdr[0] = svc_rr_zpacket;
-    WL16(&hdr[1], len);
-    WL16(&hdr[3], msg_write.cursize);
-
-    return len + ZPACKET_HEADER;
+    return msg_write.cursize;
 }
 
 static byte *get_compressed_data(void)
 {
-    return svs.z_buffer;
+    return msg_write.data;
 }
 #else
 #define can_auto_compress(c)    false
@@ -387,11 +372,9 @@ void SV_ClientAddMessage(client_t *client, int flags)
         return;
     }
 
-    if ((flags & MSG_COMPRESS_AUTO) && can_auto_compress(client)) {
-        flags |= MSG_COMPRESS;
-    }
+    bool compress = (flags & MSG_COMPRESS_AUTO) && can_auto_compress(client);
 
-    if ((flags & MSG_COMPRESS) && (len = compress_message(client)) && len < msg_write.cursize) {
+    if (compress && (len = compress_message(client)) && len < msg_write.cursize) {
         client->AddMessage(client, get_compressed_data(), len, flags & MSG_RELIABLE);
         SV_DPrintf(0, "Compressed %sreliable message to %s: %u into %d\n",
                    (flags & MSG_RELIABLE) ? "" : "un", client->name, msg_write.cursize, len);
@@ -522,10 +505,10 @@ static bool check_entity(const client_t *client, int entnum)
 }
 
 // sounds relative to entities are handled specially
-static void emit_snd(const client_t *client, const message_packet_t *msg)
+static void emit_snd(client_t *client, const message_packet_t *msg)
 {
-    int entnum = msg->sendchan >> 3;
-    int flags = msg->flags;
+    int entnum = msg->sound.entity;
+    int flags = msg->sound.flags;
 
     // check if position needs to be explicitly sent
     if (!(flags & SND_POS) && !check_entity(client, entnum)) {
@@ -534,24 +517,9 @@ static void emit_snd(const client_t *client, const message_packet_t *msg)
         flags |= SND_POS;   // entity is not present in frame
     }
 
-    MSG_WriteByte(svc_sound);
-    MSG_WriteByte(flags);
-    if (flags & SND_INDEX16)
-        MSG_WriteShort(msg->index);
-    else
-        MSG_WriteByte(msg->index);
-
-    if (flags & SND_VOLUME)
-        MSG_WriteByte(msg->volume);
-    if (flags & SND_ATTENUATION)
-        MSG_WriteByte(msg->attenuation);
-    if (flags & SND_OFFSET)
-        MSG_WriteByte(msg->timeofs);
-
-    MSG_WriteShort(msg->sendchan);
-
-    if (flags & SND_POS)
-        MSG_WritePos(msg->pos);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_SOUND, .sound = msg->sound};
+    message.sound.flags = flags;
+    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
 }
 
 static inline void write_snd(client_t *client, message_packet_t *msg, unsigned maxsize)
@@ -744,8 +712,10 @@ static void write_datagram_old(client_t *client)
     if (sv_pad_packets->integer > 0) {
         int pad = min(MAX_PACKETLEN - 8, sv_pad_packets->integer);
 
-        while (msg_write.cursize < pad)
-            MSG_WriteByte(svc_nop);
+        while (msg_write.cursize < pad) {
+            q2proto_svc_message_t message = {.type = Q2P_SVC_NOP};
+            q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
+        }
     }
 #endif
 
@@ -810,8 +780,10 @@ static void write_datagram_new(client_t *client)
     if (sv_pad_packets->integer > 0) {
         int pad = min(msg_write.maxsize, sv_pad_packets->integer);
 
-        while (msg_write.cursize < pad)
-            MSG_WriteByte(svc_nop);
+        while (msg_write.cursize < pad) {
+            q2proto_svc_message_t message = {.type = Q2P_SVC_NOP};
+            q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
+        }
     }
 #endif
 
@@ -938,21 +910,23 @@ static void write_pending_download(client_t *client)
     if (client->netchan.reliable_length)
         return;
 
-    if (buf->cursize >= client->netchan.maxpacketlen - 4)
+    if (buf->cursize >= client->netchan.maxpacketlen)
         return;
 
-    chunk = min(client->downloadsize - client->downloadcount,
-                client->netchan.maxpacketlen - buf->cursize - 4);
+    chunk = client->netchan.maxpacketlen - buf->cursize;
 
     client->downloadpending = false;
-    client->downloadcount += chunk;
 
-    SZ_WriteByte(buf, client->downloadcmd);
-    SZ_WriteShort(buf, chunk);
-    SZ_WriteByte(buf, client->downloadcount * 100 / client->downloadsize);
-    SZ_Write(buf, client->download + client->downloadcount - chunk, chunk);
+    q2proto_svc_message_t message = {.type = Q2P_SVC_DOWNLOAD};
+    int download_err = q2proto_server_download_data(&client->download_state, &client->download_ptr, &client->download_remaining, chunk, &message.download);
+    if (download_err == Q2P_ERR_SUCCESS || download_err == Q2P_ERR_DOWNLOAD_COMPLETE) {
+        q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
+        MSG_FlushTo(buf);
+    } else if (download_err != Q2P_ERR_NOT_ENOUGH_PACKET_SPACE) {
+        Com_WPrintf("%s: failed downloading data to %s: %d\n", __func__, client->name, download_err);
+    }
 
-    if (client->downloadcount == client->downloadsize) {
+    if (download_err == Q2P_ERR_DOWNLOAD_COMPLETE) {
         SV_CloseDownload(client);
         SV_AlignKeyFrames(client);
     }

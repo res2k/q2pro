@@ -1666,6 +1666,19 @@ enum {
 typedef uint8_t entity_event_t;
 
 #if !defined(GAME3_INCLUDE)
+// [Paril-KEX] player s.skinnum's encode additional data
+typedef union {
+    struct {
+        uint8_t     client_num; // client index
+        uint8_t     vwep_index; // vwep index
+        int8_t      viewheight; // viewheight
+        uint8_t     team_index : 4; // team #; note that teams are 1-indexed here, with 0 meaning no team
+                                    // (spectators in CTF would be 0, for instance)
+        uint8_t     poi_icon : 4;   // poi icon; 0 default friendly, 1 dead, others unused
+    };
+    int32_t         skinnum;
+} player_skinnum_t;
+
 // entity_state_t is the information conveyed from the server
 // in an update message about entities that the client will
 // need to render in some way

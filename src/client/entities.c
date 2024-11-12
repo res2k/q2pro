@@ -966,8 +966,14 @@ static void CL_AddPacketEntities(void)
         if (s1->modelindex2) {
             if (s1->modelindex2 == MODELINDEX_PLAYER) {
                 // custom weapon
-                ci = &cl.clientinfo[s1->skinnum & 0xff];
-                i = (s1->skinnum >> 8); // 0 is default weapon model
+                if (cl.csr.extended) {
+                    player_skinnum_t unpacked = { .skinnum = s1->skinnum };
+                    ci = &cl.clientinfo[unpacked.client_num];
+                    i = unpacked.vwep_index;
+                } else {
+                    ci = &cl.clientinfo[s1->skinnum & 0xff];
+                    i = (s1->skinnum >> 8); // 0 is default weapon model
+                }
                 if (i < 0 || i > cl.numWeaponModels - 1)
                     i = 0;
                 ent.model = ci->weaponmodel[i];

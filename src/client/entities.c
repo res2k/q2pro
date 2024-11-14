@@ -279,6 +279,7 @@ static void parse_entity_event(int number)
 static void set_active_state(void)
 {
     cls.state = ca_active;
+    Cbuf_ExecuteDeferred(&cmd_buffer);
 
     cl.serverdelta = Q_align_down(cl.frame.number, CL_FRAMEDIV);
     cl.time = cl.servertime = 0; // set time, needed for demos

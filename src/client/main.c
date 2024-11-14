@@ -771,6 +771,7 @@ void CL_Disconnect(error_type_t type)
         OGG_PlayMenu();
     } else {
         UI_OpenMenu(UIMENU_NONE);
+        Cbuf_ClearDeferred(&cmd_buffer);
     }
 
     CL_CheckForPause();

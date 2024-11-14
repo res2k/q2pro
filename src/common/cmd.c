@@ -214,6 +214,39 @@ void Cbuf_Clear(cmdbuf_t *buf)
 }
 
 /*
+============
+Cbuf_Clear
+============
+*/
+void Cbuf_Defer(cmdbuf_t *buf)
+{
+    Q_strlcpy(buf->defer, buf->text, buf->cursize);
+    Cbuf_Clear(buf);
+}
+
+/*
+============
+Cbuf_ExecuteDeferred
+============
+*/
+void Cbuf_ExecuteDeferred(cmdbuf_t *buf)
+{
+    Cbuf_AddText(buf, buf->defer);
+    Cbuf_ClearDeferred(buf);
+    Cbuf_Execute(buf);
+}
+
+/*
+============
+Cbuf_ClearDeferred
+============
+*/
+void Cbuf_ClearDeferred(cmdbuf_t *buf)
+{
+    buf->defer[0] = '\0';
+}
+
+/*
 ==============================================================================
 
                         SCRIPT COMMANDS

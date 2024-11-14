@@ -232,6 +232,10 @@ void SV_SpawnServer(const mapcmd_t *cmd)
     SV_BroadcastCommand("reconnect\n");
 
     Com_Printf("-------------------------------------\n");
+
+#if USE_CLIENT
+    Cbuf_Defer(&cmd_buffer);
+#endif
 }
 
 static server_state_t get_server_state(const char *s)

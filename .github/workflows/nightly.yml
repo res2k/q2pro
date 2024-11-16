@@ -2,7 +2,7 @@ name: nightly
 
 on:
   push:
-    branches: [master]
+    branches: [rerelease-game]
 
 permissions:
   contents: write

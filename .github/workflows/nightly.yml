@@ -2,7 +2,7 @@ name: nightly
 
 on:
   push:
-    branches: []
+    branches: [master]
 
 permissions:
   contents: write

@@ -111,7 +111,12 @@ static void write_gamestate(void)
         q2proto_svc_configstring_t *cfgstr = &configstrings[gamestate.num_configstrings++];
         cfgstr->index = i;
         cfgstr->value.str = string;
-        cfgstr->value.len = Q_strnlen(string, MAX_QPATH);
+        // FIXME: this is not very intelligent, and would probably benefit from
+        // checking Com_ConfigstringSize and increasing as appropriate to save
+        // on some bytes. for instance CS_STATUSBAR can span up to around 5 kb
+        // so there's no sense in writing `5 <96 chars> 6 <96 chars>` etc when
+        // you can just write `5 <4900>` chars and skip to the next string.
+        cfgstr->value.len = Q_strnlen(string, CS_MAX_STRING_LENGTH);
     }
 
     for (int i = 0; i < SV_BASELINES_CHUNKS; i++) {

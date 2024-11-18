@@ -69,7 +69,7 @@ jobs:
 
       - name: Zip
         run: |
-          zip -9 q2pro-rerelease-client_win64_x64.zip installdir/q2pro.exe
+          Compress-Archive -Path "${{ github.workspace }}/installdir/q2pro.exe" -CompressionLevel "Optimal" -DestinationPath "q2pro-rerelease-client_win64_x64.zip"
 
       - name: Update release
         env:

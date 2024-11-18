@@ -2,38 +2,81 @@ name: nightly
 
 on:
   push:
-    branches: [master]
+    branches: [rerelease-game]
+  workflow_dispatch:
 
-permissions:
-  contents: write
+env:
+  # FIXME: Re-add '--fatal-meson-warnings' when meson fixed 'CMake Toolchain: Failed to determine CMake compilers state' w/ openal
+  MESON_ARGS: >-
+    -Danticheat-server=true
+    -Dpacketdup-hack=true
+    -Dtests=true
+    -Dwerror=true
+    -Davcodec=enabled
+    -Dffmpeg:werror=false
+    -Dlibcurl=enabled
+    -Dlibjpeg=enabled
+    -Dlibpng=enabled
+    -Dopenal=enabled
+    -Dopenal-soft:werror=false
+    -Dsoftware-sound=enabled
+    -Dzlib=enabled
+
+  MESON_ARGS_WIN: >-
+    -Dicmp-errors=enabled
+    -Dwrap_mode=forcefallback
+    -Dwindows-crash-dumps=enabled
 
 jobs:
-  mingw:
-    runs-on: ubuntu-24.04
+  msvc:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          submodules: true
 
       - uses: actions/cache@v4
         with:
           path: subprojects/packagecache
           key: ${{ hashFiles('subprojects/*.wrap') }}
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-mingw-w64 dos2unix nasm meson ninja-build
+      - uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
 
-      - name: Build
-        run: ./.ci/nightly.sh
+      - uses: ilammy/setup-nasm@v1
+
+      - name: Install dependencies
+        run: pip3 install --no-input meson ninja
+
+      - name: Build - meson setup
+        run: |
+          meson setup ${{ env.MESON_ARGS }} ${{ env.MESON_ARGS_WIN }} builddir
+
+      - name: Build info - meson configure
+        run: |
+          meson configure builddir
+
+      - name: Build - meson compile
+        run: |
+          meson compile -C builddir
+          meson install -C builddir --tags runtime --destdir ${{ github.workspace }}/installdir
+
+      - name: Setup variables
+        uses: actions/github-script@v7
+        with:
+          script: core.exportVariable('GITHUB_SHA_SHORT', context.sha.substring(0, 7))
+
+      - name: Zip
+        run: |
+          zip -9 q2pro-rerelease-client_win64_x64.zip installdir/q2pro.exe
 
       - name: Update release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release edit nightly -t "Nightly" -n "Latest nightly build `cat q2pro-build/version.txt`." --latest
-          gh release upload nightly q2pro-build/*.zip q2pro-build/*.tar.gz q2pro-build/version.txt --clobber
+          gh release edit nightly -t "Nightly" -n "Latest nightly build" --latest
+          gh release upload nightly q2pro-rerelease-client_win64_x64.zip --clobber
 
       - name: Update tag
         uses: actions/github-script@v7

@@ -1158,6 +1158,8 @@ static void GL_InitPostProcTexture(int w, int h)
 
 bool GL_InitFramebuffers(void)
 {
+    Q_assert(gl_static.use_shaders);
+
     GL_ClearErrors();
 
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_PP_SCENE);

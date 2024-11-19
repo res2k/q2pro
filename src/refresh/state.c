@@ -234,7 +234,7 @@ void GL_Frustum(GLfloat fov_x, GLfloat fov_y, GLfloat reflect_x)
         zfar = gl_static.world.size * 2;
 
     Matrix_Frustum(fov_x, fov_y, reflect_x, znear, zfar, matrix);
-    gl_backend->load_matrix(GL_PROJECTION, matrix, NULL);
+    gl_backend->load_matrix(GL_PROJECTION, matrix, gl_identity);
 }
 
 static void GL_RotateForViewer(void)

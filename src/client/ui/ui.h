@@ -377,7 +377,7 @@ void M_Menu_PlayerConfig(void);
 void M_Menu_Demos(void);
 void M_Menu_Servers(void);
 
-void MapDB_Init(void);
-void MapDB_FetchEpisodes(char ***items, int *num_items);
-void MapDB_FetchUnits(char ***items, int **item_indices, int *num_items);
-void MapDB_Shutdown(void);
+void UI_MapDB_FetchEpisodes(char ***items, int *num_items);
+void UI_MapDB_FetchUnits(char ***items, int **item_indices, int *num_items);
+void UI_MapDB_Init(void);
+void UI_MapDB_Shutdown(void);

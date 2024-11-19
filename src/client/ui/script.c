@@ -177,7 +177,7 @@ static void Parse_EpisodeSelector(menuFrameWork_t *menu)
     s->spin.generic.status = UI_CopyString(status);
     s->spin.cvar = Cvar_WeakGet(Cmd_Argv(cmd_optind + 1));
 
-    MapDB_FetchEpisodes(&s->spin.itemnames, &s->spin.numItems);
+    UI_MapDB_FetchEpisodes(&s->spin.itemnames, &s->spin.numItems);
 
     Menu_AddItem(menu, s);
 }
@@ -205,7 +205,7 @@ static void Parse_UnitSelector(menuFrameWork_t *menu)
     s->spin.cvar = Cvar_WeakGet(Cmd_Argv(cmd_optind + 1));
     s->spin.generic.uiFlags |= UI_MULTILINE;
 
-    MapDB_FetchUnits(&s->spin.itemnames, &s->itemindices, &s->spin.numItems);
+    UI_MapDB_FetchUnits(&s->spin.itemnames, &s->itemindices, &s->spin.numItems);
 
     Menu_AddItem(menu, s);
 }

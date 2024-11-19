@@ -36,6 +36,7 @@ common_src = [
   'src/common/utils.c',
   'src/common/zone.c',
   'src/common/features.h',
+  'src/common/mapdb.c',
   'src/shared/shared.c',
 
   'q2proto/src/dummy_q2protoerr_server_read.c',

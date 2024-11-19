@@ -17,6 +17,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 */
 
 #include "server.h"
+#include "common/mapdb.h"
 
 #define SAVE_MAGIC1     MakeLittleLong('S','S','V','2')
 #define SAVE_MAGIC2     MakeLittleLong('S','A','V','2')
@@ -285,6 +286,57 @@ fail:
     return -1;
 }
 
+// try to fetch a friendly name from the given title.
+// - for strings with EOUs, check if there's a matching unit
+//   that we can pull the unit name from.
+// - if no EOU, check if the BSP exists at all stand-alone.
+static void SV_GetFriendlyMapDBTitle(char *name, size_t name_len)
+{
+    int i = 0;
+    const mapdb_t *mapdb = MapDB_Get();
+    const char *bsp_name = strrchr(name, '+');
+
+    if (!bsp_name)
+        bsp_name = name;
+    else
+        bsp_name++;
+
+    if (*bsp_name == '*')
+        bsp_name++;
+
+    mapcmd_t cmd = { 0 };
+    Q_strlcpy(cmd.buffer, bsp_name, sizeof(cmd.buffer));
+
+    if (!SV_ParseMapCmd(&cmd))
+        return;
+
+    // the BSP needs to exist for short episode listing
+    // TODO: hash mapping for names
+    const mapdb_map_t *mapdb_map = NULL;
+
+    for (mapdb_map = mapdb->maps, i = 0; i < mapdb->num_maps; mapdb_map++, i++)
+        if (!mapdb_map->sp && !strcmp(mapdb_map->bsp, cmd.server))
+            break;
+
+    // no idea what map this came from
+    if (i == mapdb->num_maps)
+        return;
+
+    // find a matching unit
+    const mapdb_map_t *mapdb_unit = NULL;
+    
+    for (mapdb_unit = mapdb->maps, i = 0; i < mapdb->num_maps; mapdb_unit++, i++)
+        if (mapdb_unit->sp && !strcmp(mapdb_unit->bsp, name))
+            break;
+
+    if (i != mapdb->num_maps) {
+        Q_snprintf(name, name_len, "[%s] %s", mapdb_map->short_name, mapdb_unit->title);
+        return;
+    }
+    
+    Q_snprintf(name, name_len, "[%s] %s", mapdb_map->short_name, mapdb_map->title);
+}
+
 char *SV_GetSaveInfo(const char *dir)
 {
     char        name[MAX_QPATH], date[MAX_QPATH];
@@ -309,7 +361,10 @@ char *SV_GetSaveInfo(const char *dir)
     // read the comment field
     timestamp = MSG_ReadLong64();
     autosave = MSG_ReadByte();
+    MSG_ReadString(NULL, 0);
     MSG_ReadString(name, sizeof(name));
+
+    SV_GetFriendlyMapDBTitle(name, sizeof(name));
 
     if (autosave == SAVE_LEVEL_START)
         return Z_CopyString(va("ENTERING %s", name));

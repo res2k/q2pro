@@ -24,6 +24,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/files.h"
 #include "common/prompt.h"
 #include "common/intreadwrite.h"
+#include "common/mapdb.h"
 #include "system/system.h"
 #include "client/client.h"
 #include "server/server.h"
@@ -3751,9 +3752,13 @@ void FS_Restart(bool total)
         setup_base_gamedir();
     }
 
+    MapDB_Shutdown();
+
     setup_game_paths();
 
     SV_RestartFilesystem();
+
+    MapDB_Init();
 
     FS_Path_f();
 
@@ -3879,6 +3884,8 @@ static void fs_game_changed(cvar_t *self)
 
         // check for game override
         setup_game_paths();
+
+        MapDB_Init();
 
         FS_Path_f();
         return;

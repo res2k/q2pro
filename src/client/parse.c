@@ -1092,9 +1092,9 @@ static void CL_ParseDamage(const q2proto_svc_damage_t *damage)
 
         if (damage->damage[i].health)
             color[0] += 1.0f;
-        else if (damage->damage[i].shield)
+        if (damage->damage[i].shield)
             color[1] += 1.0f;
-        else if (damage->damage[i].armor)
+        if (damage->damage[i].armor)
         {
             color[0] += 1.0f;
             color[1] += 1.0f;

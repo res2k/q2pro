@@ -67,7 +67,10 @@ typedef struct {
 FORWARD_EMBEDDED_FILE(q2pro_menu);
 
 static const builtin_file_t builtin_files[] = {
-    { "q2repro.menu", res_q2pro_menu, &res_q2pro_menu_size }
+#if USE_CLIENT
+    { "q2repro.menu", res_q2pro_menu, &res_q2pro_menu_size },
+#endif
+    { NULL }
 };
 
 #define MAX_FILE_HANDLES    1024
@@ -2282,7 +2285,7 @@ static pack_t *load_builtin_file(void)
     size_t          len, names_len;
     pack_t          *pack;
 
-    num_files = q_countof(builtin_files);
+    num_files = q_countof(builtin_files) - 1;
     if (num_files < 1) {
         Com_SetLastError("No files");
         goto fail1;

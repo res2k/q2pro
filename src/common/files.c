@@ -567,8 +567,6 @@ static int seek_pak_file(file_t *file, int64_t offset, int whence)
 
 static int seek_builtin_file(file_t *file, int64_t offset, int whence)
 {
-    packfile_t *entry = file->entry;
-
     offset = get_seek_offset(file, offset, whence);
     if (offset < 0)
         return offset;
@@ -1518,7 +1516,7 @@ static int read_builtin_file(file_t *file, void *buf, size_t len)
         return 0;
     }
 
-    memcpy(buf, (const void *) (file->entry->filepos + file->position), len);
+    memcpy(buf, (const void *) (intptr_t) (file->entry->filepos + file->position), len);
 
     file->position += len;
 
@@ -2316,7 +2314,7 @@ static pack_t *load_builtin_file(void)
         file->nameofs = name - pack->names;
         name += file->namelen + 1;
 
-        file->filepos = (int64_t) dfile->data;
+        file->filepos = (int64_t) (ptrdiff_t) dfile->data;
         file->filelen = *dfile->length_ptr;
 #if USE_ZLIB
         file->complen = file->filelen;
@@ -3647,7 +3645,6 @@ static void free_game_paths(void)
 static void add_builtin_content(void)
 {
 #if USE_ZLIB
-    char path[MAX_OSPATH];
     pack_t *pack;
     searchpath_t *search;
 

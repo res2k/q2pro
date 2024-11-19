@@ -748,7 +748,7 @@ void R_RenderFrame(const refdef_t *fd)
         waterwarp = (glr.fd.rdflags & RDF_UNDERWATER) && gl_waterwarp->integer;
         bloom = !(glr.fd.rdflags & RDF_NOWORLDMODEL) && gl_bloom->integer;
 
-        if (waterwarp || bloom || gl_bloom->modified) {
+        if (waterwarp || bloom || gl_bloom->modified_count != gl_bloom_modified) {
             if (glr.fd.width != glr.framebuffer_width || glr.fd.height != glr.framebuffer_height || gl_bloom->modified_count != gl_bloom_modified) {
                 glr.framebuffer_ok = GL_InitFramebuffers();
                 glr.framebuffer_width = glr.fd.width;

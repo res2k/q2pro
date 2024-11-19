@@ -26,7 +26,6 @@ env:
 
   MESON_ARGS_WIN: >-
     -Dicmp-errors=enabled
-    -Dwrap_mode=forcefallback
     -Dwindows-crash-dumps=enabled
 
   MESON_ARGS_LINUX: >-

@@ -565,6 +565,7 @@ if get_option('client-ui')
 
   client_src += ui_src
   config.set10('USE_UI', true)
+  install_data('src/client/ui/q2pro.menu', install_dir: datadir / get_option('base-game'), install_tag: 'runtime')
 endif
 
 if get_option('software-sound').require(win32 or sdl2.found()).allowed()

@@ -628,6 +628,15 @@ bool SV_MakeEntityDelta(q2proto_entity_state_delta_t *delta, const entity_packed
         delta->sound = to->sound;
     }
 
+    if (to->alpha != from->alpha) {
+        delta->delta_bits |= Q2P_ESD_ALPHA;
+        delta->alpha = to->alpha;
+    }
+    if (to->scale != from->scale) {
+        delta->delta_bits |= Q2P_ESD_SCALE;
+        delta->scale = to->scale;
+    }
+
     return (delta->delta_bits != 0) || (to->origin[0] != from->origin[0]) || (to->origin[1] != from->origin[1]) || (to->origin[2] != from->origin[2]) || (delta->angle.delta_bits != 0);
 }
 

@@ -157,8 +157,6 @@ typedef struct {
     int             framebuffer_height;
     bool            framebuffer_ok;
     bool            framebuffer_bound;
-    int             bloom_width;
-    int             bloom_height;
 } glRefdef_t;
 
 typedef enum {

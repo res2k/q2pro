@@ -192,6 +192,7 @@ typedef struct {
     int     max_texture_size_log2;
     int     max_texture_size;
     int     ssbo_align;
+    float   max_anisotropy;
 } glConfig_t;
 
 extern glStatic_t gl_static;

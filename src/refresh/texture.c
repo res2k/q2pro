@@ -1236,7 +1236,7 @@ void GL_InitImages(void)
     gl_texturemode->changed = gl_texturemode_changed;
     gl_texturemode->generator = gl_texturemode_g;
     gl_texturebits = Cvar_Get("gl_texturebits", "0", CVAR_FILES);
-    gl_anisotropy = Cvar_Get("gl_anisotropy", "1", 0);
+    gl_anisotropy = Cvar_Get("gl_anisotropy", va("%g", gl_config.max_anisotropy), 0);
     gl_anisotropy->changed = gl_anisotropy_changed;
     gl_noscrap = Cvar_Get("gl_noscrap", "0", CVAR_FILES);
     gl_round_down = Cvar_Get("gl_round_down", "0", CVAR_FILES);

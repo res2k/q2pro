@@ -900,8 +900,8 @@ static void GL_Strings_f(void)
     }
 
     if (gl_config.caps & QGL_CAP_TEXTURE_ANISOTROPY) {
-        qglGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &value);
-        Com_Printf("GL_MAX_TEXTURE_MAX_ANISOTROPY: %.f\n", value);
+        qglGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &gl_config.max_anisotropy);
+        Com_Printf("GL_MAX_TEXTURE_MAX_ANISOTROPY: %.f\n", gl_config.max_anisotropy);
     }
 
     Com_Printf("GL_PFD: color(%d-bit) Z(%d-bit) stencil(%d-bit)\n",
@@ -1126,6 +1126,10 @@ static void GL_SetupConfig(void)
             Com_DPrintf("Not enough buffer texture size available\n");
             gl_config.caps &= ~QGL_CAP_BUFFER_TEXTURE;
         }
+    }
+
+    if (gl_config.caps & QGL_CAP_TEXTURE_ANISOTROPY) {
+        qglGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &gl_config.max_anisotropy);
     }
 
     GL_ShowErrors(__func__);

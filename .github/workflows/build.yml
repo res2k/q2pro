@@ -26,6 +26,7 @@ env:
 
   MESON_ARGS_WIN: >-
     -Dicmp-errors=enabled
+    --force-fallback-for=zlib
     -Dwindows-crash-dumps=enabled
 
   MESON_ARGS_LINUX: >-

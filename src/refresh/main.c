@@ -863,7 +863,6 @@ void R_EndFrame(void)
 static void GL_Strings_f(void)
 {
     GLint integer = 0;
-    GLfloat value = 0;
 
     Com_Printf("GL_VENDOR: %s\n", qglGetString(GL_VENDOR));
     Com_Printf("GL_RENDERER: %s\n", qglGetString(GL_RENDERER));
@@ -900,7 +899,6 @@ static void GL_Strings_f(void)
     }
 
     if (gl_config.caps & QGL_CAP_TEXTURE_ANISOTROPY) {
-        qglGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY, &gl_config.max_anisotropy);
         Com_Printf("GL_MAX_TEXTURE_MAX_ANISOTROPY: %.f\n", gl_config.max_anisotropy);
     }
 

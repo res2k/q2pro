@@ -19,12 +19,13 @@ in_contents = in_file.read()
 in_file.close()
 
 # convert
+size = len(in_contents);
 in_contents = in_contents.replace('\\', '\\\\')
 in_contents = in_contents.replace('\n', '\\n')
 in_contents = in_contents.replace('\r', '\\r')
 in_contents = in_contents.replace('"', '\\"')
 
-in_contents = 'const char *const ' + sys.argv[3] + ' = ' + '\"' + in_contents + '\";'
+in_contents = '#include <stddef.h>\nconst char ' + sys.argv[3] + '[] = ' + '\"' + in_contents + '\";\nconst size_t ' + sys.argv[3] + '_size = ' + str(size) + ';'
 
 # write
 out_file = open(output_path, "w")

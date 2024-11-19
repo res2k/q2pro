@@ -1321,6 +1321,8 @@ static bool Sys_CheckSteamInstallation(char *out_dir, size_t out_dir_length)
 
     result = Sys_ParseLibraryFoldersVDF((const char **) &parse_contents, out_dir, out_dir_length);
 
+    FS_NormalizePath(out_dir);
+
 exit:
     Z_Free(file_contents);
     return result;
@@ -1345,6 +1347,9 @@ static bool Sys_CheckGOGInstallation(const char *app_id, char *out_dir, size_t o
     }
 
     Q_strlcpy(out_dir, folder_path, out_dir_length);
+
+    FS_NormalizePath(out_dir);
+
     return true;
 }
 

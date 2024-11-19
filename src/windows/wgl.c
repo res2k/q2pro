@@ -211,8 +211,8 @@ hard:
 
 static unsigned get_fake_window_extensions(void)
 {
-    static const char class[] = "Q2PRO FAKE WINDOW CLASS";
-    static const char name[] = "Q2PRO FAKE WINDOW NAME";
+    static const char class[] = PRODUCT " FAKE WINDOW CLASS";
+    static const char name[] = PRODUCT " FAKE WINDOW NAME";
     unsigned extensions = 0;
 
     WNDCLASSEXA wc = {

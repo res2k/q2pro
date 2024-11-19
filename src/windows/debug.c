@@ -283,10 +283,11 @@ static LONG WINAPI exception_filter(LPEXCEPTION_POINTERS exceptionInfo)
     execdir[len] = 0;
 
     CopyMemory(path, execdir, len);
-    CopyMemory(path + len, "\\Q2PRO_CrashReportXX.txt", 25);
+    CopyMemory(path + len, "\\" PRODUCT "_CrashReportXX.txt", 25);
+    const size_t reportCharOffset = strlen("\\" PRODUCT "_CrashReport");
     for (i = 0; i < 100; i++) {
-        path[len + 18] = '0' + i / 10;
-        path[len + 19] = '0' + i % 10;
+        path[len + reportCharOffset] = '0' + i / 10;
+        path[len + reportCharOffset + 1] = '0' + i % 10;
         crashReport = CreateFileA(
                           path,
                           GENERIC_WRITE,

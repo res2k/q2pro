@@ -18,6 +18,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "server.h"
 #include "client/input.h"
+#if USE_CLIENT
+#include "refresh/refresh.h"
+#endif
 #include "server/nav.h"
 #include "q2proto/q2proto.h"
 
@@ -1712,6 +1715,10 @@ static void SV_RunGameFrame(void)
 #if USE_CLIENT
     if (host_speeds->integer)
         time_before_game = Sys_Milliseconds();
+
+    // debug stuff is pushed via the game, so it needs
+    // to look at server time for expiry, not client time
+    GL_ExpireDebugObjects();
 #endif
 
     // run nav stuff before frame runs

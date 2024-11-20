@@ -166,6 +166,9 @@ glCullResult_t GL_CullSphere(const vec3_t origin, float radius)
         return CULL_IN;
 
     radius *= glr.entscale;
+
+    R_AddDebugSphere(origin, radius, U32_RED, 0, false);
+
     cull = CULL_IN;
     for (i = 0, p = glr.frustumPlanes; i < 4; i++, p++) {
         dist = PlaneDiff(origin, p);

@@ -1004,3 +1004,4 @@ void HQ2x_Init(void);
 void GL_InitDebugDraw(void);
 void GL_ShutdownDebugDraw(void);
 void GL_DrawDebugObjects(void);
+void GL_ExpireDebugObjects(void);

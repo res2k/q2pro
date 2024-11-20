@@ -17,6 +17,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 */
 
 #include "gl.h"
+#include "../client/client.h"
+#include "../server/server.h"
 #include "shared/list.h"
 #include <assert.h>
 
@@ -61,6 +63,16 @@ void R_ClearDebugLines(void)
     List_Init(&debug_texts_active);
 }
 
+static inline uint32_t R_DebugCurrentTime(void)
+{
+    return sv.framenum * sv.frametime.time;
+}
+
+static inline bool R_DebugTimeExpired(const uint32_t time)
+{
+    return time <= R_DebugCurrentTime();
+}
+
 void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32_t time, qboolean depth_test)
 {
     debug_line_t *l = LIST_FIRST(debug_line_t, &debug_lines_free, entry);
@@ -72,7 +84,7 @@ void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32
         } else {
             debug_line_t *next;
             LIST_FOR_EACH_SAFE(debug_line_t, l, next, &debug_lines_active, entry) {
-                if (l->time <= com_localTime2) {
+                if (R_DebugTimeExpired(l->time)) {
                     List_Remove(&l->entry);
                     List_Insert(&debug_lines_free, &l->entry);
                 }
@@ -92,9 +104,7 @@ void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32
     VectorCopy(start, l->start);
     VectorCopy(end, l->end);
     l->color = color;
-    l->time = com_localTime2 + time;
-    if (l->time < com_localTime2)
-        l->time = UINT32_MAX;
+    l->time = time ? (R_DebugCurrentTime() + time) : 0;
     l->bits = GLS_DEPTHMASK_FALSE | GLS_BLEND_BLEND;
     if (!depth_test)
         l->bits |= GLS_DEPTHTEST_DISABLE;
@@ -341,7 +351,7 @@ static void R_AddDebugTextInternal(const vec3_t origin, const vec3_t angles, con
         } else {
             debug_text_t *next;
             LIST_FOR_EACH_SAFE(debug_text_t, t, next, &debug_texts_active, entry) {
-                if (t->time <= com_localTime2) {
+                if (R_DebugTimeExpired(t->time)) {
                     List_Remove(&t->entry);
                     List_Insert(&debug_texts_free, &t->entry);
                 }
@@ -363,9 +373,7 @@ static void R_AddDebugTextInternal(const vec3_t origin, const vec3_t angles, con
         VectorCopy(angles, t->angles);
     t->size = size * 8.0f;
     t->color = color;
-    t->time = com_localTime2 + time;
-    if (t->time < com_localTime2)
-        t->time = UINT32_MAX;
+    t->time = time ? (R_DebugCurrentTime() + time) : 0;
     t->bits = GLS_DEPTHMASK_FALSE | GLS_BLEND_BLEND;
     if (!depth_test)
         t->bits |= GLS_DEPTHTEST_DISABLE;
@@ -433,12 +441,6 @@ static void GL_DrawDebugLines(void)
     dst_vert = tess.vertices;
     numverts = 0;
     LIST_FOR_EACH_SAFE(debug_line_t, l, next, &debug_lines_active, entry) {
-        if (l->time < com_localTime2) { // expired
-            List_Remove(&l->entry);
-            List_Insert(&debug_lines_free, &l->entry);
-            continue;
-        }
-
         if (bits != l->bits) {
             if (numverts) {
                 GL_LockArrays(numverts);
@@ -460,6 +462,11 @@ static void GL_DrawDebugLines(void)
         dst_vert += 8;
 
         numverts += 2;
+
+        if (!l->time) { // one-frame render
+            List_Remove(&l->entry);
+            List_Insert(&debug_lines_free, &l->entry);
+        }
     }
 
     if (numverts) {
@@ -473,6 +480,21 @@ static void GL_DrawDebugLines(void)
 
     if (qglLineWidth)
         qglLineWidth(1.0f);
+}
+
+static void GL_ExpireDebugLines(void)
+{
+    debug_line_t *l, *next;
+    
+    if (LIST_EMPTY(&debug_lines_active))
+        return;
+
+    LIST_FOR_EACH_SAFE(debug_line_t, l, next, &debug_lines_active, entry) {
+        if (R_DebugTimeExpired(l->time)) { // expired
+            List_Remove(&l->entry);
+            List_Insert(&debug_lines_free, &l->entry);
+        }
+    }
 }
 
 static void GL_FlushDebugChars(void)
@@ -574,12 +596,6 @@ static void GL_DrawDebugTexts(void)
         vec3_t right, down, pos;
         const char *s, *p;
 
-        if (text->time < com_localTime2) { // expired
-            List_Remove(&text->entry);
-            List_Insert(&debug_texts_free, &text->entry);
-            continue;
-        }
-
         // distance cull
         VectorSubtract(text->origin, glr.fd.vieworg, pos);
         if (text->size < DotProduct(pos, glr.viewaxis[0]) * gl_debug_distfrac->value)
@@ -607,15 +623,41 @@ static void GL_DrawDebugTexts(void)
             VectorAdd(pos, down, pos);
             s = p + 1;
         }
+
+        if (!text->time) { // one-frame
+            List_Remove(&text->entry);
+            List_Insert(&debug_texts_free, &text->entry);
+        }
     }
 
     GL_FlushDebugChars();
+}
+
+static void GL_ExpireDebugTexts(void)
+{
+    debug_text_t *text, *next;
+
+    if (LIST_EMPTY(&debug_texts_active))
+        return;
+
+    LIST_FOR_EACH_SAFE(debug_text_t, text, next, &debug_texts_active, entry) {
+        if (R_DebugTimeExpired(text->time)) { // expired
+            List_Remove(&text->entry);
+            List_Insert(&debug_texts_free, &text->entry);
+        }
+    }
 }
 
 void GL_DrawDebugObjects(void)
 {
     GL_DrawDebugLines();
     GL_DrawDebugTexts();
+}
+
+void GL_ExpireDebugObjects(void)
+{
+    GL_ExpireDebugLines();
+    GL_ExpireDebugTexts();
 }
 
 void GL_InitDebugDraw(void)

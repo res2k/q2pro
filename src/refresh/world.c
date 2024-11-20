@@ -464,7 +464,7 @@ void GL_DrawBspModel(mmodel_t *model)
         }
 
         GL_AddSolidFace(face);
-        }
+    }
 
     if (gl_dynamic->integer)
         GL_UploadLightmaps();

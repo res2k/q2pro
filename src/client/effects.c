@@ -1868,7 +1868,7 @@ void CL_AddShadowLights(void)
 
         color_t color;
         if (!ent->current.skinnum)
-            color.u32 = U32_WHITE;
+            color = COLOR_WHITE;
         else
             color.u32 = BigLong(ent->current.skinnum);
         // technically we should be lerping but

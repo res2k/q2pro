@@ -28,7 +28,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 typedef struct {
     list_t          entry;
     vec3_t          start, end;
-    uint32_t        color;
+    color_t         color;
     uint32_t        time;
     glStateBits_t   bits;
 } debug_line_t;
@@ -41,7 +41,7 @@ typedef struct {
     list_t          entry;
     vec3_t          origin, angles;
     float           size;
-    uint32_t        color;
+    color_t         color;
     uint32_t        time;
     glStateBits_t   bits;
     char            text[128];
@@ -73,7 +73,7 @@ static inline bool R_DebugTimeExpired(const uint32_t time)
     return time <= R_DebugCurrentTime();
 }
 
-void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32_t time, qboolean depth_test)
+void R_AddDebugLine(const vec3_t start, const vec3_t end, color_t color, uint32_t time, qboolean depth_test)
 {
     debug_line_t *l = LIST_FIRST(debug_line_t, &debug_lines_free, entry);
 
@@ -116,7 +116,7 @@ void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32
 #define GL_DRAWLINEV(s, e) \
     R_AddDebugLine(s, e, color, time, depth_test)
 
-void R_AddDebugPoint(const vec3_t point, float size, uint32_t color, uint32_t time, qboolean depth_test)
+void R_AddDebugPoint(const vec3_t point, float size, color_t color, uint32_t time, qboolean depth_test)
 {
     size *= 0.5f;
     GL_DRAWLINE(point[0] - size, point[1], point[2], point[0] + size, point[1], point[2]);
@@ -127,7 +127,7 @@ void R_AddDebugPoint(const vec3_t point, float size, uint32_t color, uint32_t ti
 void R_AddDebugAxis(const vec3_t origin, const vec3_t angles, float size, uint32_t time, qboolean depth_test)
 {
     vec3_t axis[3], end;
-    uint32_t color;
+    color_t color;
 
     if (angles) {
         AnglesToAxis(angles, axis);
@@ -137,20 +137,20 @@ void R_AddDebugAxis(const vec3_t origin, const vec3_t angles, float size, uint32
         VectorSet(axis[2], 0, 0, 1);
     }
 
-    color = U32_RED;
+    color = COLOR_RED;
     VectorMA(origin, size, axis[0], end);
     GL_DRAWLINEV(origin, end);
 
-    color = U32_GREEN;
+    color = COLOR_GREEN;
     VectorMA(origin, size, axis[1], end);
     GL_DRAWLINEV(origin, end);
 
-    color = U32_BLUE;
+    color = COLOR_BLUE;
     VectorMA(origin, size, axis[2], end);
     GL_DRAWLINEV(origin, end);
 }
 
-void R_AddDebugBounds(const vec3_t mins, const vec3_t maxs, uint32_t color, uint32_t time, qboolean depth_test)
+void R_AddDebugBounds(const vec3_t mins, const vec3_t maxs, color_t color, uint32_t time, qboolean depth_test)
 {
     for (int i = 0; i < 4; i++) {
         // draw column
@@ -168,7 +168,7 @@ void R_AddDebugBounds(const vec3_t mins, const vec3_t maxs, uint32_t color, uint
 }
 
 // https://danielsieger.com/blog/2021/03/27/generating-spheres.html
-void R_AddDebugSphere(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test)
+void R_AddDebugSphere(const vec3_t origin, float radius, color_t color, uint32_t time, qboolean depth_test)
 {
     vec3_t verts[160];
     const int n_stacks = min(4 + radius / 32, 10);
@@ -225,7 +225,7 @@ void R_AddDebugSphere(const vec3_t origin, float radius, uint32_t color, uint32_
     }
 }
 
-void R_AddDebugCircle(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test)
+void R_AddDebugCircle(const vec3_t origin, float radius, color_t color, uint32_t time, qboolean depth_test)
 {
     int vert_count = min(5 + radius / 8, 16);
     float rads = (2 * M_PIf) / vert_count;
@@ -247,7 +247,7 @@ void R_AddDebugCircle(const vec3_t origin, float radius, uint32_t color, uint32_
     }
 }
 
-void R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, uint32_t color, uint32_t time, qboolean depth_test)
+void R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, color_t color, uint32_t time, qboolean depth_test)
 {
     int vert_count = min(5 + radius / 8, 16);
     float rads = (2 * M_PIf) / vert_count;
@@ -272,7 +272,7 @@ void R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, ui
 }
 
 void R_DrawArrowCap(const vec3_t apex, const vec3_t dir, float size,
-                    uint32_t color, uint32_t time, qboolean depth_test)
+                    color_t color, uint32_t time, qboolean depth_test)
 {
     vec3_t cap_end;
     VectorMA(apex, size, dir, cap_end);
@@ -289,8 +289,8 @@ void R_DrawArrowCap(const vec3_t apex, const vec3_t dir, float size,
     R_AddDebugLine(l, cap_end, color, time, depth_test);
 }
 
-void R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, uint32_t line_color,
-                     uint32_t arrow_color, uint32_t time, qboolean depth_test)
+void R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, color_t line_color,
+                     color_t arrow_color, uint32_t time, qboolean depth_test)
 {
     vec3_t dir;
     VectorSubtract(end, start, dir);
@@ -307,7 +307,7 @@ void R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, uint32_t 
 }
 
 void R_AddDebugCurveArrow(const vec3_t start, const vec3_t ctrl, const vec3_t end, float size,
-                          uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test)
+                          color_t line_color, color_t arrow_color, uint32_t time, qboolean depth_test)
 {
     int num_points = Q_clip(Distance(start, end) / 32, 3, 24);
     vec3_t last_point;
@@ -336,7 +336,7 @@ void R_AddDebugCurveArrow(const vec3_t start, const vec3_t ctrl, const vec3_t en
 }
 
 static void R_AddDebugTextInternal(const vec3_t origin, const vec3_t angles, const char *text,
-                                   size_t len, float size, uint32_t color, uint32_t time,
+                                   size_t len, float size, color_t color, uint32_t time,
                                    qboolean depth_test)
 {
     if (!len)
@@ -385,7 +385,7 @@ static void R_AddDebugTextInternal(const vec3_t origin, const vec3_t angles, con
 }
 
 void R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text,
-                    float size, uint32_t color, uint32_t time, qboolean depth_test)
+                    float size, color_t color, uint32_t time, qboolean depth_test)
 {
     vec3_t down, pos, up;
     const char *s, *p;
@@ -457,8 +457,8 @@ static void GL_DrawDebugLines(void)
 
         VectorCopy(l->start, dst_vert);
         VectorCopy(l->end, dst_vert + 4);
-        WN32(dst_vert + 3, l->color);
-        WN32(dst_vert + 7, l->color);
+        WN32(dst_vert + 3, l->color.u32);
+        WN32(dst_vert + 7, l->color.u32);
         dst_vert += 8;
 
         numverts += 2;
@@ -512,7 +512,7 @@ static void GL_FlushDebugChars(void)
 }
 
 static void GL_DrawDebugChar(const vec3_t pos, const vec3_t right, const vec3_t down,
-                             glStateBits_t bits, uint32_t color, int c)
+                             glStateBits_t bits, color_t color, int c)
 {
     GLfloat *dst_vert;
     glIndex_t *dst_indices;
@@ -545,10 +545,10 @@ static void GL_DrawDebugChar(const vec3_t pos, const vec3_t right, const vec3_t 
     dst_vert[21] = s;
     dst_vert[22] = t + 0.0625f;
 
-    WN32(dst_vert +  5, color);
-    WN32(dst_vert + 11, color);
-    WN32(dst_vert + 17, color);
-    WN32(dst_vert + 23, color);
+    WN32(dst_vert +  5, color.u32);
+    WN32(dst_vert + 11, color.u32);
+    WN32(dst_vert + 17, color.u32);
+    WN32(dst_vert + 23, color.u32);
 
     dst_indices = tess.indices + tess.numindices;
     dst_indices[0] = tess.numverts + 0;

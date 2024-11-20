@@ -964,9 +964,9 @@ static void GL_BuildIntensityTable(void)
         j = 255.0f / f;
     }
 
-    gl_static.inverse_intensity_33 = MakeColor(j, j, j, 85);
-    gl_static.inverse_intensity_66 = MakeColor(j, j, j, 170);
-    gl_static.inverse_intensity_100 = MakeColor(j, j, j, 255);
+    gl_static.inverse_intensity_33 = COLOR_RGBA(j, j, j, 85).u32;
+    gl_static.inverse_intensity_66 = COLOR_RGBA(j, j, j, 170).u32;
+    gl_static.inverse_intensity_100 = COLOR_RGB(j, j, j).u32;
 }
 
 static void GL_BuildGammaTables(void)
@@ -1080,12 +1080,12 @@ static void GL_InitWhiteImage(void)
 {
     uint32_t pixel;
 
-    pixel = U32_WHITE;
+    pixel = COLOR_WHITE.u32;
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_WHITE);
     GL_Upload32((byte *)&pixel, 1, 1, 0, IT_SPRITE, IF_REPEAT | IF_NEAREST);
     GL_SetFilterAndRepeat(IT_SPRITE, IF_REPEAT | IF_NEAREST);
 
-    pixel = U32_BLACK;
+    pixel = COLOR_BLACK.u32;
     GL_ForceTexture(TMU_TEXTURE, TEXNUM_BLACK);
     GL_Upload32((byte *)&pixel, 1, 1, 0, IT_SPRITE, IF_REPEAT | IF_NEAREST);
     GL_SetFilterAndRepeat(IT_SPRITE, IF_REPEAT | IF_NEAREST);

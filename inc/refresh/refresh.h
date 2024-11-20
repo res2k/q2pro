@@ -219,17 +219,13 @@ void    R_EndRegistration(void);
 void    R_RenderFrame(const refdef_t *fd);
 void    R_LightPoint(const vec3_t origin, vec3_t light);
 
-void    R_ClearColor(void);
-void    R_SetAlpha(float alpha);
-void    R_SetColor(uint32_t color);
-void    R_SetColorRGB(uint32_t color);
 void    R_SetClipRect(const clipRect_t *clip);
 float   R_ClampScale(cvar_t *var);
 void    R_SetScale(float scale);
-void    R_DrawChar(int x, int y, int flags, int ch, qhandle_t font);
-void    R_DrawStretchChar(int x, int y, int w, int h, int flags, int ch, qhandle_t font);
+void    R_DrawChar(int x, int y, int flags, int ch, color_t color, qhandle_t font);
+void    R_DrawStretchChar(int x, int y, int w, int h, int flags, int ch, color_t color, qhandle_t font);
 int     R_DrawString(int x, int y, int flags, size_t maxChars,
-                     const char *string, qhandle_t font);  // returns advanced x coord
+                     const char *string, color_t color, qhandle_t font);  // returns advanced x coord
 
 // kfont stuff
 typedef struct {
@@ -248,18 +244,18 @@ typedef struct {
 
 const kfont_char_t *SCR_KFontLookup(const kfont_t *kfont, uint32_t codepoint);
 void    SCR_LoadKFont(kfont_t *font, const char *filename);
-int     R_DrawKFontChar(int x, int y, int scale, int flags, uint32_t codepoint, const kfont_t *kfont);
+int     R_DrawKFontChar(int x, int y, int scale, int flags, uint32_t codepoint, color_t color, const kfont_t *kfont);
 
 bool    R_GetPicSize(int *w, int *h, qhandle_t pic);   // returns transparency bit
-void    R_DrawPic(int x, int y, qhandle_t pic);
-void    R_DrawStretchPic(int x, int y, int w, int h, qhandle_t pic);
-void    R_DrawStretchRotatePic(int x, int y, int w, int h, float angle, int pivot_x, int pivot_y, qhandle_t pic);
-void    R_DrawKeepAspectPic(int x, int y, int w, int h, qhandle_t pic);
+void    R_DrawPic(int x, int y, color_t color, qhandle_t pic);
+void    R_DrawStretchPic(int x, int y, int w, int h, color_t color, qhandle_t pic);
+void    R_DrawStretchRotatePic(int x, int y, int w, int h, color_t color, float angle, int pivot_x, int pivot_y, qhandle_t pic);
+void    R_DrawKeepAspectPic(int x, int y, int w, int h, color_t color, qhandle_t pic);
 void    R_DrawStretchRaw(int x, int y, int w, int h);
 void    R_UpdateRawPic(int pic_w, int pic_h, const uint32_t *pic);
 void    R_TileClear(int x, int y, int w, int h, qhandle_t pic);
 void    R_DrawFill8(int x, int y, int w, int h, int c);
-void    R_DrawFill32(int x, int y, int w, int h, uint32_t color);
+void    R_DrawFill32(int x, int y, int w, int h, color_t color);
 
 // video mode and refresh state management entry points
 void    R_BeginFrame(void);

@@ -524,8 +524,8 @@ static void SCR_DrawHealthBar(vrect_t hud_vrect, int x, int y, int value)
     if (!value)
         return;
 
-    const rgba_t rgba_fg = {239, 0, 0, 255};    // index 240
-    const rgba_t rgba_bg = {63, 63, 63, 255};   // index 4
+    const rgba_t rgba_fg = {.r = 239, .g = 0, .b = 0, .a = 255};    // index 240
+    const rgba_t rgba_bg = {.r = 63, .g = 63, .b = 63, .a = 255};   // index 4
 
     int bar_width = hud_vrect.width / 3;
     float percent = (value - 1) / 254.0f;
@@ -708,7 +708,7 @@ static void SCR_ExecuteLayoutString(vrect_t hud_vrect, const char *s, int32_t pl
 
             token = COM_Parse(&s);
             if (SCR_ParseColor(token, &color)) {
-                cgix.SetColor(color.u32);
+                cgix.SetColor(color);
             }
             continue;
         }

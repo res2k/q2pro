@@ -23,22 +23,22 @@ extern const char com_env_suf[6][3];
 #endif
 
 typedef enum {
-    COLOR_BLACK,
-    COLOR_RED,
-    COLOR_GREEN,
-    COLOR_YELLOW,
-    COLOR_BLUE,
-    COLOR_CYAN,
-    COLOR_MAGENTA,
-    COLOR_WHITE,
+    COLOR_INDEX_BLACK,
+    COLOR_INDEX_RED,
+    COLOR_INDEX_GREEN,
+    COLOR_INDEX_YELLOW,
+    COLOR_INDEX_BLUE,
+    COLOR_INDEX_CYAN,
+    COLOR_INDEX_MAGENTA,
+    COLOR_INDEX_WHITE,
 
-    COLOR_ALT,
-    COLOR_NONE,
+    COLOR_INDEX_ALT,
+    COLOR_INDEX_NONE,
 
-    COLOR_COUNT
+    COLOR_INDEX_COUNT
 } color_index_t;
 
-extern const char *const colorNames[COLOR_COUNT];
+extern const char *const colorNames[COLOR_INDEX_COUNT];
 
 bool Com_WildCmpEx(const char *filter, const char *string, int term, bool ignorecase);
 #define Com_WildCmp(filter, string)  Com_WildCmpEx(filter, string, 0, false)

@@ -804,9 +804,9 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
             "\36\36\36\36\36\36\36\36\36\36\36\37"
             "\n\n");
 
-        Com_SetColor(COLOR_ALT);
+        Com_SetColor(COLOR_INDEX_ALT);
         Com_Printf("%s\n", levelname);
-        Com_SetColor(COLOR_NONE);
+        Com_SetColor(COLOR_INDEX_NONE);
     }
 
     // make sure clientNum is in range

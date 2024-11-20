@@ -182,6 +182,9 @@ typedef float mat4_t[16];
 typedef union {
     uint32_t u32;
     uint8_t u8[4];
+    struct {
+        uint8_t r, g, b, a;
+    };
 } color_t;
 
 extern const vec3_t vec3_origin;
@@ -769,11 +772,45 @@ static inline int32_t SignExtend(uint32_t v, int bits)
      (b)[1]=LittleFloat((a)[1]),\
      (b)[2]=LittleFloat((a)[2]))
 
-#if USE_BGRA
-#define MakeColor(r, g, b, a)   MakeRawLong((b), (g), (r), (a))
-#else
-#define MakeColor(r, g, b, a)   MakeRawLong((r), (g), (b), (a))
-#endif
+// color u32; only used because of screen.c
+#define COLOR_U32_RGBA(r, g, b, a) MakeLittleLong(r, g, b, a)
+#define COLOR_U32_RGB(r, g, b)     MakeLittleLong(r, g, b, 255)
+
+#define COLOR_U32_BLACK   COLOR_U32_RGB(  0,   0,   0)
+#define COLOR_U32_RED     COLOR_U32_RGB(255,   0,   0)
+#define COLOR_U32_GREEN   COLOR_U32_RGB(  0, 255,   0)
+#define COLOR_U32_YELLOW  COLOR_U32_RGB(255, 255,   0)
+#define COLOR_U32_BLUE    COLOR_U32_RGB(  0,   0, 255)
+#define COLOR_U32_CYAN    COLOR_U32_RGB(  0, 255, 255)
+#define COLOR_U32_MAGENTA COLOR_U32_RGB(255,   0, 255)
+#define COLOR_U32_WHITE   COLOR_U32_RGB(255, 255, 255)
+
+// basic construction from rgba/rgb or alpha u8
+#define COLOR_RGBA(ur, ug, ub, ua) ((color_t) { .r = (ur), .g = (ug), .b = (ub), .a = (ua) })
+#define COLOR_RGB(ur, ug, ub)      ((color_t) { .r = (ur), .g = (ug), .b = (ub), .a = 255  })
+#define COLOR_A(ua)                ((color_t) { .r = 0, .g = 0, .b = 0, .a = (ua)  })
+
+// color mask macros
+#define COLOR_MASK_ALPHA   COLOR_A(255)
+#define COLOR_MASK_RGB     COLOR_RGBA(255, 255, 255, 0)
+
+// conversion from 32-bit or 24-bit colors
+#define COLOR_U32(v)               ((color_t) { .u32 = (v) })
+#define COLOR_U24(v)               ((color_t) { .u32 = ((v) & COLOR_MASK_RGB.u32) | (COLOR_MASK_ALPHA.u32) })
+
+// change alpha macros
+#define COLOR_SETA_U8(c, a)   ((color_t) { .u32 = ((((c).u32) & COLOR_MASK_RGB.u32) | (COLOR_A((a)).u32)) })
+#define COLOR_SETA_F(c, f)    COLOR_SETA_U8((c), ((f) * 255))
+
+// built-in color_t's
+#define COLOR_BLACK   COLOR_U32(COLOR_U32_BLACK)
+#define COLOR_RED     COLOR_U32(COLOR_U32_RED)
+#define COLOR_GREEN   COLOR_U32(COLOR_U32_GREEN)
+#define COLOR_YELLOW  COLOR_U32(COLOR_U32_YELLOW)
+#define COLOR_BLUE    COLOR_U32(COLOR_U32_BLUE)
+#define COLOR_CYAN    COLOR_U32(COLOR_U32_CYAN)
+#define COLOR_MAGENTA COLOR_U32(COLOR_U32_MAGENTA)
+#define COLOR_WHITE   COLOR_U32(COLOR_U32_WHITE)
 
 //=============================================
 

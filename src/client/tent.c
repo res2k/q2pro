@@ -1196,7 +1196,7 @@ static void cl_railcore_color_changed(cvar_t *self)
     if (!SCR_ParseColor(self->string, &railcore_color)) {
         Com_WPrintf("Invalid value '%s' for '%s'\n", self->string, self->name);
         Cvar_Reset(self);
-        railcore_color.u32 = U32_RED;
+        railcore_color = COLOR_RED;
     }
 }
 
@@ -1205,7 +1205,7 @@ static void cl_railspiral_color_changed(cvar_t *self)
     if (!SCR_ParseColor(self->string, &railspiral_color)) {
         Com_WPrintf("Invalid value '%s' for '%s'\n", self->string, self->name);
         Cvar_Reset(self);
-        railspiral_color.u32 = U32_BLUE;
+        railspiral_color = COLOR_BLUE;
     }
 }
 

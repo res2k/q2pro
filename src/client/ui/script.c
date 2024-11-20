@@ -600,7 +600,7 @@ static void Parse_Background(menuFrameWork_t *menu)
 
     if (SCR_ParseColor(s, &menu->color)) {
         menu->image = 0;
-        menu->transparent = menu->color.u8[3] != 255;
+        menu->transparent = menu->color.a != 255;
     } else {
         menu->image = R_RegisterPic(s);
         menu->transparent = R_GetPicSize(NULL, NULL, menu->image);
@@ -822,7 +822,7 @@ static bool Parse_File(const char *path, int depth)
 
                     if (SCR_ParseColor(s, &uis.color.background)) {
                         uis.backgroundHandle = 0;
-                        uis.transparent = uis.color.background.u8[3] != 255;
+                        uis.transparent = uis.color.background.a != 255;
                     } else {
                         uis.backgroundHandle = R_RegisterPic(s);
                         uis.transparent = R_GetPicSize(NULL, NULL, uis.backgroundHandle);

@@ -107,16 +107,24 @@ void SCR_Cinematic_g(genctx_t *ctx);
 void SCR_ModeChanged(void);
 void SCR_UpdateScreen(void);
 
-float CL_Wheel_TimeScale(void);
+// stats system
+void    SCR_DrawStats(void);
+void    SCR_RegisterStat(const char *name, xcommand_t cb);
+void    SCR_UnregisterStat(const char *name);
+void    SCR_StatTableSize(int key_width, int value_width);
+void    SCR_StatKeyValue(const char *key, const char *value);
+bool    SCR_StatActive(void);
 
-#define U32_BLACK   MakeColor(  0,   0,   0, 255)
-#define U32_RED     MakeColor(255,   0,   0, 255)
-#define U32_GREEN   MakeColor(  0, 255,   0, 255)
-#define U32_YELLOW  MakeColor(255, 255,   0, 255)
-#define U32_BLUE    MakeColor(  0,   0, 255, 255)
-#define U32_CYAN    MakeColor(  0, 255, 255, 255)
-#define U32_MAGENTA MakeColor(255,   0, 255, 255)
-#define U32_WHITE   MakeColor(255, 255, 255, 255)
+#define SCR_StatKeyValuei(key, value) \
+    SCR_StatKeyValue((key), va("%i", (value)))
+#define SCR_StatKeyValueu(key, value) \
+    SCR_StatKeyValue((key), va("%u", (value)))
+#define SCR_StatKeyValuef(key, value) \
+    SCR_StatKeyValue((key), va("%f", (value)))
+#define SCR_StatKeyValuev(key, value) \
+    SCR_StatKeyValue((key), va("%f %f %f", (value)[0], (value)[1], (value)[2]))
+
+float CL_Wheel_TimeScale(void);
 
 #define UI_LEFT             BIT(0)
 #define UI_RIGHT            BIT(1)
@@ -132,7 +140,7 @@ float CL_Wheel_TimeScale(void);
 #define UI_MULTILINE        BIT(9)
 #define UI_DRAWCURSOR       BIT(10)
 
-extern const uint32_t   colorTable[8];
+extern const color_t   colorTable[8];
 
 bool SCR_ParseColor(const char *s, color_t *color);
 
@@ -166,22 +174,22 @@ int CL_ServerTime(void);
 
 #if USE_REF
 void R_ClearDebugLines(void);
-void R_AddDebugLine(const vec3_t start, const vec3_t end, uint32_t color, uint32_t time, qboolean depth_test);
-void R_AddDebugPoint(const vec3_t point, float size, uint32_t color, uint32_t time, qboolean depth_test);
+void R_AddDebugLine(const vec3_t start, const vec3_t end, color_t color, uint32_t time, qboolean depth_test);
+void R_AddDebugPoint(const vec3_t point, float size, color_t color, uint32_t time, qboolean depth_test);
 void R_AddDebugAxis(const vec3_t origin, const vec3_t angles, float size, uint32_t time, qboolean depth_test);
-void R_AddDebugBounds(const vec3_t mins, const vec3_t maxs, uint32_t color, uint32_t time, qboolean depth_test);
-void R_AddDebugSphere(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test);
-void R_AddDebugCircle(const vec3_t origin, float radius, uint32_t color, uint32_t time, qboolean depth_test);
-void R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, uint32_t color, uint32_t time,
+void R_AddDebugBounds(const vec3_t mins, const vec3_t maxs, color_t color, uint32_t time, qboolean depth_test);
+void R_AddDebugSphere(const vec3_t origin, float radius, color_t color, uint32_t time, qboolean depth_test);
+void R_AddDebugCircle(const vec3_t origin, float radius, color_t color, uint32_t time, qboolean depth_test);
+void R_AddDebugCylinder(const vec3_t origin, float half_height, float radius, color_t color, uint32_t time,
                         qboolean depth_test);
 void R_DrawArrowCap(const vec3_t apex, const vec3_t dir, float size,
-                    uint32_t color, uint32_t time, qboolean depth_test);
-void R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, uint32_t line_color,
-                     uint32_t arrow_color, uint32_t time, qboolean depth_test);
+                    color_t color, uint32_t time, qboolean depth_test);
+void R_AddDebugArrow(const vec3_t start, const vec3_t end, float size, color_t line_color,
+                     color_t arrow_color, uint32_t time, qboolean depth_test);
 void R_AddDebugCurveArrow(const vec3_t start, const vec3_t ctrl, const vec3_t end, float size,
-                          uint32_t line_color, uint32_t arrow_color, uint32_t time, qboolean depth_test);
+                          color_t line_color, color_t arrow_color, uint32_t time, qboolean depth_test);
 void R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text,
-                    float size, uint32_t color, uint32_t time, qboolean depth_test);
+                    float size, color_t color, uint32_t time, qboolean depth_test);
 #else
 #define R_ClearDebugLines() (void)0
 #endif

@@ -59,7 +59,7 @@ typedef struct {
     int         numPlayers;
     char        *players[MAX_STATUS_PLAYERS];
     unsigned    timestamp;
-    uint32_t    color;
+    color_t     color;
     char        name[1];
 } serverslot_t;
 
@@ -186,21 +186,21 @@ static serverslot_t *FindSlot(const netadr_t *search, int *index_p)
     return found;
 }
 
-static uint32_t ColorForStatus(const serverStatus_t *status, unsigned ping)
+static color_t ColorForStatus(const serverStatus_t *status, unsigned ping)
 {
     if (Q_atoi(Info_ValueForKey(status->infostring, "needpass")) >= 1)
-        return uis.color.disabled.u32;
+        return uis.color.disabled;
 
     if (Q_atoi(Info_ValueForKey(status->infostring, "anticheat")) >= 2)
-        return uis.color.disabled.u32;
+        return uis.color.disabled;
 
     if (Q_stricmp(Info_ValueForKey(status->infostring, "NoFake"), "ENABLED") == 0)
-        return uis.color.disabled.u32;
+        return uis.color.disabled;
 
     if (ping < 30)
-        return U32_GREEN;
+        return COLOR_GREEN;
 
-    return U32_WHITE;
+    return COLOR_WHITE;
 }
 
 /*
@@ -361,7 +361,7 @@ void UI_ErrorEvent(const netadr_t *from)
     slot->status = SLOT_ERROR;
     slot->address = address;
     slot->hostname = hostname;
-    slot->color = U32_WHITE;
+    slot->color = COLOR_WHITE;
     slot->numRules = 0;
     slot->numPlayers = 0;
     slot->timestamp = timestamp;
@@ -423,7 +423,7 @@ static menuSound_t PingSelected(void)
     slot->status = SLOT_PENDING;
     slot->address = address;
     slot->hostname = hostname;
-    slot->color = U32_WHITE;
+    slot->color = COLOR_WHITE;
     slot->numRules = 0;
     slot->numPlayers = 0;
     slot->timestamp = com_eventTime;
@@ -476,7 +476,7 @@ static void AddServer(const netadr_t *address, const char *hostname)
     slot->status = SLOT_IDLE;
     slot->address = *address;
     slot->hostname = UI_CopyString(hostname);
-    slot->color = U32_WHITE;
+    slot->color = COLOR_WHITE;
     slot->numRules = 0;
     slot->numPlayers = 0;
     slot->timestamp = com_eventTime;
@@ -1021,18 +1021,18 @@ static void DrawStatus(void)
     R_DrawFill8(w, uis.height - CHAR_HEIGHT, uis.width - w, CHAR_HEIGHT, 0);
 
     if (m_servers.status_c)
-        UI_DrawString(uis.width / 2, uis.height - CHAR_HEIGHT, UI_CENTER, m_servers.status_c);
+        UI_DrawString(uis.width / 2, uis.height - CHAR_HEIGHT, UI_CENTER, COLOR_WHITE, m_servers.status_c);
 
     if (uis.width < 800)
         return;
 
     if (m_servers.list.numItems)
-        UI_DrawString(uis.width, uis.height - CHAR_HEIGHT, UI_RIGHT, m_servers.status_r);
+        UI_DrawString(uis.width, uis.height - CHAR_HEIGHT, UI_RIGHT, COLOR_WHITE, m_servers.status_r);
 
     if (m_servers.list.numItems && m_servers.list.curvalue >= 0) {
         serverslot_t *slot = m_servers.list.items[m_servers.list.curvalue];
         if (slot->status > SLOT_PENDING) {
-            UI_DrawString(0, uis.height - CHAR_HEIGHT, UI_LEFT, slot->hostname);
+            UI_DrawString(0, uis.height - CHAR_HEIGHT, UI_LEFT, COLOR_WHITE, slot->hostname);
         }
     }
 }

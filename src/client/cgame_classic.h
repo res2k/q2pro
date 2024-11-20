@@ -29,7 +29,7 @@ typedef struct {
     // Drawing color support
     void (*ClearColor)(void);
     void (*SetAlpha)(float alpha);
-    void (*SetColor)(uint32_t color);
+    void (*SetColor)(color_t color);
 
     // Return pmove parameters for server
     const pmoveParams_t *(*GetPmoveParams)(void);

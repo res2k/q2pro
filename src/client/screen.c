@@ -82,9 +82,11 @@ static cvar_t   *scr_poi_max_scale;
 
 static cvar_t   *scr_safe_zone;
 
-const uint32_t colorTable[8] = {
-    U32_BLACK, U32_RED, U32_GREEN, U32_YELLOW,
-    U32_BLUE, U32_CYAN, U32_MAGENTA, U32_WHITE
+// nb: this is dumb but C doesn't allow
+// `(T) { }` to count as a constant
+const color_t colorTable[8] = {
+    COLOR_U32_BLACK, COLOR_U32_RED, COLOR_U32_GREEN, COLOR_U32_YELLOW,
+    COLOR_U32_BLUE, COLOR_U32_CYAN, COLOR_U32_MAGENTA, COLOR_U32_WHITE
 };
 
 static const cin_crop_t cin_crop[] = {
@@ -112,7 +114,7 @@ SCR_DrawStringEx
 ==============
 */
 int SCR_DrawStringEx(int x, int y, int flags, size_t maxlen,
-                     const char *s, qhandle_t font)
+                     const char *s, color_t color, qhandle_t font)
 {
     size_t len = strlen(s);
 
@@ -126,7 +128,7 @@ int SCR_DrawStringEx(int x, int y, int flags, size_t maxlen,
         x -= len * CHAR_WIDTH;
     }
 
-    return R_DrawString(x, y, flags, maxlen, s, font);
+    return R_DrawString(x, y, flags, maxlen, s, color, font);
 }
 
 
@@ -136,7 +138,7 @@ SCR_DrawStringMulti
 ==============
 */
 void SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen,
-                         const char *s, qhandle_t font)
+                         const char *s, color_t color, qhandle_t font)
 {
     char    *p;
     size_t  len;
@@ -146,13 +148,13 @@ void SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen,
     while (*s && maxlen) {
         p = strchr(s, '\n');
         if (!p) {
-            last_x = SCR_DrawStringEx(x, y, flags, maxlen, s, font);
+            last_x = SCR_DrawStringEx(x, y, flags, maxlen, s, color, font);
             last_y = y;
             break;
         }
 
         len = min(p - s, maxlen);
-        last_x = SCR_DrawStringEx(x, y, flags, len, s, font);
+        last_x = SCR_DrawStringEx(x, y, flags, len, s, color, font);
         last_y = y;
         maxlen -= len;
 
@@ -161,7 +163,7 @@ void SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen,
     }
 
     if (flags & UI_DRAWCURSOR && com_localTime & BIT(8))
-        R_DrawChar(last_x, last_y, flags, 11, font);
+        R_DrawChar(last_x, last_y, flags, 11, color, font);
 }
 
 
@@ -212,22 +214,22 @@ bool SCR_ParseColor(const char *s, color_t *color)
 
         switch (i) {
         case 3:
-            color->u8[0] = c[0] | (c[0] << 4);
-            color->u8[1] = c[1] | (c[1] << 4);
-            color->u8[2] = c[2] | (c[2] << 4);
-            color->u8[3] = 255;
+            color->r = c[0] | (c[0] << 4);
+            color->g = c[1] | (c[1] << 4);
+            color->b = c[2] | (c[2] << 4);
+            color->a = 255;
             break;
         case 6:
-            color->u8[0] = c[1] | (c[0] << 4);
-            color->u8[1] = c[3] | (c[2] << 4);
-            color->u8[2] = c[5] | (c[4] << 4);
-            color->u8[3] = 255;
+            color->r = c[1] | (c[0] << 4);
+            color->g = c[3] | (c[2] << 4);
+            color->b = c[5] | (c[4] << 4);
+            color->a = 255;
             break;
         case 8:
-            color->u8[0] = c[1] | (c[0] << 4);
-            color->u8[1] = c[3] | (c[2] << 4);
-            color->u8[2] = c[5] | (c[4] << 4);
-            color->u8[3] = c[7] | (c[6] << 4);
+            color->r = c[1] | (c[0] << 4);
+            color->g = c[3] | (c[2] << 4);
+            color->b = c[5] | (c[4] << 4);
+            color->a = c[7] | (c[6] << 4);
             break;
         default:
             return false;
@@ -242,7 +244,7 @@ bool SCR_ParseColor(const char *s, color_t *color)
         return false;
     }
 
-    color->u32 = colorTable[i];
+    *color = colorTable[i];
     return true;
 }
 
@@ -397,18 +399,18 @@ static void draw_progress_bar(float progress, bool paused, int framenum)
 
     len = Q_scnprintf(buffer, sizeof(buffer), "%.f%%", progress * 100);
     x = (w - len * CHAR_WIDTH) / 2;
-    R_DrawString(x, h, 0, MAX_STRING_CHARS, buffer, scr.font_pic);
+    R_DrawString(x, h, 0, MAX_STRING_CHARS, buffer, COLOR_WHITE, scr.font_pic);
 
     if (scr_demobar->integer > 1) {
         int sec = framenum / BASE_FRAMERATE;
         int min = sec / 60; sec %= 60;
 
         Q_scnprintf(buffer, sizeof(buffer), "%d:%02d.%d", min, sec, framenum % BASE_FRAMERATE);
-        R_DrawString(0, h, 0, MAX_STRING_CHARS, buffer, scr.font_pic);
+        R_DrawString(0, h, 0, MAX_STRING_CHARS, buffer, COLOR_WHITE, scr.font_pic);
     }
 
     if (paused) {
-        SCR_DrawString(w, h, UI_RIGHT, "[PAUSED]");
+        SCR_DrawString(w, h, UI_RIGHT, COLOR_WHITE, "[PAUSED]");
     }
 
     R_SetScale(1.0f);
@@ -541,7 +543,7 @@ static void SCR_LagDraw(int x, int y)
     }
 }
 
-static void SCR_DrawNet(void)
+static void SCR_DrawNet(color_t base_color)
 {
     int x = scr_lag_x->integer;
     int y = scr_lag_y->integer;
@@ -564,7 +566,7 @@ static void SCR_DrawNet(void)
     // draw phone jack
     if (cls.netchan.outgoing_sequence - cls.netchan.incoming_acknowledged >= CMD_BACKUP) {
         if ((cls.realtime >> 8) & 3) {
-            R_DrawStretchPic(x, y, LAG_WIDTH, LAG_HEIGHT, scr.net_pic);
+            R_DrawStretchPic(x, y, LAG_WIDTH, LAG_HEIGHT, base_color, scr.net_pic);
         }
     }
 }
@@ -598,7 +600,7 @@ static void SCR_Color_g(genctx_t *ctx)
 {
     int color;
 
-    for (color = 0; color < COLOR_COUNT; color++)
+    for (color = 0; color < COLOR_INDEX_COUNT; color++)
         Prompt_AddMatch(ctx, colorNames[color]);
 }
 
@@ -643,7 +645,7 @@ static void SCR_Draw_f(void)
         return;
     }
 
-    color.u32 = U32_BLACK;
+    color = COLOR_BLACK;
     flags = UI_IGNORECOLOR;
 
     s = Cmd_Argv(1);
@@ -762,7 +764,7 @@ static void SCR_UnDraw_f(void)
     Com_Printf("Draw string '%s' not found.\n", s);
 }
 
-static void SCR_DrawObjects(void)
+static void SCR_DrawObjects(color_t base_color)
 {
     char buffer[MAX_QPATH];
     int x, y;
@@ -777,19 +779,19 @@ static void SCR_DrawObjects(void)
         if (y < 0) {
             y += scr.hud_height - CHAR_HEIGHT + 1;
         }
+
+        color_t color = base_color;
+
         if (!(obj->flags & UI_IGNORECOLOR)) {
-            R_SetColor(obj->color.u32);
+            color = obj->color;
         }
+
         if (obj->macro) {
             obj->macro->function(buffer, sizeof(buffer));
-            SCR_DrawString(x, y, obj->flags, buffer);
+            SCR_DrawString(x, y, obj->flags, color, buffer);
         } else {
-            SCR_DrawString(x, y, obj->flags, obj->cvar->string);
-        }
-        if (!(obj->flags & UI_IGNORECOLOR)) {
-            R_ClearColor();
-            R_SetAlpha(scr_alpha->value);
-        }
+            SCR_DrawString(x, y, obj->flags, color, obj->cvar->string);
+        }   
     }
 }
 
@@ -833,7 +835,7 @@ void SCR_AddToChatHUD(const char *text)
         *p = 0;
 }
 
-static void SCR_DrawChatHUD(void)
+static void SCR_DrawChatHUD(color_t base_color)
 {
     int x, y, i, lines, flags, step;
     float alpha;
@@ -876,11 +878,12 @@ static void SCR_DrawChatHUD(void)
             if (!alpha)
                 break;
 
-            R_SetAlpha(alpha * scr_alpha->value);
-            SCR_DrawString(x, y, flags, line->text);
-            R_SetAlpha(scr_alpha->value);
+            color_t color = base_color;
+            color.a *= alpha;
+
+            SCR_DrawString(x, y, flags, color, line->text);
         } else {
-            SCR_DrawString(x, y, flags, line->text);
+            SCR_DrawString(x, y, flags, base_color, line->text);
         }
 
         y += step;
@@ -895,7 +898,7 @@ DEBUG STUFF
 ===============================================================================
 */
 
-static void SCR_DrawTurtle(void)
+static void SCR_DrawTurtle(color_t base_color)
 {
     int x, y;
 
@@ -910,7 +913,7 @@ static void SCR_DrawTurtle(void)
 
 #define DF(f) \
     if (cl.frameflags & FF_##f) { \
-        SCR_DrawString(x, y, UI_ALTCOLOR, #f); \
+        SCR_DrawString(x, y, UI_ALTCOLOR, base_color, #f); \
         y += CHAR_HEIGHT; \
     }
 
@@ -949,16 +952,16 @@ static void SCR_DrawDebugStats(void)
     y = (scr.hud_height - j * CHAR_HEIGHT) / 2;
     for (i = 0; i < j; i++) {
         Q_snprintf(buffer, sizeof(buffer), "%2d: %d", i, cl.frame.ps.stats[i]);
+        color_t color = COLOR_WHITE;
         if (cl.oldframe.ps.stats[i] != cl.frame.ps.stats[i]) {
-            R_SetColor(U32_RED);
+            color = COLOR_RED;
         }
-        R_DrawString(x, y, 0, MAX_STRING_CHARS, buffer, scr.font_pic);
-        R_ClearColor();
+        R_DrawString(x, y, 0, MAX_STRING_CHARS, buffer, color, scr.font_pic);
         y += CHAR_HEIGHT;
     }
 }
 
-static void SCR_DrawDebugPmove(void)
+static void SCR_DrawDebugPmove(color)
 {
     static const char * const types[] = {
         "NORMAL", "SPECTATOR", "DEAD", "GIB", "FREEZE"
@@ -981,13 +984,13 @@ static void SCR_DrawDebugPmove(void)
     if (i > PM_FREEZE)
         i = PM_FREEZE;
 
-    R_DrawString(x, y, 0, MAX_STRING_CHARS, types[i], scr.font_pic);
+    R_DrawString(x, y, 0, MAX_STRING_CHARS, types[i], COLOR_WHITE, scr.font_pic);
     y += CHAR_HEIGHT;
 
     j = cl.frame.ps.pmove.pm_flags;
     for (i = 0; i < 8; i++) {
         if (j & (1 << i)) {
-            x = R_DrawString(x, y, 0, MAX_STRING_CHARS, flags[i], scr.font_pic);
+            x = R_DrawString(x, y, 0, MAX_STRING_CHARS, flags[i], COLOR_WHITE, scr.font_pic);
             x += CHAR_WIDTH;
         }
     }
@@ -1148,11 +1151,11 @@ static void ch_color_changed(cvar_t *self)
     if (ch_health->integer) {
         SCR_SetCrosshairColor();
     } else {
-        scr.crosshair_color.u8[0] = Cvar_ClampValue(ch_red, 0, 1) * 255;
-        scr.crosshair_color.u8[1] = Cvar_ClampValue(ch_green, 0, 1) * 255;
-        scr.crosshair_color.u8[2] = Cvar_ClampValue(ch_blue, 0, 1) * 255;
+        scr.crosshair_color.r = Cvar_ClampValue(ch_red, 0, 1) * 255;
+        scr.crosshair_color.g = Cvar_ClampValue(ch_green, 0, 1) * 255;
+        scr.crosshair_color.b = Cvar_ClampValue(ch_blue, 0, 1) * 255;
     }
-    scr.crosshair_color.u8[3] = Cvar_ClampValue(ch_alpha, 0, 1) * 255;
+    scr.crosshair_color.a = Cvar_ClampValue(ch_alpha, 0, 1) * 255;
 }
 
 static void scr_crosshair_changed(cvar_t *self)
@@ -1180,24 +1183,24 @@ void SCR_SetCrosshairColor(void)
     }
 
     // red
-    scr.crosshair_color.u8[0] = 255;
+    scr.crosshair_color.r = 255;
 
     // green
     if (health >= 66) {
-        scr.crosshair_color.u8[1] = 255;
+        scr.crosshair_color.g = 255;
     } else if (health < 33) {
-        scr.crosshair_color.u8[1] = 0;
+        scr.crosshair_color.g = 0;
     } else {
-        scr.crosshair_color.u8[1] = (255 * (health - 33)) / 33;
+        scr.crosshair_color.g = (255 * (health - 33)) / 33;
     }
 
     // blue
     if (health >= 99) {
-        scr.crosshair_color.u8[2] = 255;
+        scr.crosshair_color.b = 255;
     } else if (health < 66) {
-        scr.crosshair_color.u8[2] = 0;
+        scr.crosshair_color.b = 0;
     } else {
-        scr.crosshair_color.u8[2] = (255 * (health - 66)) / 33;
+        scr.crosshair_color.b = (255 * (health - 66)) / 33;
     }
 }
 
@@ -1356,17 +1359,17 @@ void SCR_StatTableSize(int key_width, int value_width)
 void SCR_StatKeyValue(const char *key, const char *value)
 {
     int c = (stat_state.key_id & 1) ? 24 : 0;
-    R_DrawFill32(stat_state.x, stat_state.y, CHAR_WIDTH * (stat_state.key_width + stat_state.value_width) + (STAT_MARGIN * 2), CHAR_HEIGHT + (STAT_MARGIN * 2), MakeColor(c, c, c, 127));
-    SCR_DrawString(stat_state.x + STAT_MARGIN, stat_state.y + STAT_MARGIN, UI_DROPSHADOW, key);
+    R_DrawFill32(stat_state.x, stat_state.y, CHAR_WIDTH * (stat_state.key_width + stat_state.value_width) + (STAT_MARGIN * 2), CHAR_HEIGHT + (STAT_MARGIN * 2), COLOR_RGBA(c, c, c, 127));
+    SCR_DrawString(stat_state.x + STAT_MARGIN, stat_state.y + STAT_MARGIN, UI_DROPSHADOW, COLOR_WHITE, key);
     stat_state.x += CHAR_WIDTH * stat_state.key_width;
-    SCR_DrawString(stat_state.x + STAT_MARGIN, stat_state.y + STAT_MARGIN, UI_DROPSHADOW, value);
+    SCR_DrawString(stat_state.x + STAT_MARGIN, stat_state.y + STAT_MARGIN, UI_DROPSHADOW, COLOR_WHITE, value);
 
     stat_state.x = 24;
     stat_state.y += CHAR_HEIGHT + (STAT_MARGIN * 2);
     stat_state.key_id++;
 }
 
-static void SCR_DrawStats(void)
+void SCR_DrawStats(void)
 {
     if (!stat_active)
         return;
@@ -1378,6 +1381,11 @@ static void SCR_DrawStats(void)
     SCR_StatTableSize(24, 32);
 
     stat_active->cb();
+}
+
+bool SCR_StatActive(void)
+{
+    return !!stat_active;
 }
 
 static void SCR_Stat_g(genctx_t *ctx)
@@ -1593,7 +1601,7 @@ static void SCR_TileClear(void)
 
 //=============================================================================
 
-static void SCR_DrawPause(void)
+static void SCR_DrawPause(color_t base_color)
 {
     int x, y, w, h;
 
@@ -1608,7 +1616,7 @@ static void SCR_DrawPause(void)
     x = (scr.hud_width - w) / 2;
     y = (scr.hud_height - h) / 2;
 
-    R_DrawPic(x, y, scr.pause_pic);
+    R_DrawPic(x, y, base_color, scr.pause_pic);
 }
 
 static void SCR_DrawLoading(void)
@@ -1626,12 +1634,12 @@ static void SCR_DrawLoading(void)
     x = (r_config.width * scr.hud_scale - w) / 2;
     y = (r_config.height * scr.hud_scale - h) / 2;
 
-    R_DrawPic(x, y, scr.loading_pic);
+    R_DrawPic(x, y, COLOR_WHITE, scr.loading_pic);
 
     R_SetScale(1.0f);
 }
 
-static void SCR_DrawHitMarker(void)
+static void SCR_DrawHitMarker(color_t base_color)
 {
     if (!cl.hit_marker_count)
         return;
@@ -1651,13 +1659,14 @@ static void SCR_DrawHitMarker(void)
     int x = (scr.hud_width - w) / 2;
     int y = (scr.hud_height - h) / 2;
 
-    R_SetColor(MakeColor(255, 0, 0, alpha * 255));
+    color_t color = COLOR_RGBA(255, 0, 0, base_color.a * alpha);
 
     R_DrawStretchPic(x + ch_x->integer,
                      y + ch_y->integer,
                      w,
                      h,
-                     scr.hit_marker_pic);
+                     color,
+                 scr.hit_marker_pic);
 }
 
 static scr_damage_entry_t *SCR_AllocDamageDisplay(const vec3_t dir)
@@ -1699,7 +1708,7 @@ void SCR_AddToDamageDisplay(int damage, const vec3_t color, const vec3_t dir)
     entry->time = cls.realtime + scr_damage_indicator_time->integer;
 }
 
-static void SCR_DrawDamageDisplays(void)
+static void SCR_DrawDamageDisplays(color_t base_color)
 {
     for (int i = 0; i < MAX_DAMAGE_ENTRIES; i++) {
         scr_damage_entry_t *entry = &scr.damage_entries[i];
@@ -1715,18 +1724,20 @@ static void SCR_DrawDamageDisplays(void)
         float damage_yaw = angles[YAW];
         float yaw_diff = DEG2RAD((my_yaw - damage_yaw) - 180);
 
-        R_SetColor(MakeColor(
+        color_t color = COLOR_RGBA(
             (int) (entry->color[0] * 255.f),
             (int) (entry->color[1] * 255.f),
             (int) (entry->color[2] * 255.f),
-            (int) (frac * 255.f)));
+            (int) (frac * base_color.a)
+        );
 
         int x = scr.hud_width / 2;
         int y = scr.hud_height / 2;
 
         int size = min(scr.damage_display_width, (DAMAGE_ENTRY_BASE_SIZE * entry->damage));
 
-        R_DrawStretchRotatePic(x, y, size, scr.damage_display_height, yaw_diff, 0, -(scr.crosshair_height + (scr.damage_display_height / 2)), scr.damage_display_pic);
+        R_DrawStretchRotatePic(x, y, size, scr.damage_display_height, color, yaw_diff,
+            0, -(scr.crosshair_height + (scr.damage_display_height / 2)), scr.damage_display_pic);
     }
 }
 
@@ -1842,7 +1853,7 @@ typedef enum
     POI_FLAG_HIDE_ON_AIM = 1, // hide the POI if we get close to it with our aim
 } svc_poi_flags;
 
-static void SCR_DrawPOIs(void)
+static void SCR_DrawPOIs(color_t base_color)
 {
     if (!scr_pois->integer)
         return;
@@ -1934,16 +1945,16 @@ static void SCR_DrawPOIs(void)
             vec3_t centered = { (scr.hud_width / 2) - sp[0], (scr.hud_height / 2) - sp[1], 0.f };
             sp[2] = 0.f;
             float len = VectorLength(centered);
-            c.u8[3] = Q_clipf(len / (hw * 6), 0.25f, 1.0f) * 255.f;
+            c.a = base_color.a * Q_clipf(len / (hw * 6), 0.25f, 1.0f);
+        } else {
+            c.a = base_color.a;
         }
 
-        R_SetColor(c.u32);
-
-        R_DrawStretchPic(sp[0], sp[1], hw, hh, poi->image);
+        R_DrawStretchPic(sp[0], sp[1], hw, hh, c, poi->image);
     }
 }
 
-static void SCR_DrawCrosshair(void)
+static void SCR_DrawCrosshair(color_t base_color)
 {
     int x, y;
 
@@ -1952,22 +1963,21 @@ static void SCR_DrawCrosshair(void)
     if (cl.frame.ps.stats[STAT_LAYOUTS] & (LAYOUTS_HIDE_HUD | LAYOUTS_HIDE_CROSSHAIR))
         return;
 
-    SCR_DrawPOIs();
+    SCR_DrawPOIs(base_color);
 
     x = (scr.hud_width - scr.crosshair_width) / 2;
     y = (scr.hud_height - scr.crosshair_height) / 2;
-
-    R_SetColor(scr.crosshair_color.u32);
 
     R_DrawStretchPic(x + ch_x->integer,
                      y + ch_y->integer,
                      scr.crosshair_width,
                      scr.crosshair_height,
+                     scr.crosshair_color,
                      scr.crosshair_pic);
 
-    SCR_DrawHitMarker();
+    SCR_DrawHitMarker(scr.crosshair_color);
 
-    SCR_DrawDamageDisplays();
+    SCR_DrawDamageDisplays(scr.crosshair_color);
 }
 
 static void SCR_Draw2D(void)
@@ -1982,46 +1992,41 @@ static void SCR_Draw2D(void)
 
     scr.hud_height = Q_rint(scr.hud_height * scr.hud_scale);
     scr.hud_width = Q_rint(scr.hud_width * scr.hud_scale);
+    
+    // the rest of 2D elements share common alpha
+    color_t color = COLOR_SETA_F(COLOR_WHITE, Cvar_ClampValue(scr_alpha, 0, 1));
 
     // crosshair has its own color and alpha
-    SCR_DrawCrosshair();
-
-    // the rest of 2D elements share common alpha
-    R_ClearColor();
-    R_SetAlpha(Cvar_ClampValue(scr_alpha, 0, 1));
-
+    SCR_DrawCrosshair(color);
 
     if (scr_timegraph->integer)
         SCR_DebugGraph(cls.frametime * 300, 0xdc);
 
     if (scr_debuggraph->integer || scr_timegraph->integer || scr_netgraph->integer)
         SCR_DrawDebugGraph();
+
     /* Draw cgame HUD elements
      * Note: a scaling factor of 1 is fine, we're passing a "pre-scale" HUD rect
      * and the drawing functions do the scaling */
     vrect_t hud_rect = {0, 0, scr.hud_width, scr.hud_height};
     vrect_t hud_safe = {scr.hud_width * scr_safe_zone->value, scr.hud_height * scr_safe_zone->value};
     cgame->DrawHUD(0, &cl.cgame_data, hud_rect, hud_safe, 1, 0, &cl.frame.ps);
-    R_ClearColor();
 
     CL_Carousel_Draw();
 
     CL_Wheel_Draw();
 
-    SCR_DrawNet();
+    SCR_DrawNet(color);
 
-    SCR_DrawObjects();
+    SCR_DrawObjects(color);
 
-    SCR_DrawChatHUD();
+    SCR_DrawChatHUD(color);
 
-    SCR_DrawTurtle();
+    SCR_DrawTurtle(color);
 
-    SCR_DrawPause();
-
-    SCR_DrawStats();
+    SCR_DrawPause(color);
 
     // debug stats have no alpha
-    R_ClearColor();
 
 #if USE_DEBUG
     SCR_DrawDebugStats();

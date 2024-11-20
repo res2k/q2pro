@@ -125,9 +125,9 @@ void V_AddLightEx(cl_shadow_light_t *light)
     VectorCopy(light->origin, dl->origin);
     dl->radius = light->radius;
     dl->_intensity = light->intensity * (light->lightstyle == -1 ? 1.0f : r_lightstyles[light->lightstyle].white);
-    dl->color[0] = light->color.u8[0] / 255.f;
-    dl->color[1] = light->color.u8[1] / 255.f;
-    dl->color[2] = light->color.u8[2] / 255.f;
+    dl->color[0] = light->color.r / 255.f;
+    dl->color[1] = light->color.g / 255.f;
+    dl->color[2] = light->color.b / 255.f;
 
     if (light->coneangle) {
         VectorCopy(light->conedirection, dl->cone);

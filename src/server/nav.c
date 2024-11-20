@@ -856,35 +856,31 @@ static PathInfo Nav_Path_(nav_path_t *path)
 }
 
 #if USE_REF
-static inline uint32_t ColorFromU32A(uint32_t c, uint8_t alpha)
-{
-    color_t color = COLOR_U32(c);
-    color.u8[3] = alpha;
-    return color.u32;
-}
-
 static void Nav_DebugPath(const PathInfo *path, const PathRequest *request)
 {
     R_ClearDebugLines();
 
     int time = (request->debugging.drawTime * 1000) + 6000;
+    
+    color_t path_color = COLOR_SETA_U8(COLOR_RED, 64);
+    color_t arrow_color = COLOR_SETA_U8(COLOR_YELLOW, 64);
 
-    R_AddDebugSphere(request->start, 8.0f, ColorFromU32A(U32_RED, 64), time, false);
-    R_AddDebugSphere(request->goal, 8.0f, ColorFromU32A(U32_RED, 64), time, false);
+    R_AddDebugSphere(request->start, 8.0f, path_color, time, false);
+    R_AddDebugSphere(request->goal, 8.0f, path_color, time, false);
 
     if (request->pathPoints.count) {
-        R_AddDebugArrow(request->start, request->pathPoints.posArray[0], 8.0f, ColorFromU32A(U32_YELLOW, 64), ColorFromU32A(U32_YELLOW, 64), time, false);
+        R_AddDebugArrow(request->start, request->pathPoints.posArray[0], 8.0f, arrow_color, arrow_color, time, false);
 
         for (int64_t i = 0; i < request->pathPoints.count - 1; i++)
-            R_AddDebugArrow(request->pathPoints.posArray[i], request->pathPoints.posArray[i + 1], 8.0f, ColorFromU32A(U32_YELLOW, 64), ColorFromU32A(U32_YELLOW, 64), time, false);
+            R_AddDebugArrow(request->pathPoints.posArray[i], request->pathPoints.posArray[i + 1], 8.0f, arrow_color, arrow_color, time, false);
 
-        R_AddDebugArrow(request->pathPoints.posArray[request->pathPoints.count - 1], request->goal, 8.0f, ColorFromU32A(U32_YELLOW, 64), ColorFromU32A(U32_YELLOW, 64), time, false);
+        R_AddDebugArrow(request->pathPoints.posArray[request->pathPoints.count - 1], request->goal, 8.0f, arrow_color, arrow_color, time, false);
     } else {
-        R_AddDebugArrow(request->start, request->goal, 8.0f, ColorFromU32A(U32_YELLOW, 64), ColorFromU32A(U32_YELLOW, 64), time, false);
+        R_AddDebugArrow(request->start, request->goal, 8.0f, arrow_color, arrow_color, time, false);
     }
 
-    R_AddDebugSphere(path->firstMovePoint, 16.0f, ColorFromU32A(U32_RED, 64), time, false);
-    R_AddDebugArrow(path->firstMovePoint, path->secondMovePoint, 16.0f, ColorFromU32A(U32_RED, 64), ColorFromU32A(U32_RED, 64), time, false);
+    R_AddDebugSphere(path->firstMovePoint, 16.0f, path_color, time, false);
+    R_AddDebugArrow(path->firstMovePoint, path->secondMovePoint, 16.0f, path_color, path_color, time, false);
 }
 #endif
 
@@ -1096,7 +1092,7 @@ static void Nav_Debug(void)
 
         uint8_t alpha = Q_clipf((1.0f - ((len - 32.f) / (nav_debug_range->value - 32.f))), 0.0f, 1.0f) * 255.f;
 
-        R_AddDebugCircle(node->origin, node->radius, ColorFromU32A(U32_CYAN, alpha), SV_FRAMETIME, true);
+        R_AddDebugCircle(node->origin, node->radius, COLOR_SETA_U8(COLOR_CYAN, alpha), SV_FRAMETIME, true);
 
         vec3_t mins, maxs, origin;
         Nav_GetNodeBounds(node, mins, maxs);
@@ -1105,7 +1101,7 @@ static void Nav_Debug(void)
         VectorAdd(mins, origin, mins);
         VectorAdd(maxs, origin, maxs);
 
-        R_AddDebugBounds(mins, maxs, ColorFromU32A((node->flags & NodeFlag_Disabled) ? U32_RED : U32_YELLOW, alpha), SV_FRAMETIME, true);
+        R_AddDebugBounds(mins, maxs, COLOR_SETA_U8((node->flags & NodeFlag_Disabled) ? COLOR_RED : COLOR_YELLOW, alpha), SV_FRAMETIME, true);
 
         if (node->flags & NodeFlag_CheckHasFloor) {
             vec3_t floormins, floormaxs;
@@ -1116,20 +1112,20 @@ static void Nav_Debug(void)
             floormins[2] = origin[2] - NavFloorDistance;
             floormaxs[2] = mins_z;
 
-            R_AddDebugBounds(floormins, floormaxs, ColorFromU32A(U32_RED, alpha * 0.5f), SV_FRAMETIME, true);
+            R_AddDebugBounds(floormins, floormaxs, COLOR_SETA_U8(COLOR_RED, alpha * 0.5f), SV_FRAMETIME, true);
         }
 
         vec3_t s;
         VectorCopy(node->origin, s);
         s[2] += 24;
 
-        R_AddDebugLine(node->origin, s, ColorFromU32A(U32_CYAN, alpha), SV_FRAMETIME, true);
+        R_AddDebugLine(node->origin, s, COLOR_SETA_U8(COLOR_CYAN, alpha), SV_FRAMETIME, true);
 
         vec3_t t;
         VectorCopy(node->origin, t);
         t[2] += 64;
 
-        R_AddDebugText(t, NULL, va("%td", node - nav_data.nodes), 0.25f, ColorFromU32A(U32_CYAN, alpha), SV_FRAMETIME, true);
+        R_AddDebugText(t, NULL, va("%td", node - nav_data.nodes), 0.25f, COLOR_SETA_U8(COLOR_CYAN, alpha), SV_FRAMETIME, true);
 
         t[2] -= 18;
 
@@ -1166,7 +1162,7 @@ static void Nav_Debug(void)
             Q_strlcat(node_text_buffer, "CHECK DOORS\n", sizeof(node_text_buffer));
 
         if (*node_text_buffer)
-            R_AddDebugText(t, NULL, node_text_buffer, 0.1f, ColorFromU32A(U32_GREEN, alpha), SV_FRAMETIME, true);
+            R_AddDebugText(t, NULL, node_text_buffer, 0.1f, COLOR_SETA_U8(COLOR_GREEN, alpha), SV_FRAMETIME, true);
         
         for (const nav_link_t *link = node->links; link != node->links + node->num_links; link++) {
             vec3_t e;
@@ -1176,6 +1172,11 @@ static void Nav_Debug(void)
             const byte *target_bits = nav_data.node_link_bitmap + (nav_data.node_link_bitmap_size * link->target->id);
             bool link_disabled = ((node->flags | link->target->flags) & NodeFlag_Disabled);
             uint8_t link_alpha = link_disabled ? (alpha * 0.5f) : alpha;
+            
+            color_t line_color = COLOR_SETA_U8(link_disabled ? COLOR_RED : COLOR_WHITE, link_alpha);
+            color_t traversal_color = COLOR_SETA_U8(link_disabled ? COLOR_RED : COLOR_BLUE, link_alpha);
+            color_t arrow_color = COLOR_SETA_U8(COLOR_RED, link_alpha);
+            color_t one_way_line_color = COLOR_SETA_U8(link_disabled ? COLOR_RED : COLOR_CYAN, link_alpha);
 
             if (Q_IsBitSet(target_bits, i)) {
                 // two-way link
@@ -1186,15 +1187,15 @@ static void Nav_Debug(void)
                 const nav_link_t *other_link = Nav_GetLink(link->target, node);
 
                 Q_assert(other_link);
-
+                
                 // simple link
                 if (!link->traversal && !other_link->traversal) {
-                    R_AddDebugLine(s, e, ColorFromU32A(link_disabled ? U32_RED : U32_WHITE, link_alpha), SV_FRAMETIME, true);
+                    R_AddDebugLine(s, e, line_color, SV_FRAMETIME, true);
                 } else {
                     // one or both are traversals
                     // render a->b
                     if (!link->traversal) {
-                        R_AddDebugArrow(s, e, 8.0f, ColorFromU32A(link_disabled ? U32_RED : U32_WHITE, link_alpha), ColorFromU32A(U32_RED, link_alpha), SV_FRAMETIME, true);
+                        R_AddDebugArrow(s, e, 8.0f, line_color, arrow_color, SV_FRAMETIME, true);
                     } else {
                         vec3_t ctrl;
 
@@ -1206,12 +1207,12 @@ static void Nav_Debug(void)
                             ctrl[2] = e[2];
                         }
 
-                        R_AddDebugCurveArrow(s, ctrl, e, 8.0f, ColorFromU32A(link_disabled ? U32_RED : U32_BLUE, link_alpha), ColorFromU32A(U32_RED, link_alpha), SV_FRAMETIME, true);
+                        R_AddDebugCurveArrow(s, ctrl, e, 8.0f, traversal_color, arrow_color, SV_FRAMETIME, true);
                     }
 
                     // render b->a
                     if (!other_link->traversal) {
-                        R_AddDebugArrow(e, s, 8.0f, ColorFromU32A(link_disabled ? U32_RED : U32_WHITE, link_alpha), ColorFromU32A(U32_RED, link_alpha), SV_FRAMETIME, true);
+                        R_AddDebugArrow(e, s, 8.0f, line_color, arrow_color, SV_FRAMETIME, true);
                     } else {
                         vec3_t ctrl;
 
@@ -1228,7 +1229,7 @@ static void Nav_Debug(void)
                         ctrl[2] += 32.f;
                         e[2] += 32.f;
 
-                        R_AddDebugCurveArrow(e, ctrl, s, 8.0f, ColorFromU32A(link_disabled ? U32_RED : U32_BLUE, link_alpha), ColorFromU32A(U32_RED, link_alpha), SV_FRAMETIME, true);
+                        R_AddDebugCurveArrow(e, ctrl, s, 8.0f, traversal_color, arrow_color, SV_FRAMETIME, true);
 
                         s[2] -= 32.f;
                         e[2] -= 32.f;
@@ -1247,9 +1248,9 @@ static void Nav_Debug(void)
                         ctrl[2] = e[2];
                     }
 
-                    R_AddDebugCurveArrow(s, ctrl, e, 8.0f, ColorFromU32A(link_disabled ? U32_RED : U32_BLUE, link_alpha), ColorFromU32A(U32_RED, link_alpha), SV_FRAMETIME, true);
+                    R_AddDebugCurveArrow(s, ctrl, e, 8.0f, traversal_color, arrow_color, SV_FRAMETIME, true);
                 } else {
-                    R_AddDebugArrow(s, e, 8.0f, ColorFromU32A(link_disabled ? U32_RED : U32_CYAN, link_alpha), ColorFromU32A(U32_RED, link_alpha), SV_FRAMETIME, true);
+                    R_AddDebugArrow(s, e, 8.0f, one_way_line_color, arrow_color, SV_FRAMETIME, true);
                 }
             }
         }

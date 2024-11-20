@@ -1236,10 +1236,10 @@ void    SCR_SetCrosshairColor(void);
 void    SCR_AddNetgraph(void);
 
 float   SCR_FadeAlpha(unsigned startTime, unsigned visTime, unsigned fadeTime);
-#define SCR_DrawString(x, y, flags, string) \
-    SCR_DrawStringEx(x, y, flags, MAX_STRING_CHARS, string, scr.font_pic)
-int     SCR_DrawStringEx(int x, int y, int flags, size_t maxlen, const char *s, qhandle_t font);
-void    SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen, const char *s, qhandle_t font);
+#define SCR_DrawString(x, y, flags, color, string) \
+    SCR_DrawStringEx(x, y, flags, MAX_STRING_CHARS, string, color, scr.font_pic)
+int     SCR_DrawStringEx(int x, int y, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font);
+void    SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font);
 
 void    SCR_ClearChatHUD_f(void);
 void    SCR_AddToChatHUD(const char *text);
@@ -1250,20 +1250,6 @@ void    SCR_AddToDamageDisplay(int damage, const vec3_t color, const vec3_t dir)
 void    SCR_RemovePOI(int id);
 void    SCR_AddPOI(int id, int time, const vec3_t p, int image, int color, int flags);
 void    SCR_Clear(void);
-
-void    SCR_RegisterStat(const char *name, xcommand_t cb);
-void    SCR_UnregisterStat(const char *name);
-void    SCR_StatTableSize(int key_width, int value_width);
-void    SCR_StatKeyValue(const char *key, const char *value);
-
-#define SCR_StatKeyValuei(key, value) \
-    SCR_StatKeyValue((key), va("%i", (value)))
-#define SCR_StatKeyValueu(key, value) \
-    SCR_StatKeyValue((key), va("%u", (value)))
-#define SCR_StatKeyValuef(key, value) \
-    SCR_StatKeyValue((key), va("%f", (value)))
-#define SCR_StatKeyValuev(key, value) \
-    SCR_StatKeyValue((key), va("%f %f %f", (value)[0], (value)[1], (value)[2]))
 
 //
 // cin.c

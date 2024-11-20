@@ -29,11 +29,6 @@ static void scr_font_changed(cvar_t *self)
     scr.font_pic = R_RegisterFont(self->string);
 }
 
-static inline uint32_t color_to_u32(const rgba_t* color)
-{
-    return MakeColor(color->r, color->g, color->b, color->a);
-}
-
 static bool CGX_IsExtendedServer(void)
 {
     return cl.csr.extended;
@@ -42,22 +37,22 @@ static bool CGX_IsExtendedServer(void)
 static void CGX_ClearColor(void)
 {
     color_t clear_color;
-    clear_color.u8[0] = clear_color.u8[1] = clear_color.u8[2] = 255;
-    clear_color.u8[3] = 255 * Cvar_ClampValue(scr_alpha, 0, 1);
-    R_SetColor(clear_color.u32);
+    clear_color.r = clear_color.g = clear_color.b = 255;
+    clear_color.a = 255 * Cvar_ClampValue(scr_alpha, 0, 1);
+    //R_SetColor(clear_color.u32);
 }
 
 static void CGX_SetAlpha(float alpha)
 {
-    R_SetAlpha(alpha * Cvar_ClampValue(scr_alpha, 0, 1));
+    //R_SetAlpha(alpha * Cvar_ClampValue(scr_alpha, 0, 1));
 }
 
-static void CGX_SetColor(uint32_t color)
+static void CGX_SetColor(color_t color)
 {
     color_t new_color;
-    new_color.u32 = color;
-    new_color.u8[3] *= Cvar_ClampValue(scr_alpha, 0, 1);
-    R_SetColor(new_color.u32);
+    new_color = color;
+    new_color.a *= Cvar_ClampValue(scr_alpha, 0, 1);
+    //R_SetColor(new_color.u32);
 }
 
 static const pmoveParams_t* CGX_GetPmoveParams(void)
@@ -220,7 +215,7 @@ static void CG_Draw_GetPicSize (int *w, int *h, const char *name)
 static void CG_SCR_DrawChar(int x, int y, int scale, int num, bool shadow)
 {
     int draw_flags = shadow ? UI_DROPSHADOW : 0;
-    R_DrawChar(x, y, draw_flags, num, scr.font_pic);
+    R_DrawChar(x, y, draw_flags, num, COLOR_WHITE, scr.font_pic);
 }
 
 static void CG_SCR_DrawPic (int x, int y, int w, int h, const char *name)
@@ -229,7 +224,7 @@ static void CG_SCR_DrawPic (int x, int y, int w, int h, const char *name)
     if (img == 0)
         return;
 
-    R_DrawStretchPic(x, y, w, h, img);
+    R_DrawStretchPic(x, y, w, h, COLOR_WHITE, img);
 }
 
 static void CG_SCR_DrawColorPic(int x, int y, int w, int h, const char* name, const rgba_t *color)
@@ -238,9 +233,7 @@ static void CG_SCR_DrawColorPic(int x, int y, int w, int h, const char* name, co
     if (img == 0)
         return;
 
-    CGX_SetColor(color_to_u32(color));
-    R_DrawStretchPic(x, y, w, h, img);
-    CGX_ClearColor();
+    R_DrawStretchPic(x, y, w, h, *color, img);
 }
 
 static void CG_SCR_SetAltTypeface(bool enabled)
@@ -280,8 +273,6 @@ static cg_vec2_t CG_SCR_MeasureFontString(const char *str, int scale)
 
 static void CG_SCR_DrawFontString(const char *str, int x, int y, int scale, const rgba_t *color, bool shadow, text_align_t align)
 {
-    CGX_SetColor(color_to_u32(color));
-
     int draw_x = x;
     if (align != LEFT) {
         int text_width = CG_SCR_MeasureFontString(str, scale).x;
@@ -297,16 +288,14 @@ static void CG_SCR_DrawFontString(const char *str, int x, int y, int scale, cons
     // FIXME: can contain line breaks
     if (!scr.kfont.pic) {
         while (*str) {
-            R_DrawStretchChar(draw_x, y, CHAR_WIDTH * scale, CHAR_HEIGHT * scale, draw_flags, *str++, scr.font_pic);
+            R_DrawStretchChar(draw_x, y, CHAR_WIDTH * scale, CHAR_HEIGHT * scale, draw_flags, *str++, *color, scr.font_pic);
             draw_x += CHAR_WIDTH * scale;
         }
     } else {
         while (*str) {
-            draw_x += R_DrawKFontChar(draw_x, y, scale, draw_flags, *str++, &scr.kfont);
+            draw_x += R_DrawKFontChar(draw_x, y, scale, draw_flags, *str++, *color, &scr.kfont);
         }
     }
-
-    CGX_ClearColor();
 }
 
 static bool CG_CL_GetTextInput(const char **msg, bool *is_team)
@@ -334,7 +323,7 @@ static const char* CG_Localize (const char *base, const char **args, size_t num_
     return out_str;
 }
 
-static const rgba_t rgba_white = {255, 255, 255, 255};
+static const rgba_t rgba_white = { .r = 255, .g = 255, .b = 255, .a = 255 };
 
 static int32_t CG_SCR_DrawBind(int32_t isplit, const char *binding, const char *purpose, int x, int y, int scale)
 {

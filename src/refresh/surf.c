@@ -556,7 +556,7 @@ static uint32_t color_for_surface(const mface_t *surf)
     if (surf->drawflags & SURF_WARP)
         return gl_static.inverse_intensity_100;
 
-    return U32_WHITE;
+    return COLOR_WHITE.u32;
 }
 
 static bool enable_intensity_for_surface(const mface_t *surf)

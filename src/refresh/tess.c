@@ -110,10 +110,10 @@ void GL_DrawParticles(void)
             dst_vert[15] = PARTICLE_SIZE;   dst_vert[16] = 0;
 
             if (p->color == -1)
-                color.u32 = p->rgba.u32;
+                color = p->rgba;
             else
                 color.u32 = d_8to24table[p->color & 0xff];
-            color.u8[3] *= p->alpha;
+            color.a *= p->alpha;
 
             WN32(dst_vert +  5, color.u32);
             WN32(dst_vert + 11, color.u32);
@@ -338,10 +338,10 @@ void GL_DrawBeams(void)
         VectorCopy(ent->oldorigin, segs[1]);
 
         if (ent->skinnum == -1)
-            color.u32 = ent->rgba.u32;
+            color = ent->rgba;
         else
             color.u32 = d_8to24table[ent->skinnum & 0xff];
-        color.u8[3] *= ent->alpha;
+        color.a *= ent->alpha;
 
         width = abs((int16_t)ent->frame) * scale;
 
@@ -470,17 +470,17 @@ void GL_DrawFlares(void)
         }
 
         inner.u32 = ent->rgba.u32;
-        inner.u8[3] = (128 + def * 32) * (ent->alpha * q->frac);
+        inner.a = (128 + def * 32) * (ent->alpha * q->frac);
         outer.u32 = inner.u32;
 
         if (ent->flags & (RF_SHELL_RED | RF_SHELL_GREEN | RF_SHELL_BLUE)) {
             VectorClear(outer.u8);
             if (ent->flags & RF_SHELL_RED)
-                outer.u8[0] = 255;
+                outer.r = 255;
             if (ent->flags & RF_SHELL_GREEN)
-                outer.u8[1] = 255;
+                outer.g = 255;
             if (ent->flags & RF_SHELL_BLUE)
-                outer.u8[2] = 255;
+                outer.b = 255;
             tess.flags |= GLS_SHADE_SMOOTH;
         }
 

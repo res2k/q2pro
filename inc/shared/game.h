@@ -289,10 +289,7 @@ typedef struct {
     PathReturnCode  returnCode /*= PathReturnCode::StartPathErrors*/;
 } PathInfo;
 
-typedef struct
-{
-    uint8_t r, g, b, a;
-} rgba_t;
+typedef color_t rgba_t;
 
 typedef enum
 {

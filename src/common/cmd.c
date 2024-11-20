@@ -1827,7 +1827,7 @@ static void Cmd_EchoEx_f(void)
     char buffer[MAX_STRING_CHARS], *s;
     bool escapes = false;
     print_type_t level = PRINT_ALL;
-    color_index_t color = COLOR_NONE;
+    color_index_t color = COLOR_INDEX_NONE;
     const char *newline = "\n";
     int c;
 
@@ -1872,7 +1872,7 @@ static void Cmd_EchoEx_f(void)
 
     Com_SetColor(color);
     Com_LPrintf(level, "%s%s", s, newline);
-    Com_SetColor(COLOR_NONE);
+    Com_SetColor(COLOR_INDEX_NONE);
 }
 
 /*

@@ -435,7 +435,7 @@ void SCR_DrawCinematic(void)
         if (cin.video.frame)
             R_DrawStretchRaw(x, y, w, h);
         else if (cin.static_pic)
-            R_DrawStretchPic(x, y, w, h, cin.static_pic);
+            R_DrawStretchPic(x, y, w, h, COLOR_WHITE, cin.static_pic);
     }
 }
 

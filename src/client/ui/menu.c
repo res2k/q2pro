@@ -63,28 +63,27 @@ Action_Draw
 static void Action_Draw(menuAction_t *a)
 {
     int flags;
+    color_t color = COLOR_WHITE;
 
     flags = a->generic.uiFlags;
     if (a->generic.flags & QMF_HASFOCUS) {
         if ((a->generic.uiFlags & UI_CENTER) != UI_CENTER) {
             if ((uis.realtime >> 8) & 1) {
-                UI_DrawChar(a->generic.x - RCOLUMN_OFFSET / 2, a->generic.y, a->generic.uiFlags | UI_RIGHT, 13);
+                UI_DrawChar(a->generic.x - RCOLUMN_OFFSET / 2, a->generic.y, a->generic.uiFlags | UI_RIGHT, color, 13);
             }
         } else {
             flags |= UI_ALTCOLOR;
             if ((uis.realtime >> 8) & 1) {
-                UI_DrawChar(a->generic.x - strlen(a->generic.name) * CHAR_WIDTH / 2 - CHAR_WIDTH, a->generic.y, flags, 13);
+                UI_DrawChar(a->generic.x - strlen(a->generic.name) * CHAR_WIDTH / 2 - CHAR_WIDTH, a->generic.y, flags, color, 13);
             }
         }
     }
 
     if (a->generic.flags & QMF_GRAYED) {
-        R_SetColor(uis.color.disabled.u32);
+        color = uis.color.disabled;
     }
-    UI_DrawString(a->generic.x, a->generic.y, flags, a->generic.name);
-    if (a->generic.flags & QMF_GRAYED) {
-        R_ClearColor();
-    }
+
+    UI_DrawString(a->generic.x, a->generic.y, flags, color, a->generic.name);
 }
 
 /*
@@ -122,13 +121,13 @@ Static_Draw
 */
 static void Static_Draw(menuStatic_t *s)
 {
+    color_t color = COLOR_WHITE;
+
     if (s->generic.flags & QMF_CUSTOM_COLOR) {
-        R_SetColor(s->generic.color.u32);
+        color = s->generic.color;
     }
-    UI_DrawString(s->generic.x, s->generic.y, s->generic.uiFlags, s->generic.name);
-    if (s->generic.flags & QMF_CUSTOM_COLOR) {
-        R_ClearColor();
-    }
+
+    UI_DrawString(s->generic.x, s->generic.y, s->generic.uiFlags, color, s->generic.name);
 }
 
 /*
@@ -156,12 +155,14 @@ static void Bitmap_Init(menuBitmap_t *b)
 
 static void Bitmap_Draw(menuBitmap_t *b)
 {
+    color_t color = COLOR_WHITE;
+
     if (b->generic.flags & QMF_HASFOCUS) {
         unsigned frame = (uis.realtime / 100) % NUM_CURSOR_FRAMES;
-        R_DrawPic(b->generic.x - CURSOR_OFFSET, b->generic.y, uis.bitmapCursors[frame]);
-        R_DrawPic(b->generic.x, b->generic.y, b->pics[1]);
+        R_DrawPic(b->generic.x - CURSOR_OFFSET, b->generic.y, color, uis.bitmapCursors[frame]);
+        R_DrawPic(b->generic.x, b->generic.y, color, b->pics[1]);
     } else {
-        R_DrawPic(b->generic.x, b->generic.y, b->pics[0]);
+        R_DrawPic(b->generic.x, b->generic.y, color, b->pics[0]);
     }
 }
 
@@ -221,23 +222,24 @@ static void Keybind_Draw(menuKeybind_t *k)
 {
     char string[MAX_STRING_CHARS];
     int flags;
+    color_t color = COLOR_WHITE;
 
     flags = UI_ALTCOLOR;
     if (k->generic.flags & QMF_HASFOCUS) {
         /*if(k->generic.parent->keywait) {
             UI_DrawChar(k->generic.x + RCOLUMN_OFFSET / 2, k->generic.y, k->generic.uiFlags | UI_RIGHT, '=');
         } else*/ if ((uis.realtime >> 8) & 1) {
-            UI_DrawChar(k->generic.x + RCOLUMN_OFFSET / 2, k->generic.y, k->generic.uiFlags | UI_RIGHT, 13);
+            UI_DrawChar(k->generic.x + RCOLUMN_OFFSET / 2, k->generic.y, k->generic.uiFlags | UI_RIGHT, color, 13);
         }
     } else {
         if (k->generic.parent->keywait) {
-            R_SetColor(uis.color.disabled.u32);
+            color = uis.color.disabled;
             flags = 0;
         }
     }
 
     UI_DrawString(k->generic.x + LCOLUMN_OFFSET, k->generic.y,
-                  k->generic.uiFlags | UI_RIGHT | flags, k->generic.name);
+                  k->generic.uiFlags | UI_RIGHT | flags, color, k->generic.name);
 
     if (k->altbinding[0]) {
         Q_concat(string, sizeof(string), k->binding, " or ", k->altbinding);
@@ -248,9 +250,7 @@ static void Keybind_Draw(menuKeybind_t *k)
     }
 
     UI_DrawString(k->generic.x + RCOLUMN_OFFSET, k->generic.y,
-                  k->generic.uiFlags | UI_LEFT, string);
-
-    R_ClearColor();
+                  k->generic.uiFlags | UI_LEFT, color, string);
 }
 
 static void Keybind_Push(menuKeybind_t *k)
@@ -418,16 +418,16 @@ Field_Draw
 static void Field_Draw(menuField_t *f)
 {
     int flags = f->generic.uiFlags;
-    uint32_t color = uis.color.normal.u32;
+    color_t color = uis.color.normal;
 
     if (f->generic.flags & QMF_HASFOCUS) {
         flags |= UI_DRAWCURSOR;
-        color = uis.color.active.u32;
+        color = uis.color.active;
     }
 
     if (f->generic.name) {
         UI_DrawString(f->generic.x + LCOLUMN_OFFSET, f->generic.y,
-                      f->generic.uiFlags | UI_RIGHT | UI_ALTCOLOR, f->generic.name);
+                      f->generic.uiFlags | UI_RIGHT | UI_ALTCOLOR, color, f->generic.name);
 
         R_DrawFill32(f->generic.x + RCOLUMN_OFFSET, f->generic.y - 1,
                      f->field.visibleChars * CHAR_WIDTH, CHAR_HEIGHT + 2, color);
@@ -640,12 +640,12 @@ static void SpinControl_Draw(menuSpinControl_t *s)
     const char *name;
 
     UI_DrawString(s->generic.x + LCOLUMN_OFFSET, s->generic.y,
-                  s->generic.uiFlags | UI_RIGHT | UI_ALTCOLOR, s->generic.name);
+                  s->generic.uiFlags | UI_RIGHT | UI_ALTCOLOR, COLOR_WHITE, s->generic.name);
 
     if (s->generic.flags & QMF_HASFOCUS) {
         if ((uis.realtime >> 8) & 1) {
             UI_DrawChar(s->generic.x + RCOLUMN_OFFSET / 2, s->generic.y,
-                        s->generic.uiFlags | UI_RIGHT, 13);
+                        s->generic.uiFlags | UI_RIGHT, COLOR_WHITE, 13);
         }
     }
 
@@ -655,7 +655,7 @@ static void SpinControl_Draw(menuSpinControl_t *s)
         name = s->itemnames[s->curvalue];
 
     UI_DrawString(s->generic.x + RCOLUMN_OFFSET, s->generic.y,
-                  s->generic.uiFlags, name);
+                  s->generic.uiFlags, COLOR_WHITE, name);
 }
 
 /*
@@ -725,7 +725,7 @@ static void ImageSpinControl_Draw(menuSpinControl_t *s)
         int w, h;
         R_GetPicSize(&w, &h, pic);
 
-        R_DrawPic(s->generic.x + LCOLUMN_OFFSET + ((s->generic.width / 2) - (w / 2)), s->generic.y + MENU_SPACING + ((s->generic.height / 2) - (h / 2)), pic);
+        R_DrawPic(s->generic.x + LCOLUMN_OFFSET + ((s->generic.width / 2) - (w / 2)), s->generic.y + MENU_SPACING + ((s->generic.height / 2) - (h / 2)), COLOR_WHITE, pic);
     }
 }
 
@@ -1452,7 +1452,7 @@ MenuList_DrawString
 */
 static void MenuList_DrawString(int x, int y, int flags,
                                 menuListColumn_t *column,
-                                const char *string)
+                                color_t color, const char *string)
 {
     clipRect_t rc;
 
@@ -1470,7 +1470,7 @@ static void MenuList_DrawString(int x, int y, int flags,
     }
 
     R_SetClipRect(&rc);
-    UI_DrawString(x, y + 1, column->uiFlags | flags, string);
+    UI_DrawString(x, y + 1, column->uiFlags | flags, color, string);
     R_SetClipRect(NULL);
 }
 
@@ -1498,7 +1498,7 @@ static void MenuList_Draw(menuList_t *l)
         xx = x;
         for (j = 0; j < l->numcolumns; j++) {
             int flags = UI_ALTCOLOR;
-            uint32_t color = uis.color.normal.u32;
+            color_t color = uis.color.normal;
 
             if (!l->columns[j].width) {
                 continue;
@@ -1507,7 +1507,7 @@ static void MenuList_Draw(menuList_t *l)
             if (l->sortcol == j && l->sortdir) {
                 flags = 0;
                 if (l->generic.flags & QMF_HASFOCUS) {
-                    color = uis.color.active.u32;
+                    color = uis.color.active;
                 }
             }
             R_DrawFill32(xx, y, l->columns[j].width - 1,
@@ -1515,7 +1515,7 @@ static void MenuList_Draw(menuList_t *l)
 
             if (l->columns[j].name) {
                 MenuList_DrawString(xx, y, flags,
-                                    &l->columns[j], l->columns[j].name);
+                                    &l->columns[j], COLOR_WHITE, l->columns[j].name);
             }
             xx += l->columns[j].width;
         }
@@ -1530,7 +1530,7 @@ static void MenuList_Draw(menuList_t *l)
         // draw scrollbar background
         R_DrawFill32(x + width - MLIST_SCROLLBAR_WIDTH, yy,
                      MLIST_SCROLLBAR_WIDTH - 1, barHeight,
-                     uis.color.normal.u32);
+                     uis.color.normal);
 
         if (l->numItems > l->maxItems) {
             pageFrac = (float)l->maxItems / l->numItems;
@@ -1545,13 +1545,13 @@ static void MenuList_Draw(menuList_t *l)
                      yy + Q_rint(barHeight * prestepFrac),
                      MLIST_SCROLLBAR_WIDTH - 1,
                      Q_rint(barHeight * pageFrac),
-                     uis.color.selection.u32);
+                     uis.color.selection);
     }
 
     // draw background
     xx = x;
     for (j = 0; j < l->numcolumns; j++) {
-        uint32_t color = uis.color.normal.u32;
+        color_t color = uis.color.normal;
 
         if (!l->columns[j].width) {
             continue;
@@ -1559,7 +1559,7 @@ static void MenuList_Draw(menuList_t *l)
 
         if (l->sortcol == j && l->sortdir) {
             if (l->generic.flags & QMF_HASFOCUS) {
-                color = uis.color.active.u32;
+                color = uis.color.active;
             }
         }
         R_DrawFill32(xx, y, l->columns[j].width - 1,
@@ -1570,6 +1570,8 @@ static void MenuList_Draw(menuList_t *l)
 
     yy = y;
     k = min(l->numItems, l->prestep + l->maxItems);
+    color_t color = COLOR_WHITE;
+
     for (i = l->prestep; i < k; i++) {
         // draw selection
         if (!(l->generic.flags & QMF_DISABLED) && i == l->curvalue) {
@@ -1579,15 +1581,16 @@ static void MenuList_Draw(menuList_t *l)
                     continue;
                 }
                 R_DrawFill32(xx, yy, l->columns[j].width - 1,
-                             MLIST_SPACING, uis.color.selection.u32);
+                             MLIST_SPACING, uis.color.selection);
                 xx += l->columns[j].width;
             }
         }
 
         // draw contents
         s = (char *)l->items[i] + l->extrasize;
+
         if (l->mlFlags & MLF_COLOR) {
-            R_SetColor(*((uint32_t *)(s - 4)));
+            color = COLOR_U32(*((uint32_t *)(s - 4)));
         }
 
         xx = x;
@@ -1597,17 +1600,13 @@ static void MenuList_Draw(menuList_t *l)
             }
 
             if (l->columns[j].width) {
-                MenuList_DrawString(xx, yy, 0, &l->columns[j], s);
+                MenuList_DrawString(xx, yy, 0, &l->columns[j], color, s);
                 xx += l->columns[j].width;
             }
             s += strlen(s) + 1;
         }
 
         yy += MLIST_SPACING;
-    }
-
-    if (l->mlFlags & MLF_COLOR) {
-        R_SetColor(U32_WHITE);
     }
 }
 
@@ -1788,28 +1787,29 @@ static void Slider_Draw(menuSlider_t *s)
 {
     int     i, flags;
     float   pos;
+    color_t color = COLOR_WHITE;
 
     flags = s->generic.uiFlags & ~(UI_LEFT | UI_RIGHT);
 
     if (s->generic.flags & QMF_HASFOCUS) {
         if ((uis.realtime >> 8) & 1) {
-            UI_DrawChar(s->generic.x + RCOLUMN_OFFSET / 2, s->generic.y, s->generic.uiFlags | UI_RIGHT, 13);
+            UI_DrawChar(s->generic.x + RCOLUMN_OFFSET / 2, s->generic.y, s->generic.uiFlags | UI_RIGHT, color, 13);
         }
     }
 
     UI_DrawString(s->generic.x + LCOLUMN_OFFSET, s->generic.y,
-                  flags | UI_RIGHT | UI_ALTCOLOR, s->generic.name);
+                  flags | UI_RIGHT | UI_ALTCOLOR, color, s->generic.name);
 
-    UI_DrawChar(s->generic.x + RCOLUMN_OFFSET, s->generic.y, flags | UI_LEFT, 128);
+    UI_DrawChar(s->generic.x + RCOLUMN_OFFSET, s->generic.y, flags | UI_LEFT, color, 128);
 
     for (i = 0; i < SLIDER_RANGE; i++)
-        UI_DrawChar(RCOLUMN_OFFSET + s->generic.x + i * CHAR_WIDTH + CHAR_WIDTH, s->generic.y, flags | UI_LEFT, 129);
+        UI_DrawChar(RCOLUMN_OFFSET + s->generic.x + i * CHAR_WIDTH + CHAR_WIDTH, s->generic.y, flags | UI_LEFT, color, 129);
 
-    UI_DrawChar(RCOLUMN_OFFSET + s->generic.x + i * CHAR_WIDTH + CHAR_WIDTH, s->generic.y, flags | UI_LEFT, 130);
+    UI_DrawChar(RCOLUMN_OFFSET + s->generic.x + i * CHAR_WIDTH + CHAR_WIDTH, s->generic.y, flags | UI_LEFT, color, 130);
 
     pos = Q_clipf((s->curvalue - s->minvalue) / (s->maxvalue - s->minvalue), 0, 1);
 
-    UI_DrawChar(CHAR_WIDTH + RCOLUMN_OFFSET + s->generic.x + (SLIDER_RANGE - 1) * CHAR_WIDTH * pos, s->generic.y, flags | UI_LEFT, 131);
+    UI_DrawChar(CHAR_WIDTH + RCOLUMN_OFFSET + s->generic.x + (SLIDER_RANGE - 1) * CHAR_WIDTH * pos, s->generic.y, flags | UI_LEFT, color, 131);
 }
 
 /*
@@ -1839,7 +1839,7 @@ Separator_Draw
 static void Separator_Draw(menuSeparator_t *s)
 {
     if (s->generic.name)
-        UI_DrawString(s->generic.x, s->generic.y, UI_RIGHT, s->generic.name);
+        UI_DrawString(s->generic.x, s->generic.y, UI_RIGHT, COLOR_WHITE, s->generic.name);
 }
 
 /*
@@ -2289,7 +2289,7 @@ static void Menu_DrawStatus(menuFrameWork_t *menu)
     for (l = 0; l < count; l++) {
         x = (uis.width - lens[l] * CHAR_WIDTH) / 2;
         y = menu->y2 - (count - l) * CHAR_HEIGHT;
-        R_DrawString(x, y, 0, lens[l], ptrs[l], uis.fontHandle);
+        R_DrawString(x, y, 0, lens[l], ptrs[l], COLOR_WHITE, uis.fontHandle);
     }
 }
 
@@ -2302,16 +2302,17 @@ void Menu_Draw(menuFrameWork_t *menu)
 {
     void *item;
     int i;
+    color_t color = COLOR_WHITE;
 
 //
 // draw background
 //
     if (menu->image) {
         R_DrawKeepAspectPic(0, menu->y1, uis.width,
-                            menu->y2 - menu->y1, menu->image);
+                            menu->y2 - menu->y1, color, menu->image);
     } else {
         R_DrawFill32(0, menu->y1, uis.width,
-                     menu->y2 - menu->y1, menu->color.u32);
+                     menu->y2 - menu->y1, menu->color);
     }
 
 //
@@ -2319,20 +2320,20 @@ void Menu_Draw(menuFrameWork_t *menu)
 //
     if (menu->title) {
         UI_DrawString(uis.width / 2, menu->y1,
-                      UI_CENTER | UI_ALTCOLOR, menu->title);
+                      UI_CENTER | UI_ALTCOLOR, color, menu->title);
     }
 
 //
 // draw banner, plaque and logo
 //
     if (menu->banner) {
-        R_DrawPic(menu->banner_rc.x, menu->banner_rc.y, menu->banner);
+        R_DrawPic(menu->banner_rc.x, menu->banner_rc.y, color, menu->banner);
     }
     if (menu->plaque) {
-        R_DrawPic(menu->plaque_rc.x, menu->plaque_rc.y, menu->plaque);
+        R_DrawPic(menu->plaque_rc.x, menu->plaque_rc.y, color, menu->plaque);
     }
     if (menu->logo) {
-        R_DrawPic(menu->logo_rc.x, menu->logo_rc.y, menu->logo);
+        R_DrawPic(menu->logo_rc.x, menu->logo_rc.y, color, menu->logo);
     }
 
 //

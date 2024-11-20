@@ -157,7 +157,7 @@ static int IMG_Unpack8(uint32_t *out, const uint8_t *in, int width, int height)
                 else
                     p = 0;
                 // copy rgb components
-                *out = d_8to24table[p] & U32_RGB;
+                *out = COLOR_SETA_U8(COLOR_U32(d_8to24table[p]), 0).u32;
             } else {
                 *out = d_8to24table[p];
             }
@@ -399,16 +399,16 @@ static uint32_t tga_unpack_pixel(const byte *in, int bpp)
     switch (bpp) {
     case 1:
         r = in[0];
-        return MakeColor(r, r, r, 255);
+        return COLOR_RGB(r, r, r).u32;
     case 2:
         r = (in[1] & 0x7C) >> 2;
         g = ((in[1] & 0x03) << 3) | ((in[0] & 0xE0) >> 5);
         b = (in[0] & 0x1F);
-        return MakeColor(r << 3, g << 3, b << 3, 255);
+        return COLOR_RGB(r << 3, g << 3, b << 3).u32;
     case 3:
-        return MakeColor(in[2], in[1], in[0], 255);
+        return COLOR_RGB(in[2], in[1], in[0]).u32;
     case 4:
-        return MakeColor(in[2], in[1], in[0], in[3]);
+        return COLOR_RGBA(in[2], in[1], in[0], in[3]).u32;
     default:
         q_unreachable();
     }
@@ -2223,10 +2223,10 @@ void IMG_GetPalette(void)
         goto fail;
 
     for (i = 0, src = pal; i < 255; i++, src += 3)
-        d_8to24table[i] = MakeColor(src[0], src[1], src[2], 255);
+        d_8to24table[i] = COLOR_RGB(src[0], src[1], src[2]).u32;
 
     // 255 is transparent
-    d_8to24table[i] = MakeColor(src[0], src[1], src[2], 0);
+    d_8to24table[i] = COLOR_RGBA(src[0], src[1], src[2], 0).u32;
     return;
 
 fail:

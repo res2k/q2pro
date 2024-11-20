@@ -87,20 +87,16 @@ static void CL_Carousel_Open(void)
 
 #define CAROUSEL_ICON_SIZE (24 + 2)
 
-static void R_DrawPicShadow(int x, int y, qhandle_t pic, int shadow_offset)
-{
-    R_SetColor(U32_BLACK);
-    R_DrawPic(x + shadow_offset, y + shadow_offset, pic);
-    R_SetColor(U32_WHITE);
-    R_DrawPic(x, y, pic);
-}
-
 static void R_DrawStretchPicShadowAlpha(int x, int y, int w, int h, qhandle_t pic, int shadow_offset, float alpha)
 {
-    R_SetColorRGB(U32_BLACK);
-    R_DrawStretchPic(x + shadow_offset, y + shadow_offset, w, h, pic);
-    R_SetColorRGB(U32_WHITE);
-    R_DrawStretchPic(x, y, w, h, pic);
+    R_DrawStretchPic(x + shadow_offset, y + shadow_offset, w, h, COLOR_SETA_F(COLOR_BLACK, alpha), pic);
+    R_DrawStretchPic(x, y, w, h, COLOR_SETA_F(COLOR_WHITE, alpha), pic);
+}
+
+static void R_DrawPicShadow(int x, int y, qhandle_t pic, int shadow_offset)
+{
+    R_DrawPic(x + shadow_offset, y + shadow_offset, COLOR_BLACK, pic);
+    R_DrawPic(x, y, COLOR_WHITE, pic);
 }
 
 void CL_Carousel_Draw(void)
@@ -121,7 +117,7 @@ void CL_Carousel_Draw(void)
         R_DrawPicShadow(carousel_x, carousel_y, selected ? icons->selected : icons->wheel, 2);
         
         if (selected) {
-            R_DrawPic(carousel_x - 1, carousel_y - 1, scr.carousel_selected);
+            R_DrawPic(carousel_x - 1, carousel_y - 1, COLOR_WHITE, scr.carousel_selected);
             
             char localized[CS_MAX_STRING_LENGTH];
 
@@ -129,17 +125,15 @@ void CL_Carousel_Draw(void)
             // make sure they get reset of language is changed.
             Loc_Localize(cl.configstrings[cl.csr.items + cl.carousel.slots[i].item_index], false, NULL, 0, localized, sizeof(localized));
 
-            SCR_DrawString(center_x, carousel_y - 16, UI_CENTER | UI_DROPSHADOW, localized);
+            SCR_DrawString(center_x, carousel_y - 16, UI_CENTER | UI_DROPSHADOW, COLOR_WHITE, localized);
         }
 
         if (weap->ammo_index >= 0) {
             int count = cgame->GetWeaponWheelAmmoCount(&cl.frame.ps, weap->ammo_index);
-            uint32_t color = count <= weap->quantity_warn ? U32_RED : U32_WHITE;
+            color_t color = count <= weap->quantity_warn ? COLOR_RED : COLOR_WHITE;
 
             R_SetScale(1.0f);
-            R_SetColor(color);
-            SCR_DrawString((carousel_x + 12) / scr.hud_scale, (carousel_y + 2) / scr.hud_scale, UI_DROPSHADOW | UI_CENTER, va("%i", count));
-            R_SetColor(U32_WHITE);
+            SCR_DrawString((carousel_x + 12) / scr.hud_scale, (carousel_y + 2) / scr.hud_scale, UI_DROPSHADOW | UI_CENTER, color, va("%i", count));
             R_SetScale(scr.hud_scale);
         }
     }
@@ -427,9 +421,9 @@ void CL_Wheel_Draw(void)
     float t = 1.0f - cl.wheel.timer;
     float tween = 0.5f - (cos((t * t) * M_PIf) * 0.5f);
     float wheel_alpha = 1.0f - tween;
-    R_SetAlpha(wheel_alpha);
+    color_t base_color = COLOR_SETA_F(COLOR_WHITE, wheel_alpha);
 
-    R_DrawPic(center_x - (scr.wheel_size / 2), center_y - (scr.wheel_size / 2), scr.wheel_circle);
+    R_DrawPic(center_x - (scr.wheel_size / 2), center_y - (scr.wheel_size / 2), base_color, scr.wheel_circle);
 
     for (int i = 0; i < cl.wheel.num_slots; i++) {
         const cl_wheel_slot_t *slot = &cl.wheel.slots[i];
@@ -483,9 +477,8 @@ void CL_Wheel_Draw(void)
         }
 
         if (count != -1) {
-            R_SetColorRGB(warn_low ? U32_RED : U32_WHITE);
-            SCR_DrawString(center_x + p[0] + size, center_y + p[1] + size, UI_CENTER | UI_DROPSHADOW, va("%i", count));
-            R_SetColorRGB(U32_WHITE);
+            color_t color = warn_low ? COLOR_RED : COLOR_WHITE;
+            SCR_DrawString(center_x + p[0] + size, center_y + p[1] + size, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(color, wheel_alpha), va("%i", count));
         }
 
         if (selected) {
@@ -496,7 +489,7 @@ void CL_Wheel_Draw(void)
             Loc_Localize(cl.configstrings[cl.csr.items + slot->item_index], false, NULL, 0, localized, sizeof(localized));
 
             R_SetScale(0.5f);
-            SCR_DrawString(center_x * 0.5f, (center_y - (scr.wheel_size / 8)) * 0.5f, UI_CENTER | UI_DROPSHADOW, localized);
+            SCR_DrawString(center_x * 0.5f, (center_y - (scr.wheel_size / 8)) * 0.5f, UI_CENTER | UI_DROPSHADOW, base_color, localized);
             R_SetScale(1);
 
             int ammo_index;
@@ -506,7 +499,7 @@ void CL_Wheel_Draw(void)
 
                 if (!cl.wheel_data.powerups[slot->data_id].is_toggle) {
                     R_SetScale(0.25f);
-                    SCR_DrawString(center_x * 0.25f, (center_y * 0.25f), UI_CENTER | UI_DROPSHADOW, va("%i", cgame->GetPowerupWheelCount(&cl.frame.ps, slot->data_id)));
+                    SCR_DrawString(center_x * 0.25f, (center_y * 0.25f), UI_CENTER | UI_DROPSHADOW, base_color, va("%i", cgame->GetPowerupWheelCount(&cl.frame.ps, slot->data_id)));
                     R_SetScale(1);
                 }
             } else {
@@ -519,17 +512,15 @@ void CL_Wheel_Draw(void)
                 R_DrawStretchPicShadowAlpha(center_x - (24 * 3) / 2, center_y - ((24 * 3) / 2), (24 * 3), (24 * 3), ammo->icons.wheel, 2, wheel_alpha);
 
                 R_SetScale(0.25f);
-                R_SetColorRGB(warn_low ? U32_RED : U32_WHITE);
-                SCR_DrawString(center_x * 0.25f, (center_y * 0.25f) + 16, UI_CENTER | UI_DROPSHADOW, va("%i", count));
-                R_SetColorRGB(U32_WHITE);
+                color_t color = warn_low ? COLOR_RED : COLOR_WHITE;
+                SCR_DrawString(center_x * 0.25f, (center_y * 0.25f) + 16, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(color, wheel_alpha), va("%i", count));
                 R_SetScale(1);
             }
         }
     }
 
-    R_SetColorRGB(U32_WHITE);
-    R_SetAlpha(wheel_alpha * 0.5f);
-    R_DrawPic(center_x + (int) cl.wheel.position[0] - (scr.wheel_button_size / 2), center_y + (int) cl.wheel.position[1] - (scr.wheel_button_size / 2), scr.wheel_button);
+    R_DrawPic(center_x + (int) cl.wheel.position[0] - (scr.wheel_button_size / 2), center_y + (int) cl.wheel.position[1] - (scr.wheel_button_size / 2),
+              COLOR_SETA_F(COLOR_WHITE, wheel_alpha * 0.5f), scr.wheel_button);
 }
 
 void CL_Wheel_Precache(void)

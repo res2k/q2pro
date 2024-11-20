@@ -580,7 +580,7 @@ static void Draw(menuFrameWork_t *self)
     Menu_Draw(self);
     if (uis.width >= 640) {
         UI_DrawString(uis.width, uis.height - CHAR_HEIGHT,
-                      UI_RIGHT, m_demos.status);
+                      UI_RIGHT, COLOR_WHITE, m_demos.status);
     }
 }
 

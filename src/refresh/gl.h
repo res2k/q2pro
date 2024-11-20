@@ -461,6 +461,7 @@ typedef struct {
     GLuint buffer;
 } model_t;
 
+// 2d:    xy[2]  | st[2]     | color[1]
 // world: xyz[3] | color[1]  | st[2]    | lmst[2]   | normal[3] | unused[1]
 // model: xyz[3] | unused[1] | color[4]             | normal[3] | unused[1]
 #define VERTEX_SIZE 12
@@ -620,6 +621,13 @@ typedef enum {
 
     VA_DEBUG = VA_OCCLUDE // VA_OCCLUDE happens to have the layout needed to debug lines
 } glVertexArray_t;
+
+// VA_2D
+typedef struct {
+    vec2_t      xy;
+    vec2_t      st;
+    uint32_t    c;
+} glVertexDesc2D_t;
 
 typedef enum {
     TMU_TEXTURE,
@@ -894,7 +902,6 @@ void GL_UpdateBlurParams(void);
  *
  */
 typedef struct {
-    color_t     colors[2]; // 0 - actual color, 1 - transparency (for text drawing)
     bool        scissor;
     float       scale;
 } drawStatic_t;
@@ -904,7 +911,6 @@ extern drawStatic_t draw;
 extern qhandle_t r_charset;
 
 #if USE_DEBUG
-void Draw_Stats(void);
 void Draw_Lightmaps(void);
 void Draw_Scrap(void);
 #endif

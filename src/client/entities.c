@@ -714,7 +714,7 @@ static void CL_AddPacketEntities(void)
                 VectorSet(ent.scale, s, s, s);
                 ent.flags = renderfx | RF_TRANSLUCENT;
                 if (!s1->skinnum)
-                    ent.rgba.u32 = U32_WHITE;
+                    ent.rgba = COLOR_WHITE;
                 else
                     ent.rgba.u32 = BigLong(s1->skinnum);
                 ent.skinnum = s1->number;
@@ -725,13 +725,13 @@ static void CL_AddPacketEntities(void)
             if (renderfx & RF_CUSTOM_LIGHT) {
                 color_t color;
                 if (!s1->skinnum)
-                    color.u32 = U32_WHITE;
+                    color = COLOR_WHITE;
                 else
                     color.u32 = BigLong(s1->skinnum);
                 V_AddLight(ent.origin, DLIGHT_CUTOFF + s1->frame,
-                           color.u8[0] / 255.0f,
-                           color.u8[1] / 255.0f,
-                           color.u8[2] / 255.0f);
+                           color.r / 255.0f,
+                           color.g / 255.0f,
+                           color.b / 255.0f);
                 goto skip;
             }
 
@@ -847,7 +847,7 @@ static void CL_AddPacketEntities(void)
                 light.radius = 512.0f;
                 light.coneangle = 22.0f;
                 VectorCopy(forward, light.conedirection);
-                light.color.u32 = U32_WHITE;
+                light.color = COLOR_WHITE;
                 VectorCopy(start, light.origin);
                 if (s1->number == cl.frame.clientNum + 1 && info_hand->integer != 2) {
                     VectorMA(light.origin, info_hand->integer ? -7 : 7, cl.v_right, light.origin);

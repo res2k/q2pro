@@ -341,10 +341,9 @@ bool        UI_DoHitTest(void);
 bool        UI_CursorInRect(const vrect_t *rect);
 void        *UI_FormatColumns(int extrasize, ...) q_sentinel;
 char        *UI_GetColumn(char *s, int n);
-void        UI_DrawString(int x, int y, int flags, const char *string);
-void        UI_DrawChar(int x, int y, int flags, int ch);
+void        UI_DrawString(int x, int y, int flags, color_t color, const char *string);
+void        UI_DrawChar(int x, int y, int flags, color_t color, int ch);
 void        UI_DrawRect8(const vrect_t *rect, int border, int c);
-//void        UI_DrawRect32(const vrect_t *rect, int border, uint32_t color);
 void        UI_StringDimensions(vrect_t *rc, int flags, const char *string);
 
 void        UI_LoadScript(void);

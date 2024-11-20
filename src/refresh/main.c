@@ -75,7 +75,6 @@ cvar_t *gl_showorigins;
 cvar_t *gl_showtearing;
 cvar_t *gl_showbloom;
 #if USE_DEBUG
-cvar_t *gl_showstats;
 cvar_t *gl_showscrap;
 cvar_t *gl_nobind;
 cvar_t *gl_novbo;
@@ -390,14 +389,14 @@ static void GL_DrawNullModel(void)
     VectorMA(e->origin, 16, glr.entaxis[1], tess.vertices + 12);
     VectorMA(e->origin, 16, glr.entaxis[2], tess.vertices + 20);
 
-    WN32(tess.vertices +  3, U32_RED);
-    WN32(tess.vertices +  7, U32_RED);
+    WN32(tess.vertices +  3, COLOR_RED.u32);
+    WN32(tess.vertices +  7, COLOR_RED.u32);
 
-    WN32(tess.vertices + 11, U32_GREEN);
-    WN32(tess.vertices + 15, U32_GREEN);
+    WN32(tess.vertices + 11, COLOR_GREEN.u32);
+    WN32(tess.vertices + 15, COLOR_GREEN.u32);
 
-    WN32(tess.vertices + 19, U32_BLUE);
-    WN32(tess.vertices + 23, U32_BLUE);
+    WN32(tess.vertices + 19, COLOR_BLUE.u32);
+    WN32(tess.vertices + 23, COLOR_BLUE.u32);
 
     GL_LoadMatrix(glr.entmatrix, glr.viewmatrix);
     GL_LoadUniforms();
@@ -844,11 +843,12 @@ void R_BeginFrame(void)
 
 void R_EndFrame(void)
 {
-#if USE_DEBUG
-    if (gl_showstats->integer) {
+    if (SCR_StatActive()) {
         GL_Flush2D();
-        Draw_Stats();
+        SCR_DrawStats();
     }
+
+#if USE_DEBUG
     if (gl_showscrap->integer)
         Draw_Scrap();
 #endif
@@ -1010,7 +1010,6 @@ static void GL_Register(void)
     gl_showtearing = Cvar_Get("gl_showtearing", "0", CVAR_CHEAT);
     gl_showbloom = Cvar_Get("gl_showbloom", "0", CVAR_CHEAT);
 #if USE_DEBUG
-    gl_showstats = Cvar_Get("gl_showstats", "0", 0);
     gl_showscrap = Cvar_Get("gl_showscrap", "0", 0);
     gl_nobind = Cvar_Get("gl_nobind", "0", CVAR_CHEAT);
     gl_novbo = Cvar_Get("gl_novbo", "0", CVAR_FILES);
@@ -1201,6 +1200,33 @@ void GL_DeleteQueries(void)
 
 // ==============================================================================
 
+static void Draw_Stats_s(void)
+{
+    SCR_StatKeyValuei("Nodes visible", glr.nodes_visible);
+    SCR_StatKeyValuei("Nodes culled", c.nodesCulled);
+    SCR_StatKeyValuei("Nodes drawn", c.nodesDrawn);
+    SCR_StatKeyValuei("Leaves drawn", c.leavesDrawn);
+    SCR_StatKeyValuei("Faces drawn", c.facesDrawn);
+    SCR_StatKeyValuei("Faces culled", c.facesCulled);
+    SCR_StatKeyValuei("Boxes culled", c.boxesCulled);
+    SCR_StatKeyValuei("Spheres culled", c.spheresCulled);
+    SCR_StatKeyValuei("RtBoxes culled", c.rotatedBoxesCulled);
+    SCR_StatKeyValuei("Tris drawn", c.trisDrawn);
+    SCR_StatKeyValuei("Tex switches", c.texSwitches);
+    SCR_StatKeyValuei("Tex uploads", c.texUploads);
+    SCR_StatKeyValuei("LM texels", c.lightTexels);
+    SCR_StatKeyValuei("Batches drawn", c.batchesDrawn);
+    SCR_StatKeyValuef("Faces / batch", c.batchesDrawn ? (float)c.facesDrawn / c.batchesDrawn : 0.0f);
+    SCR_StatKeyValuef("Tris / batch", c.batchesDrawn ? (float)c.facesTris / c.batchesDrawn : 0.0f);
+    SCR_StatKeyValuei("2D batches", c.batchesDrawn2D);
+    SCR_StatKeyValuei("Total entities", glr.fd.num_entities);
+    SCR_StatKeyValuei("Total dlights", glr.fd.num_dlights);
+    SCR_StatKeyValuei("Total particles", glr.fd.num_particles);
+    SCR_StatKeyValuei("Uniform uploads", c.uniformUploads);
+    SCR_StatKeyValuei("Array binds", c.vertexArrayBinds);
+    SCR_StatKeyValuei("Occl. queries", c.occlusionQueries);
+}
+
 /*
 ===============
 R_Init
@@ -1244,6 +1270,8 @@ bool R_Init(bool total)
     GL_PostInit();
 
     GL_ShowErrors(__func__);
+
+    SCR_RegisterStat("refresh", Draw_Stats_s);
 
     Com_Printf("----------------------\n");
 
@@ -1289,6 +1317,8 @@ void R_Shutdown(bool total)
     GL_Unregister();
 
     GL_ShutdownDebugDraw();
+
+    SCR_UnregisterStat("refresh");
 
     memset(&gl_static, 0, sizeof(gl_static));
     memset(&gl_config, 0, sizeof(gl_config));

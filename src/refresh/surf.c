@@ -275,7 +275,8 @@ void GL_PushLights(mface_t *surf)
 
     // dynamic this frame or dynamic previously
     if (surf->dlightframe) {
-        update_dynamic_lightmap(surf);
+        if (!gl_backend->use_dlights())
+            update_dynamic_lightmap(surf);
         return;
     }
 

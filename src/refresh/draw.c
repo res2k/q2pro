@@ -111,7 +111,6 @@ static inline void GL_StretchRotatePic_(
 
     float s = sinf(angle);
     float c = cosf(angle);
-    int i = 0;
 
     for (int i = 0; i < 4; i++) {
         float vert_x = vertices[i][0];
@@ -582,18 +581,6 @@ void SCR_LoadKFont(kfont_t *font, const char *filename)
 qhandle_t r_charset;
 
 #if USE_DEBUG
-
-static void Draw_Stringf(int x, int y, const char *fmt, ...)
-{
-    va_list argptr;
-    char buffer[MAX_STRING_CHARS];
-
-    va_start(argptr, fmt);
-    Q_vsnprintf(buffer, sizeof(buffer), fmt, argptr);
-    va_end(argptr);
-
-    R_DrawString(x, y, 0, -1, buffer, COLOR_WHITE, r_charset);
-}
 
 void Draw_Lightmaps(void)
 {

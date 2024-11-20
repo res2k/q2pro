@@ -267,6 +267,7 @@ extern cvar_t *gl_test;
 #endif
 extern cvar_t *gl_cull_nodes;
 extern cvar_t *gl_cull_models;
+extern cvar_t *gl_showcull;
 extern cvar_t *gl_clear;
 extern cvar_t *gl_novis;
 extern cvar_t *gl_lockpvs;

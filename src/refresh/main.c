@@ -82,6 +82,7 @@ cvar_t *gl_test;
 #endif
 cvar_t *gl_cull_nodes;
 cvar_t *gl_cull_models;
+cvar_t *gl_showcull;
 cvar_t *gl_clear;
 cvar_t *gl_finish;
 cvar_t *gl_novis;
@@ -1017,6 +1018,7 @@ static void GL_Register(void)
 #endif
     gl_cull_nodes = Cvar_Get("gl_cull_nodes", "1", 0);
     gl_cull_models = Cvar_Get("gl_cull_models", "1", 0);
+    gl_showcull = Cvar_Get("gl_showcull", "0", CVAR_CHEAT);
     gl_clear = Cvar_Get("gl_clear", "0", 0);
     gl_finish = Cvar_Get("gl_finish", "0", 0);
     gl_novis = Cvar_Get("gl_novis", "0", 0);

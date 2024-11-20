@@ -1100,10 +1100,15 @@ static void shader_setup_3d(void)
     VectorCopy(glr.fd.vieworg, gls.u_block.vieworg);
 
     if (gl_per_pixel_lighting->integer) {
-        gls.u_block.num_dlights = glr.fd.num_dlights;
+        int i = 0;
 
-        for (int i = 0; i < min(q_countof(gls.u_dlights.lights), glr.fd.num_dlights); i++) {
-            const dlight_t *dl = &glr.fd.dlights[i];
+        for (int n = 0; n < min(q_countof(gls.u_dlights.lights), glr.fd.num_dlights); n++) {
+            const dlight_t *dl = &glr.fd.dlights[n];
+
+            // FIXME: cull cone if cone is specified
+            if (GL_CullSphere(dl->origin, dl->radius) == CULL_OUT)
+                continue;
+
             VectorCopy(dl->origin, gls.u_dlights.lights[i].position);
             gls.u_dlights.lights[i].radius = dl->radius;
             VectorCopy(dl->color, gls.u_dlights.lights[i].color);
@@ -1114,7 +1119,11 @@ static void shader_setup_3d(void)
             } else {
                 gls.u_dlights.lights[i].cone[3] = 0.0f;
             }
+
+            i++;
         }
+
+        gls.u_block.num_dlights = i;
     }
 }
 

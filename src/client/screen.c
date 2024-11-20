@@ -85,8 +85,8 @@ static cvar_t   *scr_safe_zone;
 // nb: this is dumb but C doesn't allow
 // `(T) { }` to count as a constant
 const color_t colorTable[8] = {
-    COLOR_U32_BLACK, COLOR_U32_RED, COLOR_U32_GREEN, COLOR_U32_YELLOW,
-    COLOR_U32_BLUE, COLOR_U32_CYAN, COLOR_U32_MAGENTA, COLOR_U32_WHITE
+    { .u32 = COLOR_U32_BLACK }, { .u32 = COLOR_U32_RED }, { .u32 = COLOR_U32_GREEN }, { .u32 = COLOR_U32_YELLOW },
+    { .u32 = COLOR_U32_BLUE }, { .u32 = COLOR_U32_CYAN }, { .u32 = COLOR_U32_MAGENTA }, { .u32 = COLOR_U32_WHITE }
 };
 
 static const cin_crop_t cin_crop[] = {
@@ -961,7 +961,7 @@ static void SCR_DrawDebugStats(void)
     }
 }
 
-static void SCR_DrawDebugPmove(color)
+static void SCR_DrawDebugPmove(void)
 {
     static const char * const types[] = {
         "NORMAL", "SPECTATOR", "DEAD", "GIB", "FREEZE"

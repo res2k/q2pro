@@ -904,7 +904,7 @@ void CL_EmitDemoSnapshot(void)
         if (!strcmp(from, to))
             continue;
 
-        len = Q_strnlen(to, MAX_QPATH);
+        len = Q_strnlen(to, CS_MAX_STRING_LENGTH);
         q2proto_svc_message_t message = {.type = Q2P_SVC_CONFIGSTRING};
         message.configstring.index = i;
         message.configstring.value.str = to;

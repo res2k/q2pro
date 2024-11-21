@@ -40,25 +40,9 @@ static color_t apply_scr_alpha(color_t color)
     return color;
 }
 
-static void CGX_ClearColor(void)
+static void CGX_DrawCharEx(int x, int y, int flags, int ch, color_t color)
 {
-    color_t clear_color;
-    clear_color.r = clear_color.g = clear_color.b = 255;
-    clear_color.a = 255 * Cvar_ClampValue(scr_alpha, 0, 1);
-    //R_SetColor(clear_color.u32);
-}
-
-static void CGX_SetAlpha(float alpha)
-{
-    //R_SetAlpha(alpha * Cvar_ClampValue(scr_alpha, 0, 1));
-}
-
-static void CGX_SetColor(color_t color)
-{
-    color_t new_color;
-    new_color = color;
-    new_color.a *= Cvar_ClampValue(scr_alpha, 0, 1);
-    //R_SetColor(new_color.u32);
+    R_DrawChar(x, y, flags, ch, apply_scr_alpha(color), scr.font_pic);
 }
 
 static const pmoveParams_t* CGX_GetPmoveParams(void)
@@ -67,12 +51,10 @@ static const pmoveParams_t* CGX_GetPmoveParams(void)
 }
 
 static cgame_q2pro_extended_support_ext_t cgame_q2pro_extended_support = {
-    .api_version = 1,
+    .api_version = 2,
 
     .IsExtendedServer = CGX_IsExtendedServer,
-    .ClearColor = CGX_ClearColor,
-    .SetAlpha = CGX_SetAlpha,
-    .SetColor = CGX_SetColor,
+    .DrawCharEx = CGX_DrawCharEx,
     .GetPmoveParams = CGX_GetPmoveParams,
 };
 

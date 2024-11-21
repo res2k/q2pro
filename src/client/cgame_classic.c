@@ -60,6 +60,8 @@ static char     scr_centerstring[MAX_STRING_CHARS];
 static unsigned scr_centertime_start;   // for slow victory printing
 static int      scr_center_lines;
 
+static color_t  ui_color;
+
 static void CGC_Init(void)
 {
     /* We don't consider rerelease servers here and assume the appropriate
@@ -72,6 +74,8 @@ static void CGC_Init(void)
     ch_scale = cgi.cvar("ch_scale", "1", 0);
     ch_x = cgi.cvar("ch_x", "0", 0);
     ch_y = cgi.cvar("ch_y", "0", 0);
+
+    ui_color = COLOR_WHITE;
 }
 
 static void CGC_Shutdown(void)
@@ -91,22 +95,11 @@ static void DrawPic(int x, int y, const char* pic)
     cgi.SCR_DrawPic(x, y, w, h, pic);
 }
 
-static void CG_DrawString(int x, int y, int flags, size_t maxlen, const char *s)
+static void CG_DrawString(int x, int y, int flags, size_t maxlen, const char *s, color_t color)
 {
-    const char *write_str = s;
-    if (flags & UI_XORCOLOR) {
-        size_t new_str_len = min(strlen(s), maxlen);
-        char *new_str = alloca(new_str_len + 1);
-        for (size_t i = 0; i < new_str_len; i++) {
-            new_str[i] = s[i] ^ 0x80;
-        }
-        new_str[new_str_len] = 0;
-        write_str = new_str;
-    }
-
-    while (maxlen-- && *write_str) {
-        byte c = *write_str++;
-        cgi.SCR_DrawChar(x, y, 1, c, flags & UI_DROPSHADOW);
+    while (maxlen-- && *s) {
+        byte c = *s++;
+        cgix.DrawCharEx(x, y, flags, c, color);
         x += CHAR_WIDTH;
     }
 }
@@ -116,7 +109,7 @@ static void CG_DrawString(int x, int y, int flags, size_t maxlen, const char *s)
 DrawStringEx
 ==============
 */
-static void CG_DrawStringEx(int x, int y, int flags, size_t maxlen, const char *s)
+static void CG_DrawStringEx(int x, int y, int flags, size_t maxlen, const char *s, color_t color)
 {
     size_t len = strlen(s);
 
@@ -130,7 +123,7 @@ static void CG_DrawStringEx(int x, int y, int flags, size_t maxlen, const char *
         x -= len * CHAR_WIDTH;
     }
 
-    CG_DrawString(x, y, flags, maxlen, s);
+    CG_DrawString(x, y, flags, maxlen, s, color);
 }
 
 /*
@@ -138,7 +131,7 @@ static void CG_DrawStringEx(int x, int y, int flags, size_t maxlen, const char *
 DrawStringMulti
 ==============
 */
-static void CG_DrawStringMulti(int x, int y, int flags, size_t maxlen, const char *s)
+static void CG_DrawStringMulti(int x, int y, int flags, size_t maxlen, const char *s, color_t color)
 {
     char    *p;
     size_t  len;
@@ -146,7 +139,7 @@ static void CG_DrawStringMulti(int x, int y, int flags, size_t maxlen, const cha
     while (*s) {
         p = strchr(s, '\n');
         if (!p) {
-            CG_DrawStringEx(x, y, flags, maxlen, s);
+            CG_DrawStringEx(x, y, flags, maxlen, s, color);
             break;
         }
 
@@ -154,7 +147,7 @@ static void CG_DrawStringMulti(int x, int y, int flags, size_t maxlen, const cha
         if (len > maxlen) {
             len = maxlen;
         }
-        CG_DrawStringEx(x, y, flags, len, s);
+        CG_DrawStringEx(x, y, flags, len, s, color);
 
         y += CHAR_HEIGHT;
         s = p + 1;
@@ -162,22 +155,22 @@ static void CG_DrawStringMulti(int x, int y, int flags, size_t maxlen, const cha
 }
 
 #define HUD_DrawString(x, y, string) \
-    CG_DrawString(x, y, 0, MAX_STRING_CHARS, string)
+    CG_DrawString(x, y, 0, MAX_STRING_CHARS, string, ui_color)
 
 #define HUD_DrawAltString(x, y, string) \
-    CG_DrawString(x, y, UI_XORCOLOR, MAX_STRING_CHARS, string)
+    CG_DrawString(x, y, UI_XORCOLOR, MAX_STRING_CHARS, string, ui_color)
 
 #define HUD_DrawCenterString(x, y, string) \
-    CG_DrawStringMulti(x, y, UI_CENTER, MAX_STRING_CHARS, string)
+    CG_DrawStringMulti(x, y, UI_CENTER, MAX_STRING_CHARS, string, ui_color)
 
 #define HUD_DrawAltCenterString(x, y, string) \
-    CG_DrawStringMulti(x, y, UI_CENTER | UI_XORCOLOR, MAX_STRING_CHARS, string)
+    CG_DrawStringMulti(x, y, UI_CENTER | UI_XORCOLOR, MAX_STRING_CHARS, string, ui_color)
 
 #define HUD_DrawRightString(x, y, string) \
-    CG_DrawStringEx(x, y, UI_RIGHT, MAX_STRING_CHARS, string)
+    CG_DrawStringEx(x, y, UI_RIGHT, MAX_STRING_CHARS, string, ui_color)
 
 #define HUD_DrawAltRightString(x, y, string) \
-    CG_DrawStringEx(x, y, UI_RIGHT | UI_XORCOLOR, MAX_STRING_CHARS, string)
+    CG_DrawStringEx(x, y, UI_RIGHT | UI_XORCOLOR, MAX_STRING_CHARS, string, ui_color)
 
 static const char field_pic[] = "field_3";
 static const char inven_pic[] = "inventory";
@@ -708,7 +701,7 @@ static void SCR_ExecuteLayoutString(vrect_t hud_vrect, const char *s, int32_t pl
 
             token = COM_Parse(&s);
             if (SCR_ParseColor(token, &color)) {
-                cgix.SetColor(color);
+                ui_color = color;
             }
             continue;
         }
@@ -734,7 +727,7 @@ static void SCR_ExecuteLayoutString(vrect_t hud_vrect, const char *s, int32_t pl
         }
     }
 
-    cgix.ClearColor();
+    ui_color = COLOR_WHITE;
 }
 
 // The status bar is a small layout program that is based on the stats array
@@ -849,14 +842,13 @@ static void SCR_DrawCenterString(vrect_t hud_vrect)
         return;
     }
 
-    cgix.SetAlpha(alpha);
+    color_t color = ui_color;
+    color.a *= alpha;
 
     y = hud_vrect.height / 4 - scr_center_lines * 8 / 2;
 
     CG_DrawStringMulti(hud_vrect.width / 2, y, UI_CENTER,
-                       MAX_STRING_CHARS, scr_centerstring);
-
-    cgix.ClearColor();
+                       MAX_STRING_CHARS, scr_centerstring, color);
 }
 
 static void CGC_DrawHUD (int32_t isplit, const cg_server_data_t *data, vrect_t hud_vrect, vrect_t hud_safe, int32_t scale, int32_t playernum, const player_state_t *ps)

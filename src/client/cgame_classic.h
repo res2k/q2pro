@@ -26,10 +26,8 @@ typedef struct {
     // Whether server is using "extended" protocol
     bool (*IsExtendedServer)(void);
 
-    // Drawing color support
-    void (*ClearColor)(void);
-    void (*SetAlpha)(float alpha);
-    void (*SetColor)(color_t color);
+    // Draw single character, colorized & w/ flags
+    void (*DrawCharEx)(int x, int y, int flags, int ch, color_t color);
 
     // Return pmove parameters for server
     const pmoveParams_t *(*GetPmoveParams)(void);

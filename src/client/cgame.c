@@ -34,6 +34,12 @@ static bool CGX_IsExtendedServer(void)
     return cl.csr.extended;
 }
 
+static color_t apply_scr_alpha(color_t color)
+{
+    color.a *= Cvar_ClampValue(scr_alpha, 0, 1);
+    return color;
+}
+
 static void CGX_ClearColor(void)
 {
     color_t clear_color;
@@ -215,7 +221,7 @@ static void CG_Draw_GetPicSize (int *w, int *h, const char *name)
 static void CG_SCR_DrawChar(int x, int y, int scale, int num, bool shadow)
 {
     int draw_flags = shadow ? UI_DROPSHADOW : 0;
-    R_DrawChar(x, y, draw_flags, num, COLOR_WHITE, scr.font_pic);
+    R_DrawChar(x, y, draw_flags, num, apply_scr_alpha(COLOR_WHITE), scr.font_pic);
 }
 
 static void CG_SCR_DrawPic (int x, int y, int w, int h, const char *name)
@@ -224,7 +230,7 @@ static void CG_SCR_DrawPic (int x, int y, int w, int h, const char *name)
     if (img == 0)
         return;
 
-    R_DrawStretchPic(x, y, w, h, COLOR_WHITE, img);
+    R_DrawStretchPic(x, y, w, h, apply_scr_alpha(COLOR_WHITE), img);
 }
 
 static void CG_SCR_DrawColorPic(int x, int y, int w, int h, const char* name, const rgba_t *color)
@@ -233,7 +239,7 @@ static void CG_SCR_DrawColorPic(int x, int y, int w, int h, const char* name, co
     if (img == 0)
         return;
 
-    R_DrawStretchPic(x, y, w, h, *color, img);
+    R_DrawStretchPic(x, y, w, h, apply_scr_alpha(*color), img);
 }
 
 static void CG_SCR_SetAltTypeface(bool enabled)
@@ -283,17 +289,18 @@ static void CG_SCR_DrawFontString(const char *str, int x, int y, int scale, cons
     }
 
     int draw_flags = shadow ? UI_DROPSHADOW : 0;
+    color_t draw_color = apply_scr_alpha(*color);
 
     // TODO: 'str' may contain UTF-8, handle that.
     // FIXME: can contain line breaks
     if (!scr.kfont.pic) {
         while (*str) {
-            R_DrawStretchChar(draw_x, y, CHAR_WIDTH * scale, CHAR_HEIGHT * scale, draw_flags, *str++, *color, scr.font_pic);
+            R_DrawStretchChar(draw_x, y, CHAR_WIDTH * scale, CHAR_HEIGHT * scale, draw_flags, *str++, draw_color, scr.font_pic);
             draw_x += CHAR_WIDTH * scale;
         }
     } else {
         while (*str) {
-            draw_x += R_DrawKFontChar(draw_x, y, scale, draw_flags, *str++, *color, &scr.kfont);
+            draw_x += R_DrawKFontChar(draw_x, y, scale, draw_flags, *str++, draw_color, &scr.kfont);
         }
     }
 }

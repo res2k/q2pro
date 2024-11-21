@@ -485,7 +485,7 @@ static void CL_Record_f(void)
         q2proto_svc_configstring_t *cfgstr = &configstrings[gamestate.num_configstrings++];
         cfgstr->index = i;
         cfgstr->value.str = string;
-        cfgstr->value.len = Q_strnlen(string, MAX_QPATH);
+        cfgstr->value.len = Q_strnlen(string, CS_MAX_STRING_LENGTH);
     }
 
     // baselines

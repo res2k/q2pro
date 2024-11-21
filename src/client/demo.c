@@ -348,6 +348,91 @@ void CL_Stop_f(void)
     CL_UpdateRecordingSetting();
 }
 
+static void fill_message_fog(q2proto_svc_fog_t *msg_fog, const cl_fog_params_t *client_fog)
+{
+    msg_fog->flags = 0;
+    q2proto_var_color_set_float_comp(&msg_fog->global.color.values, 0, client_fog->linear.color[0]);
+    q2proto_var_color_set_float_comp(&msg_fog->global.color.values, 1, client_fog->linear.color[1]);
+    q2proto_var_color_set_float_comp(&msg_fog->global.color.values, 2, client_fog->linear.color[2]);
+    msg_fog->global.color.delta_bits = BIT(0) | BIT(1) | BIT(2);
+    q2proto_var_fraction_set_float(&msg_fog->global.density, client_fog->linear.density);
+    q2proto_var_fraction_set_float(&msg_fog->global.skyfactor, client_fog->linear.sky_factor);
+    msg_fog->flags |= Q2P_FOG_DENSITY_SKYFACTOR;
+
+    q2proto_var_fraction_set_float(&msg_fog->height.falloff, client_fog->height.falloff);
+    msg_fog->flags |= Q2P_HEIGHTFOG_FALLOFF;
+    q2proto_var_fraction_set_float(&msg_fog->height.density, client_fog->height.density);
+    msg_fog->flags |= Q2P_HEIGHTFOG_DENSITY;
+
+    q2proto_var_color_set_float_comp(&msg_fog->height.start_color.values, 0, client_fog->height.start.color[0]);
+    q2proto_var_color_set_float_comp(&msg_fog->height.start_color.values, 1, client_fog->height.start.color[1]);
+    q2proto_var_color_set_float_comp(&msg_fog->height.start_color.values, 2, client_fog->height.start.color[2]);
+    msg_fog->height.start_color.delta_bits = BIT(0) | BIT(1) | BIT(2);
+    q2proto_var_coord_set_float(&msg_fog->height.start_dist, client_fog->height.start.dist);
+    msg_fog->flags |= Q2P_HEIGHTFOG_START_DIST;
+
+    q2proto_var_color_set_float_comp(&msg_fog->height.end_color.values, 0, client_fog->height.end.color[0]);
+    q2proto_var_color_set_float_comp(&msg_fog->height.end_color.values, 1, client_fog->height.end.color[1]);
+    q2proto_var_color_set_float_comp(&msg_fog->height.end_color.values, 2, client_fog->height.end.color[2]);
+    msg_fog->height.end_color.delta_bits = BIT(0) | BIT(1) | BIT(2);
+    q2proto_var_coord_set_float(&msg_fog->height.end_dist, client_fog->height.end.dist);
+    msg_fog->flags |= Q2P_HEIGHTFOG_END_DIST;
+}
+
+static void write_current_fog(void)
+{
+    q2proto_svc_message_t fog_message = {.type = Q2P_SVC_FOG};
+
+    if (cl.fog.lerp_time == 0 || cl.time > cl.fog.lerp_time_start + cl.fog.lerp_time) {
+        // No fog lerping
+        fill_message_fog(&fog_message.fog, &cl.fog.end);
+        q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &fog_message);
+    } else {
+        cl_fog_params_t current_fog;
+
+        int time_since_lerp_start = (cl.time - cl.fog.lerp_time_start);
+        float fog_frontlerp = time_since_lerp_start / (float) cl.fog.lerp_time;
+        float fog_backlerp = 1.0f - fog_frontlerp;
+
+#define Q_FP(p) \
+            current_fog.linear.p = LERP2(cl.fog.start.linear.p, cl.fog.end.linear.p, fog_backlerp, fog_frontlerp)
+#define Q_HFP(p) \
+            current_fog.height.p = LERP2(cl.fog.start.height.p, cl.fog.end.height.p, fog_backlerp, fog_frontlerp)
+
+        Q_FP(color[0]);
+        Q_FP(color[1]);
+        Q_FP(color[2]);
+        Q_FP(density);
+        Q_FP(sky_factor);
+
+        Q_HFP(start.color[0]);
+        Q_HFP(start.color[1]);
+        Q_HFP(start.color[2]);
+        Q_HFP(start.dist);
+
+        Q_HFP(end.color[0]);
+        Q_HFP(end.color[1]);
+        Q_HFP(end.color[2]);
+        Q_HFP(end.dist);
+
+        Q_HFP(density);
+        Q_HFP(falloff);
+
+#undef Q_FP
+#undef Q_HFP
+
+        // Write current fog, as perceived by user
+        fill_message_fog(&fog_message.fog, &current_fog);
+        q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &fog_message);
+
+        // Write fog being lerped to
+        fill_message_fog(&fog_message.fog, &cl.fog.end);
+        fog_message.fog.global.time = cl.fog.lerp_time - time_since_lerp_start;
+        fog_message.fog.flags |= Q2P_FOG_TIME;
+        q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &fog_message);
+    }
+}
+
 static const cmd_option_t o_record[] = {
     { "h", "help", "display this message" },
     { "z", "compress", "compress demo with gzip" },
@@ -506,6 +591,9 @@ static void CL_Record_f(void)
         write_result = q2proto_server_write_gamestate(&cls.demo.q2proto_context, NULL, Q2PROTO_IOARG_DEMO_WRITE, &gamestate);;
         CL_WriteDemoMessage(&cls.demo.buffer);
     } while (write_result == Q2P_ERR_NOT_ENOUGH_PACKET_SPACE);
+
+    // write fog
+    write_current_fog();
 
     q2proto_svc_message_t message = {.type = Q2P_SVC_STUFFTEXT};
     message.stufftext.string = q2proto_make_string("precache\n");
@@ -916,6 +1004,9 @@ void CL_EmitDemoSnapshot(void)
     q2proto_svc_message_t message = {.type = Q2P_SVC_LAYOUT};
     message.layout.layout_str = q2proto_make_string(cl.cgame_data.layout);
     q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message);
+
+    // write fog
+    write_current_fog();
 
     if (cls.demo.buffer.overflowed) {
         Com_WPrintf("%s: message buffer overflowed\n", __func__);

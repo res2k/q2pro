@@ -1968,16 +1968,19 @@ static void SCR_DrawCrosshair(color_t base_color)
     x = (scr.hud_width - scr.crosshair_width) / 2;
     y = (scr.hud_height - scr.crosshair_height) / 2;
 
+    color_t crosshair_color = scr.crosshair_color;
+    crosshair_color.a = (crosshair_color.a * base_color.a) / 255;
+
     R_DrawStretchPic(x + ch_x->integer,
                      y + ch_y->integer,
                      scr.crosshair_width,
                      scr.crosshair_height,
-                     scr.crosshair_color,
+                     crosshair_color,
                      scr.crosshair_pic);
 
-    SCR_DrawHitMarker(scr.crosshair_color);
+    SCR_DrawHitMarker(crosshair_color);
 
-    SCR_DrawDamageDisplays(scr.crosshair_color);
+    SCR_DrawDamageDisplays(crosshair_color);
 }
 
 static void SCR_Draw2D(void)

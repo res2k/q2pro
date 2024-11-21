@@ -161,6 +161,33 @@ static contents_t CL_PointContents(const vec3_t point)
         if (!cmodel)
             continue;
 
+        // Kex: mins/maxs check, required for certain
+        // weird bmodels that only have a single leaf
+        // and contain contents like SLIME. in Kex we
+        // also had a secondary fix because of func_train's
+        // that had SOLID on them but had no faces, but I think
+        // this block fixes both.
+        vec3_t pos_l;
+
+        // subtract origin offset
+        VectorSubtract(point, ent->current.origin, pos_l);
+
+        // rotate start and end into the models frame of reference
+        if (!VectorEmpty(ent->current.angles)) {
+            vec3_t angles, axis[3];
+            AnglesToAxis(angles, axis);
+            RotatePoint(pos_l, axis);
+        }
+        
+        // see if the ent needs to be tested
+        if (pos_l[0] <= cmodel->mins[0] ||
+            pos_l[1] <= cmodel->mins[1] ||
+            pos_l[2] <= cmodel->mins[2] ||
+            pos_l[0] >= cmodel->maxs[0] ||
+            pos_l[1] >= cmodel->maxs[1] ||
+            pos_l[2] >= cmodel->maxs[2])
+            continue;
+
         contents |= CM_TransformedPointContents(
                         point, cmodel->headnode,
                         ent->current.origin,

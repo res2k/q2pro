@@ -1076,6 +1076,26 @@ static void shader_setup_fog(void)
     gls.u_block.heightfog_falloff = glr.fd.heightfog.falloff;
 }
 
+// calculate the fade distance from screen to light
+static inline float fade_distance_to_light(const dlight_t *dl)
+{
+    if (dl->fade[0] <= 1.0f && dl->fade[1] <= 1.0f)
+        return 1.0f;
+    else if (dl->fade[0] > dl->fade[1])
+        return 1.0f;
+
+    float dist_to_light = VectorDistance(glr.fd.vieworg, dl->origin);
+    float frac_to_end = Q_clipf(dist_to_light / dl->fade[1], 0.0f, 1.0f);
+    float min_frag_dist = dl->fade[0] / dl->fade[1];
+    
+    if (min_frag_dist > 1.0f)
+        return 1.0f;
+    else if (min_frag_dist <= 0)
+        return frac_to_end;
+
+    return 1.0f - smoothstep(min_frag_dist, 1.0f, frac_to_end);
+}
+
 static void shader_setup_3d(void)
 {
     gls.u_block.time = glr.fd.time;
@@ -1109,10 +1129,11 @@ static void shader_setup_3d(void)
             if (GL_CullSphere(dl->origin, dl->radius) == CULL_OUT)
                 continue;
 
+
             VectorCopy(dl->origin, gls.u_dlights.lights[i].position);
             gls.u_dlights.lights[i].radius = dl->radius;
             VectorCopy(dl->color, gls.u_dlights.lights[i].color);
-            gls.u_dlights.lights[i].color[3] = dl->_intensity;
+            gls.u_dlights.lights[i].color[3] = dl->intensity * fade_distance_to_light(dl);
             if (dl->cone[3]) {
                 VectorCopy(dl->cone, gls.u_dlights.lights[i].cone);
                 gls.u_dlights.lights[i].cone[3] = cosf(DEG2RAD(dl->cone[3]));

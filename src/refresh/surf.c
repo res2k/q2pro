@@ -166,7 +166,7 @@ static void add_dynamic_lights(const mface_t *surf)
             scale = 1;              // fall off from rad to minlight
         }
 
-        scale *= light->_intensity;
+        scale *= light->intensity;
 
         VectorMA(light->transformed, -dist, surf->plane->normal, point);
 

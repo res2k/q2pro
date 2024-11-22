@@ -74,8 +74,10 @@ typedef struct {
     vec3_t  transformed;
     vec3_t  color;
     float   radius;
-    float   _intensity;
+    float   intensity; // note: this is different than Q2PRO and is a light
+                       // intensity scalar, not a radius!
     vec4_t  cone;
+    vec2_t  fade;
 } dlight_t;
 
 typedef struct {

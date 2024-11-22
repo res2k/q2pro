@@ -124,7 +124,7 @@ void V_AddLightEx(cl_shadow_light_t *light)
     dl = &r_dlights[r_numdlights++];
     VectorCopy(light->origin, dl->origin);
     dl->radius = light->radius;
-    dl->_intensity = light->intensity * (light->lightstyle == -1 ? 1.0f : r_lightstyles[light->lightstyle].white);
+    dl->intensity = light->intensity * (light->lightstyle == -1 ? 1.0f : r_lightstyles[light->lightstyle].white);
     dl->color[0] = light->color.r / 255.f;
     dl->color[1] = light->color.g / 255.f;
     dl->color[2] = light->color.b / 255.f;
@@ -135,6 +135,9 @@ void V_AddLightEx(cl_shadow_light_t *light)
     } else {
         dl->cone[3] = 0.0f;
     }
+
+    dl->fade[0] = light->fade_start;
+    dl->fade[1] = light->fade_end;
 }
 
 /*
@@ -152,11 +155,12 @@ void V_AddLight(const vec3_t org, float intensity, float r, float g, float b)
     dl = &r_dlights[r_numdlights++];
     VectorCopy(org, dl->origin);
     dl->radius = intensity;
-    dl->_intensity = 1.0f;
+    dl->intensity = 1.0f;
     dl->color[0] = r;
     dl->color[1] = g;
     dl->color[2] = b;
     dl->cone[3] = 0.0f;
+    dl->fade[0] = dl->fade[1] = 0.0f;
 }
 
 /*
@@ -259,7 +263,7 @@ static void V_TestLights(void)
         else
             VectorSet(dl->color, 1, 1, 1);
         dl->radius = 256;
-        dl->_intensity = 1.0f;
+        dl->intensity = 1.0f;
         return;
     }
 
@@ -279,7 +283,7 @@ static void V_TestLights(void)
         dl->color[1] = (((i % 6) + 1) & 2) >> 1;
         dl->color[2] = (((i % 6) + 1) & 4) >> 2;
         dl->radius = 200;
-        dl->_intensity = 1.0f;
+        dl->intensity = 1.0f;
     }
 }
 

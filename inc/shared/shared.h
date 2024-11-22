@@ -488,6 +488,14 @@ static inline uint16_t Q_clip_uint16(int a)
     return (a & ~0xFFFF) ? ~a >> 31 : a;
 }
 
+static inline float smoothstep(float edge0, float edge1, float x)
+{
+    // https://registry.khronos.org/OpenGL-Refpages/gl4/html/smoothstep.xhtml
+    float t;
+    t = Q_clipf((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
 #ifndef max
 #define max(a,b) ((a)>(b)?(a):(b))
 #endif

@@ -292,7 +292,7 @@ static void GL_AddLights(const vec3_t origin, vec3_t color)
         f = light->radius - DLIGHT_CUTOFF - Distance(light->origin, origin);
         if (f > 0) {
             f *= (1.0f / 255);
-            VectorMA(color, f * light->_intensity, light->color, color);
+            VectorMA(color, f * light->intensity, light->color, color);
         }
     }
 }

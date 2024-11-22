@@ -27,10 +27,13 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <setjmp.h>
 #endif
 
-#if _MSC_VER >= 1943
+#if _MSC_VER >= 1930
 #define XBOX_SUPPORT
 #include <appmodel.h>
 #include <VersionHelpers.h>
+#pragma message("Xbox support enabled");
+#else
+#pragma message("No Xbox support")
 #endif
 
 HINSTANCE                       hGlobalInstance;
@@ -1363,6 +1366,9 @@ static bool Sys_CheckGOGInstallation(const char *app_id, char *out_dir, size_t o
 static bool Sys_CheckXboxInstallation(PCWSTR family_name, char *out_dir, size_t out_dir_length)
 {
 #ifdef XBOX_SUPPORT
+    if (!IsWindows8Point1OrGreater())
+        return false;
+
     WCHAR buffer[MAX_PATH];
     PWSTR packageNames[1];
     uint32_t num_packages = 1, buffer_length = MAX_PATH;
@@ -1392,9 +1398,6 @@ Sys_GetInstalledGamePath
 */
 bool Sys_GetInstalledGamePath(game_path_t path_type, char *path, size_t path_length)
 {
-    if (!IsWindows8Point1OrGreater())
-        return false;
-
     Q_strlcpy(path, "", path_length);
     
     if (path_type == GAME_PATH_STEAM) {

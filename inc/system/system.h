@@ -66,13 +66,14 @@ void    Sys_Quit(void);
 void    Sys_ListFiles_r(listfiles_t *list, const char *path, int depth);
 
 typedef enum {
-    GAME_PATH_STEAM,
-    GAME_PATH_GOG_CLASSIC,
-    GAME_PATH_GOG_RERELEASE,
-    GAME_PATH_XBOX_RERELEASE
-} game_path_t;
+    RERELEASE_MODE_NO = 0, // use vanilla game
+    RERELEASE_MODE_YES = 1, // use re-release game
+    RERELEASE_MODE_NEVER = -1 // do not attempt any sort of auto-detection
+} rerelease_mode_t;
 
-bool    Sys_GetInstalledGamePath(game_path_t path_type, char *path, size_t path_length);
+typedef bool (*sys_getinstalledgamepath_func_t)(rerelease_mode_t rr_mode, char *path, size_t path_length);
+
+extern const sys_getinstalledgamepath_func_t gamepath_funcs[];
 
 void    Sys_DebugBreak(void);
 

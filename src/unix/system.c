@@ -439,15 +439,10 @@ GAME PATH DETECTION
 ========================================================================
 */
 
-/*
-================
-Sys_GetInstalledGamePath
-================
-*/
-bool Sys_GetInstalledGamePath(game_path_t path_type, char *path, size_t path_length)
-{
-    return false;
-}
+const sys_getinstalledgamepath_func_t gamepath_funcs[] = {
+    NULL
+};
+
 
 /*
 =================

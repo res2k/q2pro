@@ -1283,7 +1283,7 @@ static bool parse_vdf_libraryfolders(const char **file_contents, char *out_dir, 
     return false;
 }
 
-static bool find_steam_installation_path(char *out_dir, size_t out_dir_length)
+static bool find_steam_installation_base(char *out_dir, size_t out_dir_length)
 {
     // grab Steam installation path
     DWORD folder_path_len = MAX_OSPATH;
@@ -1337,6 +1337,40 @@ exit:
     return result;
 }
 
+static bool find_steam_installation_path(rerelease_mode_t rr_mode, char *out_dir, size_t out_dir_length)
+{
+    if (!find_steam_installation_base(out_dir, out_dir_length))
+        return false;
+
+    // found Steam dir - see if the mode we want is available
+    listfiles_t list = {
+        .flags = FS_SEARCH_DIRSONLY,
+        .baselen = strlen(out_dir) + 1,
+    };
+
+    Sys_ListFiles_r(&list, out_dir, 0);
+
+    bool has_rerelease = false;
+
+    for (int i = 0; i < list.count; i++) {
+        char *s = list.files[i];
+
+        if (!Q_stricmp(s, "rerelease")) {
+            has_rerelease = true;
+        }
+
+        Z_Free(s);
+    }
+
+    Z_Free(list.files);
+
+    if (rr_mode == RERELEASE_MODE_YES && has_rerelease) {
+        Q_strlcat(out_dir, PATH_SEP_STRING "rerelease", out_dir_length);
+    }
+
+    return true;
+}
+
 static bool find_gog_installation_path(const char *app_id, char *out_dir, size_t out_dir_length)
 {
     DWORD folder_path_len = MAX_OSPATH;
@@ -1361,11 +1395,29 @@ static bool find_gog_installation_path(const char *app_id, char *out_dir, size_t
     return true;
 }
 
-static bool find_xbox_installation_path(PCWSTR family_name, char *out_dir, size_t out_dir_length)
+static bool find_gog_installation_path_rr(rerelease_mode_t rr_mode, char *out_dir, size_t out_dir_length)
 {
+    if (com_rerelease->integer != RERELEASE_MODE_YES)
+        return false;
+    return find_gog_installation_path(QUAKE_II_GOG_RERELEASE_APP_ID, out_dir, out_dir_length);
+}
+
+static bool find_gog_installation_path_classic(rerelease_mode_t rr_mode, char *out_dir, size_t out_dir_length)
+{
+    if (com_rerelease->integer != RERELEASE_MODE_NO)
+        return false;
+    return find_gog_installation_path(QUAKE_II_GOG_CLASSIC_APP_ID, out_dir, out_dir_length);
+}
+
 #ifdef XBOX_SUPPORT
+static bool find_xbox_installation_path(rerelease_mode_t rr_mode, char *out_dir, size_t out_dir_length)
+{
+    if (com_rerelease->integer != RERELEASE_MODE_YES)
+        return false;
     if (!IsWindows8Point1OrGreater())
         return false;
+
+    const PCWSTR family_name = QUAKE_II_XBOX_FAMILY_NAME;
 
     WCHAR buffer[MAX_PATH];
     PWSTR packageNames[1];
@@ -1384,32 +1436,19 @@ static bool find_xbox_installation_path(PCWSTR family_name, char *out_dir, size_
 
     WideCharToMultiByte(CP_ACP, 0, path, pathLength, out_dir, out_dir_length, NULL, NULL);
     return true;
+}
 #endif
 
-    return false;
-}
-
-/*
-================
-Sys_GetInstalledGamePath
-================
-*/
-bool Sys_GetInstalledGamePath(game_path_t path_type, char *path, size_t path_length)
-{
-    Q_strlcpy(path, "", path_length);
-    
-    if (path_type == GAME_PATH_STEAM) {
-        return find_steam_installation_path(path, path_length);
-    } else if (path_type == GAME_PATH_GOG_RERELEASE) {
-        return find_gog_installation_path(QUAKE_II_GOG_RERELEASE_APP_ID, path, path_length);
-    } else if (path_type == GAME_PATH_GOG_CLASSIC) {
-        return find_gog_installation_path(QUAKE_II_GOG_CLASSIC_APP_ID, path, path_length);
-    } else if (path_type == GAME_PATH_XBOX_RERELEASE) {
-        return find_xbox_installation_path(QUAKE_II_XBOX_FAMILY_NAME, path, path_length);
-    }
-
-    return false;
-}
+// Installation detection functions, called by FS_FindBaseDir in order
+const sys_getinstalledgamepath_func_t gamepath_funcs[] = {
+    &find_steam_installation_path,
+    &find_gog_installation_path_rr,
+#ifdef XBOX_SUPPORT
+    &find_xbox_installation_path,
+#endif
+    &find_gog_installation_path_classic,
+    NULL
+};
 
 /*
 ========================================================================

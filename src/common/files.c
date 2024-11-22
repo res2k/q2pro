@@ -3954,7 +3954,7 @@ static void FS_FindBaseDir(void)
 
     if (detect_base_dir) {
         // find Steam installation dir first
-        char client_dir[MAX_OSPATH];
+        char client_dir[MAX_OSPATH] = { 0 };
 
         if (Sys_GetInstalledGamePath(GAME_PATH_STEAM, client_dir, sizeof(client_dir))) {
 

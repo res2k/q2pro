@@ -1125,10 +1125,9 @@ static void shader_setup_3d(void)
         for (int n = 0; n < min(q_countof(gls.u_dlights.lights), glr.fd.num_dlights); n++) {
             const dlight_t *dl = &glr.fd.dlights[n];
 
-            // FIXME: cull cone if cone is specified
+            // FIXME: cull cone instead if cone is specified
             if (GL_CullSphere(dl->origin, dl->radius) == CULL_OUT)
                 continue;
-
 
             VectorCopy(dl->origin, gls.u_dlights.lights[i].position);
             gls.u_dlights.lights[i].radius = dl->radius;

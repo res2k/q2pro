@@ -85,11 +85,15 @@ void SCR_InitCinematics(void)
 {
     for (int i = 0; i < q_countof(formats); i++) {
         const avformat_t *f = &formats[i];
-        if (!av_find_input_format(f->fmt))
+        if (!av_find_input_format(f->fmt)) {
+            Com_DDPrintf("%s not supported: no input format\n", f->fmt);
             continue;
+        }
         if (f->codec_id != AV_CODEC_ID_NONE &&
-            !avcodec_find_decoder(f->codec_id))
+            !avcodec_find_decoder(f->codec_id)) {
+            Com_DDPrintf("%s not supported: no decoder for codec ID %i\n", f->fmt, f->codec_id);
             continue;
+        }
         supported |= BIT(i);
         if (*extensions)
             Q_strlcat(extensions, ";", sizeof(extensions));

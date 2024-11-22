@@ -358,10 +358,12 @@ static void GL_DrawSpriteModel(const model_t *model)
     GL_ArrayBits(GLA_VERTEX | GLA_TC);
     GL_Color(1, 1, 1, alpha);
 
-    VectorScale(glr.viewaxis[1], frame->origin_x, left);
-    VectorScale(glr.viewaxis[1], frame->origin_x - frame->width, right);
-    VectorScale(glr.viewaxis[2], -frame->origin_y, down);
-    VectorScale(glr.viewaxis[2], frame->height - frame->origin_y, up);
+    float scale = e->scale[0] ? e->scale[0] : 1.0f;
+
+    VectorScale(glr.viewaxis[1], frame->origin_x * scale, left);
+    VectorScale(glr.viewaxis[1], (frame->origin_x - frame->width) * scale, right);
+    VectorScale(glr.viewaxis[2], (-frame->origin_y) * scale, down);
+    VectorScale(glr.viewaxis[2], (frame->height - frame->origin_y) * scale, up);
 
     VectorAdd3(e->origin, down, left,  tess.vertices);
     VectorAdd3(e->origin, up,   left,  tess.vertices +  5);

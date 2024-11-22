@@ -3985,6 +3985,8 @@ static void FS_FindBaseDir(void)
             }
         } else if (com_rerelease->integer == RERELEASE_MODE_YES && Sys_GetInstalledGamePath(GAME_PATH_GOG_RERELEASE, client_dir, sizeof(client_dir))) {
             //
+        } else if (com_rerelease->integer == RERELEASE_MODE_YES && Sys_GetInstalledGamePath(GAME_PATH_XBOX_RERELEASE, client_dir, sizeof(client_dir))) {
+            //
         } else if (com_rerelease->integer == RERELEASE_MODE_NO && Sys_GetInstalledGamePath(GAME_PATH_GOG_CLASSIC, client_dir, sizeof(client_dir))) {
             //
         }

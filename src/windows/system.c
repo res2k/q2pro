@@ -27,6 +27,12 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <setjmp.h>
 #endif
 
+#if _MSC_VER >= 1943
+#define XBOX_SUPPORT
+#include <appmodel.h>
+#include <VersionHelpers.h>
+#endif
+
 HINSTANCE                       hGlobalInstance;
 
 #if USE_WINSVC
@@ -1193,6 +1199,7 @@ static void Sys_SkipVDFValue(const char **file_contents)
 #define QUAKE_II_STEAM_APP_ID           "2320"
 #define QUAKE_II_GOG_CLASSIC_APP_ID     "1441704824"
 #define QUAKE_II_GOG_RERELEASE_APP_ID   "1947927225"
+#define QUAKE_II_XBOX_FAMILY_NAME       L"BethesdaSoftworks.ProjAthena_3275kfvn8vcwc"
 
 static bool Sys_ParseAppsList(const char **file_contents)
 {
@@ -1353,6 +1360,31 @@ static bool Sys_CheckGOGInstallation(const char *app_id, char *out_dir, size_t o
     return true;
 }
 
+static bool Sys_CheckXboxInstallation(PCWSTR family_name, char *out_dir, size_t out_dir_length)
+{
+#ifdef XBOX_SUPPORT
+    WCHAR buffer[MAX_PATH];
+    PWSTR packageNames[1];
+    uint32_t num_packages = 1, buffer_length = MAX_PATH;
+    LONG result = GetPackagesByPackageFamily(family_name, &num_packages, packageNames, &buffer_length, buffer);
+
+    if (result)
+        return false;
+
+    WCHAR path[MAX_PATH];
+    uint32_t pathLength = MAX_PATH;
+    result = GetPackagePathByFullName(packageNames[0], &pathLength, path);
+    
+    if (result)
+        return false;
+
+    WideCharToMultiByte(CP_ACP, 0, path, pathLength, out_dir, out_dir_length, NULL, NULL);
+    return true;
+#endif
+
+    return false;
+}
+
 /*
 ================
 Sys_GetInstalledGamePath
@@ -1360,6 +1392,9 @@ Sys_GetInstalledGamePath
 */
 bool Sys_GetInstalledGamePath(game_path_t path_type, char *path, size_t path_length)
 {
+    if (!IsWindows8Point1OrGreater())
+        return false;
+
     Q_strlcpy(path, "", path_length);
     
     if (path_type == GAME_PATH_STEAM) {
@@ -1368,6 +1403,8 @@ bool Sys_GetInstalledGamePath(game_path_t path_type, char *path, size_t path_len
         return Sys_CheckGOGInstallation(QUAKE_II_GOG_RERELEASE_APP_ID, path, path_length);
     } else if (path_type == GAME_PATH_GOG_CLASSIC) {
         return Sys_CheckGOGInstallation(QUAKE_II_GOG_CLASSIC_APP_ID, path, path_length);
+    } else if (path_type == GAME_PATH_XBOX_RERELEASE) {
+        return Sys_CheckXboxInstallation(QUAKE_II_XBOX_FAMILY_NAME, path, path_length);
     }
 
     return false;

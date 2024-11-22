@@ -502,7 +502,7 @@ contents_t SV_PointContents(const vec3_t p)
     int         contents;
 
     // get base contents from world
-    contents = CM_PointContents(p, SV_WorldNodes());
+    contents = CM_PointContents(p, SV_WorldNodes(), svs.csr.extended);
 
     // or in contents from all the other entities
     num = SV_AreaEdicts(p, p, touch, q_countof(touch), AREA_SOLID, NULL, NULL);
@@ -512,7 +512,8 @@ contents_t SV_PointContents(const vec3_t p)
 
         // might intersect, so do an exact clip
         contents |= CM_TransformedPointContents(p, SV_HullForEntity(hit, false),
-                                                hit->s.origin, hit->s.angles);
+                                                hit->s.origin, hit->s.angles,
+                                                svs.csr.extended);
     }
 
     return contents;
@@ -579,7 +580,8 @@ static void SV_ClipMoveToEntities(trace_t *tr,
         // might intersect, so do an exact clip
         CM_TransformedBoxTrace(&trace, start, end, mins, maxs,
                                SV_HullForEntity(touch, false), contentmask,
-                               touch->s.origin, touch->s.angles);
+                               touch->s.origin, touch->s.angles,
+                               svs.csr.extended);
 
         CM_ClipEntity(tr, &trace, touch);
     }
@@ -605,7 +607,7 @@ trace_t q_gameabi SV_Trace(const vec3_t start, const vec3_t mins,
         maxs = vec3_origin;
 
     // clip to world
-    CM_BoxTrace(&trace, start, end, mins, maxs, SV_WorldNodes(), contentmask);
+    CM_BoxTrace(&trace, start, end, mins, maxs, SV_WorldNodes(), contentmask, svs.csr.extended);
     trace.ent = ge->edicts;
     if (trace.fraction == 0)
         return trace;   // blocked by the world
@@ -635,11 +637,12 @@ trace_t q_gameabi SV_Clip(const vec3_t start, const vec3_t mins,
         maxs = vec3_origin;
 
     if (clip == ge->edicts)
-        CM_BoxTrace(&trace, start, end, mins, maxs, SV_WorldNodes(), contentmask);
+        CM_BoxTrace(&trace, start, end, mins, maxs, SV_WorldNodes(), contentmask, svs.csr.extended);
     else
         CM_TransformedBoxTrace(&trace, start, end, mins, maxs,
                                SV_HullForEntity(clip, true), contentmask,
-                               clip->s.origin, clip->s.angles);
+                               clip->s.origin, clip->s.angles,
+                               svs.csr.extended);
     trace.ent = clip;
     return trace;
 }

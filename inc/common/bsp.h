@@ -157,7 +157,7 @@ typedef struct {
     struct mnode_s      *parent;
     /* <====== */
 
-    int             contents;
+    int             contents[2];    // 0 - original, 1 - merged
     int             cluster;
     int             area;
     int             numleafbrushes;

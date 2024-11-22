@@ -182,30 +182,6 @@ void CM_FreeMap(cm_t *cm)
     memset(cm, 0, sizeof(*cm));
 }
 
-// fixes a bug in old map compilers,
-// required for Kex PMove to work (ladders, etc)
-static void fix_incorrect_leaf_contents(cm_t *cm)
-{
-    int i, k;
-    int fixed = 0;
-
-    for (i = 0; i < cm->cache->numleafs; i++) {
-        mleaf_t *leaf = &cm->cache->leafs[i];
-        contents_t contents = 0;
-
-        for (k = 0; k < leaf->numleafbrushes; k++) {
-            contents |= leaf->firstleafbrush[k]->contents;
-        }
-
-        if ((contents | leaf->contents) != leaf->contents) {
-            fixed++;
-            leaf->contents |= contents;
-        }
-    }
-
-    Com_DPrintf("Fixed %i leaves with incorrect contents\n", fixed);
-}
-
 /*
 ==================
 CM_LoadMap
@@ -230,8 +206,6 @@ int CM_LoadMap(cm_t *cm, const char *name)
     cm->floodnums = Z_TagMallocz(sizeof(cm->floodnums[0]) * cm->cache->numareas, TAG_CMODEL);
     cm->portalopen = Z_TagMallocz(sizeof(cm->portalopen[0]) * cm->cache->numportals, TAG_CMODEL);
     FloodAreaConnections(cm);
-
-    fix_incorrect_leaf_contents(cm);
 
     return Q_ERR_SUCCESS;
 }
@@ -296,7 +270,7 @@ static void CM_InitBoxHull(void)
     box_brush.firstbrushside = &box_brushsides[0];
     box_brush.contents = CONTENTS_MONSTER;
 
-    box_leaf.contents = CONTENTS_MONSTER;
+    box_leaf.contents[0] = box_leaf.contents[1] = CONTENTS_MONSTER;
     box_leaf.firstleafbrush = &box_leafbrush;
     box_leaf.numleafbrushes = 1;
 
@@ -421,7 +395,8 @@ rotating entities
 ==================
 */
 int CM_TransformedPointContents(const vec3_t p, const mnode_t *headnode,
-                                const vec3_t origin, const vec3_t angles)
+                                const vec3_t origin, const vec3_t angles,
+                                bool extended)
 {
     vec3_t      p_l;
     vec3_t      axis[3];
@@ -438,7 +413,7 @@ int CM_TransformedPointContents(const vec3_t p, const mnode_t *headnode,
         RotatePoint(p_l, axis);
     }
 
-    return BSP_PointLeaf(headnode, p_l)->contents;
+    return BSP_PointLeaf(headnode, p_l)->contents[extended];
 }
 
 /*
@@ -459,6 +434,7 @@ static vec3_t   trace_extents;
 static trace_t  *trace_trace;
 static int      trace_contents;
 static bool     trace_ispoint;      // optimized case
+static bool     trace_extended;     // remaster fixes
 
 /*
 ================
@@ -552,7 +528,7 @@ static void CM_ClipBoxToBrush(const vec3_t p1, const vec3_t p2, trace_t *trace, 
         trace->startsolid = true;
         if (!getout) {
             trace->allsolid = true;
-            if (!map_allsolid_bug->integer) {
+            if (trace_extended || !map_allsolid_bug->integer) {
                 // original Q2 didn't set these
                 trace->fraction = 0;
                 trace->contents = brush->contents;
@@ -626,7 +602,7 @@ static void CM_TraceToLeaf(const mleaf_t *leaf)
     int         k;
     mbrush_t    *b, **leafbrush;
 
-    if (!(leaf->contents & trace_contents))
+    if (!(leaf->contents[trace_extended] & trace_contents))
         return;
     // trace line against all brushes in the leaf
     leafbrush = leaf->firstleafbrush;
@@ -654,7 +630,7 @@ static void CM_TestInLeaf(const mleaf_t *leaf)
     int         k;
     mbrush_t    *b, **leafbrush;
 
-    if (!(leaf->contents & trace_contents))
+    if (!(leaf->contents[trace_extended] & trace_contents))
         return;
     // trace line against all brushes in the leaf
     leafbrush = leaf->firstleafbrush;
@@ -771,7 +747,8 @@ CM_BoxTrace
 void CM_BoxTrace(trace_t *trace,
                  const vec3_t start, const vec3_t end,
                  const vec3_t mins, const vec3_t maxs,
-                 const mnode_t *headnode, int brushmask)
+                 const mnode_t *headnode, int brushmask,
+                 bool extended)
 {
     const vec_t *bounds[2] = { mins, maxs };
     int i, j;
@@ -788,6 +765,7 @@ void CM_BoxTrace(trace_t *trace,
         return;
 
     trace_contents = brushmask;
+    trace_extended = extended;
     VectorCopy(start, trace_start);
     VectorCopy(end, trace_end);
     for (i = 0; i < 8; i++)
@@ -853,7 +831,8 @@ void CM_TransformedBoxTrace(trace_t *trace,
                             const vec3_t start, const vec3_t end,
                             const vec3_t mins, const vec3_t maxs,
                             const mnode_t *headnode, int brushmask,
-                            const vec3_t origin, const vec3_t angles)
+                            const vec3_t origin, const vec3_t angles,
+                            bool extended)
 {
     vec3_t      start_l, end_l;
     vec3_t      axis[3];
@@ -872,15 +851,19 @@ void CM_TransformedBoxTrace(trace_t *trace,
     }
 
     // sweep the box through the model
-    CM_BoxTrace(trace, start_l, end_l, mins, maxs, headnode, brushmask);
+    CM_BoxTrace(trace, start_l, end_l, mins, maxs, headnode, brushmask, extended);
 
-    // rotate plane normal into the worlds frame of reference
-    if (rotated && trace->fraction != 1.0f) {
-        TransposeAxis(axis);
-        RotatePoint(trace->plane.normal, axis);
+    if (trace->fraction != 1.0f) {
+        // rotate plane normal into the worlds frame of reference
+        if (rotated) {
+            TransposeAxis(axis);
+            RotatePoint(trace->plane.normal, axis);
+        }
+
+        // offset plane distance
+        if (extended)
+            trace->plane.dist += DotProduct(trace->plane.normal, origin);
     }
-
-    // FIXME: offset plane distance?
 
     LerpVector(start, end, trace->fraction, trace->endpos);
 }

@@ -100,7 +100,8 @@ static void CL_ClipMoveToEntities(trace_t *tr, const vec3_t start, const vec3_t 
 
         CM_TransformedBoxTrace(&trace, start, end,
                                mins, maxs, headnode, contentmask,
-                               ent->current.origin, ent->current.angles);
+                               ent->current.origin, ent->current.angles,
+                               cl.csr.extended);
 
         CM_ClipEntity(tr, &trace, (struct edict_s *)ent);
     }
@@ -114,7 +115,7 @@ CL_Trace
 void CL_Trace(trace_t *tr, const vec3_t start, const vec3_t end, const vec3_t mins, const vec3_t maxs, const struct edict_s* passent, contents_t contentmask)
 {
     // check against world
-    CM_BoxTrace(tr, start, end, mins, maxs, cl.bsp->nodes, contentmask);
+    CM_BoxTrace(tr, start, end, mins, maxs, cl.bsp->nodes, contentmask, cl.csr.extended);
     tr->ent = (struct edict_s *)cl_entities;
     if (tr->fraction == 0)
         return;     // blocked by the world
@@ -139,7 +140,7 @@ static trace_t q_gameabi CL_Clip(const vec3_t start, const vec3_t mins, const ve
     if (!maxs)
         maxs = vec3_origin;
 
-    CM_BoxTrace(&trace, start, end, mins, maxs, cl.bsp->nodes, contentmask);
+    CM_BoxTrace(&trace, start, end, mins, maxs, cl.bsp->nodes, contentmask, cl.csr.extended);
     return trace;
 }
 
@@ -149,7 +150,7 @@ static contents_t CL_PointContents(const vec3_t point)
     const mmodel_t  *cmodel;
     int i, contents;
 
-    contents = CM_PointContents(point, cl.bsp->nodes);
+    contents = CM_PointContents(point, cl.bsp->nodes, cl.csr.extended);
 
     for (i = 0; i < cl.numSolidEntities; i++) {
         ent = cl.solidEntities[i];
@@ -161,37 +162,40 @@ static contents_t CL_PointContents(const vec3_t point)
         if (!cmodel)
             continue;
 
-        // Kex: mins/maxs check, required for certain
-        // weird bmodels that only have a single leaf
-        // and contain contents like SLIME. in Kex we
-        // also had a secondary fix because of func_train's
-        // that had SOLID on them but had no faces, but I think
-        // this block fixes both.
-        vec3_t pos_l;
+        if (cl.csr.extended) {
+	        // Kex: mins/maxs check, required for certain
+	        // weird bmodels that only have a single leaf
+	        // and contain contents like SLIME. in Kex we
+	        // also had a secondary fix because of func_train's
+	        // that had SOLID on them but had no faces, but I think
+	        // this block fixes both.
+	        vec3_t pos_l;
 
-        // subtract origin offset
-        VectorSubtract(point, ent->current.origin, pos_l);
+	        // subtract origin offset
+	        VectorSubtract(point, ent->current.origin, pos_l);
 
-        // rotate start and end into the models frame of reference
-        if (!VectorEmpty(ent->current.angles)) {
-            vec3_t angles, axis[3];
-            AnglesToAxis(angles, axis);
-            RotatePoint(pos_l, axis);
-        }
+	        // rotate start and end into the models frame of reference
+	        if (!VectorEmpty(ent->current.angles)) {
+	            vec3_t angles, axis[3];
+	            AnglesToAxis(angles, axis);
+	            RotatePoint(pos_l, axis);
+	        }
         
-        // see if the ent needs to be tested
-        if (pos_l[0] <= cmodel->mins[0] ||
-            pos_l[1] <= cmodel->mins[1] ||
-            pos_l[2] <= cmodel->mins[2] ||
-            pos_l[0] >= cmodel->maxs[0] ||
-            pos_l[1] >= cmodel->maxs[1] ||
-            pos_l[2] >= cmodel->maxs[2])
-            continue;
+	        // see if the ent needs to be tested
+	        if (pos_l[0] <= cmodel->mins[0] ||
+	            pos_l[1] <= cmodel->mins[1] ||
+	            pos_l[2] <= cmodel->mins[2] ||
+	            pos_l[0] >= cmodel->maxs[0] ||
+	            pos_l[1] >= cmodel->maxs[1] ||
+	            pos_l[2] >= cmodel->maxs[2])
+	            continue;
+        }
 
         contents |= CM_TransformedPointContents(
                         point, cmodel->headnode,
                         ent->current.origin,
-                        ent->current.angles);
+                        ent->current.angles,
+                        cl.csr.extended);
     }
 
     return contents;

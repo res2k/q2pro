@@ -828,6 +828,11 @@ void R_RenderFrame(const refdef_t *fd)
         GL_ShowErrors(__func__);
 }
 
+bool R_SupportsPerPixelLighting(void)
+{
+    return gl_backend->use_per_pixel_lighting();
+}
+
 void R_BeginFrame(void)
 {
     memset(&c, 0, sizeof(c));

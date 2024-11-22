@@ -155,8 +155,8 @@ static void legacy_color(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 static void legacy_load_matrix(GLenum mode, const GLfloat *matrix, const GLfloat *view)
 {
     qglMatrixMode(mode);
-    qglLoadMatrixf(matrix);
-    qglMultMatrixf(view);
+    qglLoadMatrixf(view);
+    qglMultMatrixf(matrix);
 }
 
 static void legacy_disable_state(void)
@@ -234,7 +234,7 @@ static void legacy_shutdown(void)
     }
 }
 
-static bool legacy_use_dlights(void)
+static bool legacy_use_per_pixel_lighting(void)
 {
     return false;
 }
@@ -255,5 +255,5 @@ const glbackend_t backend_legacy = {
     .tex_coord_pointer = legacy_tex_coord_pointer,
 
     .color = legacy_color,
-    .use_dlights = legacy_use_dlights
+    .use_per_pixel_lighting = legacy_use_per_pixel_lighting
 };

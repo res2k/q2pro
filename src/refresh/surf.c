@@ -240,7 +240,7 @@ static void update_dynamic_lightmap(mface_t *surf)
     add_light_styles(surf);
 
     // add all the dynamic lights
-    if (surf->dlightframe == glr.dlightframe && !gl_backend->use_dlights())
+    if (surf->dlightframe == glr.dlightframe && !gl_backend->use_per_pixel_lighting())
         add_dynamic_lights(surf);
     else
         surf->dlightframe = 0;
@@ -275,7 +275,7 @@ void GL_PushLights(mface_t *surf)
 
     // dynamic this frame or dynamic previously
     if (surf->dlightframe) {
-        if (!gl_backend->use_dlights())
+        if (!gl_backend->use_per_pixel_lighting())
             update_dynamic_lightmap(surf);
         return;
     }

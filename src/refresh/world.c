@@ -309,7 +309,7 @@ void GL_LightPoint(const vec3_t origin, vec3_t color)
         VectorSet(color, 1, 1, 1);
 
     // add dynamic lights
-    if (!gl_backend->use_dlights())
+    if (!gl_backend->use_per_pixel_lighting())
         GL_AddLights(origin, color);
 }
 
@@ -429,7 +429,7 @@ void GL_DrawBspModel(mmodel_t *model)
         VectorSubtract(glr.fd.vieworg, ent->origin, transformed);
     }
 
-    if (!gl_backend->use_dlights())
+    if (!gl_backend->use_per_pixel_lighting())
         GL_TransformLights(model);
 
     GL_RotateForEntity(gl_static.use_bmodel_skies);

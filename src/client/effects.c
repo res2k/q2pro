@@ -1854,7 +1854,7 @@ CL_AddShadowLights
 */
 void CL_AddShadowLights(void)
 {
-    if (!cl_shadowlights->integer)
+    if (!cl_shadowlights->integer || !R_SupportsPerPixelLighting())
         return;
 
     for (size_t i = 0; i < cl.csr.max_shadowlights; i++) {

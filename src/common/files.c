@@ -3992,8 +3992,7 @@ static void FS_FindBaseDir(void)
         }
 
         // Don't set an "empty" base dir, use defaults instead
-        if (*client_dir)
-        {
+        if (*client_dir) {
             Cvar_Set("basedir", client_dir);
             Cvar_Set("libdir", client_dir);
         }

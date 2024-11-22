@@ -263,5 +263,6 @@ void    R_EndFrame(void);
 void    R_ModeChanged(int width, int height, int flags);
 
 void    GL_ExpireDebugObjects(void);
+bool    R_SupportsPerPixelLighting(void);
 
 r_opengl_config_t R_GetGLConfig(void);

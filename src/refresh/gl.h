@@ -761,7 +761,7 @@ typedef struct {
 
     void (*color)(GLfloat r, GLfloat g, GLfloat b, GLfloat a);
 
-    bool (*use_dlights)(void);
+    bool (*use_per_pixel_lighting)(void);
 } glbackend_t;
 
 extern const glbackend_t *gl_backend;

@@ -821,8 +821,9 @@ static void CL_AddPacketEntities(void)
             vec3_t forward, start, end;
             trace_t trace;
             contents_t mask = CONTENTS_SOLID;
+            bool is_per_pixel = cl_shadowlights->integer && R_SupportsPerPixelLighting();
             
-            if (!cl_shadowlights->integer)
+            if (!is_per_pixel)
                 mask |= CONTENTS_MONSTER | CONTENTS_PLAYER;
 
             if (s1->number == cl.frame.clientNum + 1) {
@@ -831,14 +832,14 @@ static void CL_AddPacketEntities(void)
                 VectorCopy(cl.v_forward, forward);
             } else {
                 AngleVectors(ent.angles, forward, NULL, NULL);
-                float dist = cl_shadowlights->integer ? 1024 : 256;
+                float dist = is_per_pixel ? 1024 : 256;
                 VectorMA(ent.origin, dist, forward, end);
                 VectorCopy(ent.origin, start);
             }
 
             CL_Trace(&trace, start, end, vec3_origin, vec3_origin, NULL, mask);
 
-            if (cl_shadowlights->integer) {
+            if (is_per_pixel) {
                 cl_shadow_light_t light;
                 light.fade_end = light.fade_start = 0;
                 light.lightstyle = -1;

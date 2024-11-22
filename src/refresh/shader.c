@@ -1259,7 +1259,7 @@ static void shader_shutdown(void)
         qglDisable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 }
 
-static bool shader_use_dlights(void)
+static bool shader_use_per_pixel_lighting(void)
 {
     return !!gl_per_pixel_lighting->integer;
 }
@@ -1283,5 +1283,5 @@ const glbackend_t backend_shader = {
     .tex_coord_pointer = shader_tex_coord_pointer,
 
     .color = shader_color,
-    .use_dlights = shader_use_dlights
+    .use_per_pixel_lighting = shader_use_per_pixel_lighting
 };

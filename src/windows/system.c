@@ -1187,14 +1187,14 @@ GAME PATH DETECTION
 #define COM_ParseExpect(d, s) \
     !strcmp(COM_Parse((d)), (s))
 
-static void Sys_SkipVDFValue(const char **file_contents)
+static void skip_vdf_value(const char **file_contents)
 {
     char *value = COM_Parse(file_contents);
 
     if (!strcmp(value, "{")) {
         while (true) {
             COM_Parse(file_contents);
-            Sys_SkipVDFValue(file_contents);
+            skip_vdf_value(file_contents);
         }
     }
 }
@@ -1204,7 +1204,7 @@ static void Sys_SkipVDFValue(const char **file_contents)
 #define QUAKE_II_GOG_RERELEASE_APP_ID   "1947927225"
 #define QUAKE_II_XBOX_FAMILY_NAME       L"BethesdaSoftworks.ProjAthena_3275kfvn8vcwc"
 
-static bool Sys_ParseAppsList(const char **file_contents)
+static bool parse_vdf_apps_list(const char **file_contents)
 {
     if (!COM_ParseExpect(file_contents, "{")) {
         return false;
@@ -1229,7 +1229,7 @@ static bool Sys_ParseAppsList(const char **file_contents)
     return game_found;
 }
 
-static bool Sys_ParseLibraryVDF(const char **file_contents, char *out_dir, size_t out_dir_length)
+static bool parse_library_vdf(const char **file_contents, char *out_dir, size_t out_dir_length)
 {
     char library_path[MAX_OSPATH];
 
@@ -1241,20 +1241,20 @@ static bool Sys_ParseLibraryVDF(const char **file_contents, char *out_dir, size_
         } else if (!strcmp(key, "path")) {
             COM_ParseToken(file_contents, library_path, sizeof(library_path), PARSE_FLAG_ESCAPE);
         } else if (!strcmp(key, "apps")) {
-            if (Sys_ParseAppsList(file_contents)) {
+            if (parse_vdf_apps_list(file_contents)) {
                 Q_strlcat(library_path, "\\steamapps\\common\\Quake 2", sizeof(library_path));
                 Q_strlcpy(out_dir, library_path, out_dir_length);
                 return true;
             }
         } else {
-            Sys_SkipVDFValue(file_contents);
+            skip_vdf_value(file_contents);
         }
     }
 
     return false;
 }
 
-static bool Sys_ParseLibraryFoldersVDF(const char **file_contents, char *out_dir, size_t out_dir_length)
+static bool parse_vdf_libraryfolders(const char **file_contents, char *out_dir, size_t out_dir_length)
 {
     // parse library folders VDF
     if (!COM_ParseExpect(file_contents, "libraryfolders") ||
@@ -1275,7 +1275,7 @@ static bool Sys_ParseLibraryFoldersVDF(const char **file_contents, char *out_dir
             break;
         }
 
-        if (Sys_ParseLibraryVDF(file_contents, out_dir, out_dir_length)) {
+        if (parse_library_vdf(file_contents, out_dir, out_dir_length)) {
             return true;
         }
     }
@@ -1283,7 +1283,7 @@ static bool Sys_ParseLibraryFoldersVDF(const char **file_contents, char *out_dir
     return false;
 }
 
-static bool Sys_CheckSteamInstallation(char *out_dir, size_t out_dir_length)
+static bool find_steam_installation_path(char *out_dir, size_t out_dir_length)
 {
     // grab Steam installation path
     DWORD folder_path_len = MAX_OSPATH;
@@ -1306,9 +1306,8 @@ static bool Sys_CheckSteamInstallation(char *out_dir, size_t out_dir_length)
 
     FILE *libraryfolders = fopen(folder_path, "rb");
 
-    if (!libraryfolders) {
+    if (!libraryfolders)
         return result;
-    }
 
     fseek(libraryfolders, 0, SEEK_END);
     long len = ftell(libraryfolders);
@@ -1329,7 +1328,7 @@ static bool Sys_CheckSteamInstallation(char *out_dir, size_t out_dir_length)
 
     char *parse_contents = file_contents;
 
-    result = Sys_ParseLibraryFoldersVDF((const char **) &parse_contents, out_dir, out_dir_length);
+    result = parse_vdf_libraryfolders((const char **) &parse_contents, out_dir, out_dir_length);
 
     FS_NormalizePath(out_dir);
 
@@ -1338,9 +1337,8 @@ exit:
     return result;
 }
 
-static bool Sys_CheckGOGInstallation(const char *app_id, char *out_dir, size_t out_dir_length)
+static bool find_gog_installation_path(const char *app_id, char *out_dir, size_t out_dir_length)
 {
-    // grab Steam installation path
     DWORD folder_path_len = MAX_OSPATH;
     char folder_path[MAX_OSPATH];
     bool result = false;
@@ -1363,7 +1361,7 @@ static bool Sys_CheckGOGInstallation(const char *app_id, char *out_dir, size_t o
     return true;
 }
 
-static bool Sys_CheckXboxInstallation(PCWSTR family_name, char *out_dir, size_t out_dir_length)
+static bool find_xbox_installation_path(PCWSTR family_name, char *out_dir, size_t out_dir_length)
 {
 #ifdef XBOX_SUPPORT
     if (!IsWindows8Point1OrGreater())
@@ -1401,13 +1399,13 @@ bool Sys_GetInstalledGamePath(game_path_t path_type, char *path, size_t path_len
     Q_strlcpy(path, "", path_length);
     
     if (path_type == GAME_PATH_STEAM) {
-        return Sys_CheckSteamInstallation(path, path_length);
+        return find_steam_installation_path(path, path_length);
     } else if (path_type == GAME_PATH_GOG_RERELEASE) {
-        return Sys_CheckGOGInstallation(QUAKE_II_GOG_RERELEASE_APP_ID, path, path_length);
+        return find_gog_installation_path(QUAKE_II_GOG_RERELEASE_APP_ID, path, path_length);
     } else if (path_type == GAME_PATH_GOG_CLASSIC) {
-        return Sys_CheckGOGInstallation(QUAKE_II_GOG_CLASSIC_APP_ID, path, path_length);
+        return find_gog_installation_path(QUAKE_II_GOG_CLASSIC_APP_ID, path, path_length);
     } else if (path_type == GAME_PATH_XBOX_RERELEASE) {
-        return Sys_CheckXboxInstallation(QUAKE_II_XBOX_FAMILY_NAME, path, path_length);
+        return find_xbox_installation_path(QUAKE_II_XBOX_FAMILY_NAME, path, path_length);
     }
 
     return false;

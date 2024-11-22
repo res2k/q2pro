@@ -31,7 +31,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define XBOX_SUPPORT
 #include <appmodel.h>
 #include <VersionHelpers.h>
-#pragma message("Xbox support enabled");
+#pragma message("Xbox support enabled")
 #else
 #pragma message("No Xbox support")
 #endif

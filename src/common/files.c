@@ -3949,8 +3949,13 @@ static void FS_FindBaseDir(void)
     //static const char *defgame = "baseq2";
 
     // Don't try to detect the base directory if it was already explicitly specified
-    bool detect_base_dir = !strcmp(sys_basedir->string, sys_basedir->default_string) &&
-                           !strcmp(sys_libdir->string, sys_libdir->default_string);
+    bool detect_base_dir = !strcmp(sys_basedir->string, sys_basedir->default_string);
+    /* Only detect libdir on Windows:
+     * At least on Linux, a detected game directory probably contains a game .DLL, but no .SO,
+     * so we're better off using our own game .SOs from the default dir */
+#ifdef _WIN32
+    detect_base_dir &= !strcmp(sys_libdir->string, sys_libdir->default_string);
+#endif
 
     if (detect_base_dir) {
         // find Steam installation dir first
@@ -3965,7 +3970,9 @@ static void FS_FindBaseDir(void)
         // Don't set an "empty" base dir, use defaults instead
         if (*client_dir) {
             Cvar_Set("basedir", client_dir);
+        #ifdef _WIN32
             Cvar_Set("libdir", client_dir);
+        #endif
         }
     }
 

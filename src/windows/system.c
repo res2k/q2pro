@@ -20,6 +20,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/cvar.h"
 #include "common/field.h"
 #include "common/prompt.h"
+#include "common/steam.h"
 #include "shared/atomic.h"
 
 #if USE_WINSVC
@@ -1184,157 +1185,27 @@ GAME PATH DETECTION
 ========================================================================
 */
 
-#define COM_ParseExpect(d, s) \
-    !strcmp(COM_Parse((d)), (s))
-
-static void skip_vdf_value(const char **file_contents)
-{
-    char *value = COM_Parse(file_contents);
-
-    if (!strcmp(value, "{")) {
-        while (true) {
-            COM_Parse(file_contents);
-            skip_vdf_value(file_contents);
-        }
-    }
-}
-
-#define QUAKE_II_STEAM_APP_ID           "2320"
 #define QUAKE_II_GOG_CLASSIC_APP_ID     "1441704824"
 #define QUAKE_II_GOG_RERELEASE_APP_ID   "1947927225"
 #define QUAKE_II_XBOX_FAMILY_NAME       L"BethesdaSoftworks.ProjAthena_3275kfvn8vcwc"
 
-static bool parse_vdf_apps_list(const char **file_contents)
+bool Steam_GetInstallationPath(char *out_dir, size_t out_dir_length)
 {
-    if (!COM_ParseExpect(file_contents, "{")) {
-        return false;
-    }
+    DWORD path_length = out_dir_length;
 
-    bool game_found = false;
-
-    while (true) {
-        char *key = COM_Parse(file_contents);
-
-        if (!*key || !strcmp(key, "}")) {
-            return game_found;
-        }
-
-        COM_Parse(file_contents);
-
-        if (!strcmp(key, QUAKE_II_STEAM_APP_ID)) {
-            game_found = true;
-        }
-    }
-
-    return game_found;
-}
-
-static bool parse_library_vdf(const char **file_contents, char *out_dir, size_t out_dir_length)
-{
-    char library_path[MAX_OSPATH];
-
-    while (true) {
-        char *key = COM_Parse(file_contents);
-
-        if (!*key || !strcmp(key, "}")) {
-            return false;
-        } else if (!strcmp(key, "path")) {
-            COM_ParseToken(file_contents, library_path, sizeof(library_path), PARSE_FLAG_ESCAPE);
-        } else if (!strcmp(key, "apps")) {
-            if (parse_vdf_apps_list(file_contents)) {
-                Q_strlcat(library_path, "\\steamapps\\common\\Quake 2", sizeof(library_path));
-                Q_strlcpy(out_dir, library_path, out_dir_length);
-                return true;
-            }
-        } else {
-            skip_vdf_value(file_contents);
-        }
-    }
-
-    return false;
-}
-
-static bool parse_vdf_libraryfolders(const char **file_contents, char *out_dir, size_t out_dir_length)
-{
-    // parse library folders VDF
-    if (!COM_ParseExpect(file_contents, "libraryfolders") ||
-        !COM_ParseExpect(file_contents, "{")) {
-        return false;
-    }
-
-    while (true) {
-        char *token = COM_Parse(file_contents);
-
-        // done with folders
-        if (!*token || !strcmp(token, "}")) {
-            break;
-        }
-
-        // should be an integer; check the entrance of the folder
-        if (!COM_ParseExpect(file_contents, "{")) {
-            break;
-        }
-
-        if (parse_library_vdf(file_contents, out_dir, out_dir_length)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-static bool find_steam_installation_path(char *out_dir, size_t out_dir_length)
-{
-    // grab Steam installation path
-    DWORD folder_path_len = MAX_OSPATH;
-    char folder_path[MAX_OSPATH];
-    bool result = false;
-    
 #ifndef _WIN64
-    LSTATUS status = RegGetValueA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Valve\\Steam\\", "InstallPath", RRF_RT_REG_SZ, NULL, (PVOID) &folder_path, &folder_path_len);
+    LSTATUS status = RegGetValueA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Valve\\Steam\\", "InstallPath", RRF_RT_REG_SZ, NULL, (PVOID) out_dir, &path_length);
 #else
-    LSTATUS status = RegGetValueA(HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\Valve\\Steam\\", "InstallPath", RRF_RT_REG_SZ, NULL, (PVOID) &folder_path, &folder_path_len);
+    LSTATUS status = RegGetValueA(HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\Valve\\Steam\\", "InstallPath", RRF_RT_REG_SZ, NULL, (PVOID) out_dir, &path_length);
 #endif
 
     if (status != ERROR_SUCCESS) {
-        Com_WPrintf("Error %lu finding Steam installation.\n", GetLastError());
-        return result;
+        if (status != ERROR_FILE_NOT_FOUND) // ERROR_FILE_NOT_FOUND may just mean Steam's not installed
+            Com_WPrintf("Error %lu finding Steam installation.\n", GetLastError());
+        return false;
     }
 
-    // grab library folders file
-    Q_strlcat(folder_path, "\\steamapps\\libraryfolders.vdf", sizeof(folder_path));
-
-    FILE *libraryfolders = fopen(folder_path, "rb");
-
-    if (!libraryfolders)
-        return result;
-
-    fseek(libraryfolders, 0, SEEK_END);
-    long len = ftell(libraryfolders);
-    fseek(libraryfolders, 0, SEEK_SET);
-
-    char *file_contents = Z_Malloc(len + 1);
-    file_contents[len] = '\0';
-
-    size_t file_read = fread((void *) file_contents, 1, len, libraryfolders);
-
-    fclose(libraryfolders);
-
-    if (file_read != len) {
-        Com_EPrintf("Error %lu reading libraryfolders.vdf.\n", GetLastError());
-        result = false;
-        goto exit;
-    }
-
-    char *parse_contents = file_contents;
-
-    result = parse_vdf_libraryfolders((const char **) &parse_contents, out_dir, out_dir_length);
-
-    FS_NormalizePath(out_dir);
-
-exit:
-    Z_Free(file_contents);
-    return result;
+    return true;
 }
 
 static bool find_gog_installation_path(const char *app_id, char *out_dir, size_t out_dir_length)
@@ -1361,11 +1232,29 @@ static bool find_gog_installation_path(const char *app_id, char *out_dir, size_t
     return true;
 }
 
-static bool find_xbox_installation_path(PCWSTR family_name, char *out_dir, size_t out_dir_length)
+static bool find_gog_installation_path_rr(rerelease_mode_t rr_mode, char *out_dir, size_t out_dir_length)
 {
+    if (com_rerelease->integer != RERELEASE_MODE_YES)
+        return false;
+    return find_gog_installation_path(QUAKE_II_GOG_RERELEASE_APP_ID, out_dir, out_dir_length);
+}
+
+static bool find_gog_installation_path_classic(rerelease_mode_t rr_mode, char *out_dir, size_t out_dir_length)
+{
+    if (com_rerelease->integer != RERELEASE_MODE_NO)
+        return false;
+    return find_gog_installation_path(QUAKE_II_GOG_CLASSIC_APP_ID, out_dir, out_dir_length);
+}
+
 #ifdef XBOX_SUPPORT
+static bool find_xbox_installation_path(rerelease_mode_t rr_mode, char *out_dir, size_t out_dir_length)
+{
+    if (com_rerelease->integer != RERELEASE_MODE_YES)
+        return false;
     if (!IsWindows8Point1OrGreater())
         return false;
+
+    const PCWSTR family_name = QUAKE_II_XBOX_FAMILY_NAME;
 
     WCHAR buffer[MAX_PATH];
     PWSTR packageNames[1];
@@ -1384,32 +1273,19 @@ static bool find_xbox_installation_path(PCWSTR family_name, char *out_dir, size_
 
     WideCharToMultiByte(CP_ACP, 0, path, pathLength, out_dir, out_dir_length, NULL, NULL);
     return true;
+}
 #endif
 
-    return false;
-}
-
-/*
-================
-Sys_GetInstalledGamePath
-================
-*/
-bool Sys_GetInstalledGamePath(game_path_t path_type, char *path, size_t path_length)
-{
-    Q_strlcpy(path, "", path_length);
-    
-    if (path_type == GAME_PATH_STEAM) {
-        return find_steam_installation_path(path, path_length);
-    } else if (path_type == GAME_PATH_GOG_RERELEASE) {
-        return find_gog_installation_path(QUAKE_II_GOG_RERELEASE_APP_ID, path, path_length);
-    } else if (path_type == GAME_PATH_GOG_CLASSIC) {
-        return find_gog_installation_path(QUAKE_II_GOG_CLASSIC_APP_ID, path, path_length);
-    } else if (path_type == GAME_PATH_XBOX_RERELEASE) {
-        return find_xbox_installation_path(QUAKE_II_XBOX_FAMILY_NAME, path, path_length);
-    }
-
-    return false;
-}
+// Installation detection functions, called by FS_FindBaseDir in order
+const sys_getinstalledgamepath_func_t gamepath_funcs[] = {
+    &Steam_FindQuake2Path,
+    &find_gog_installation_path_rr,
+#ifdef XBOX_SUPPORT
+    &find_xbox_installation_path,
+#endif
+    &find_gog_installation_path_classic,
+    NULL
+};
 
 /*
 ========================================================================

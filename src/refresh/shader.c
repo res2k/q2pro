@@ -1096,6 +1096,20 @@ static inline float fade_distance_to_light(const dlight_t *dl)
     return 1.0f - smoothstep(min_frag_dist, 1.0f, frac_to_end);
 }
 
+static void cone_to_bounding_sphere(vec3_t origin, vec3_t forward, float size, float angle_radians, float c, float s, vec4_t out)
+{
+    if(angle_radians > M_PI/4.0f)
+    {
+        VectorMA(origin, c * size, forward, out);
+        out[3]   = s * size;
+    }
+    else
+    {
+        VectorMA(origin, size / (2.0f * c), forward, out);
+        out[3]   = size / (2.0f * c);
+    }
+}
+
 static void shader_setup_3d(void)
 {
     gls.u_block.time = glr.fd.time;
@@ -1124,10 +1138,25 @@ static void shader_setup_3d(void)
 
         for (int n = 0; n < min(q_countof(gls.u_dlights.lights), glr.fd.num_dlights); n++) {
             const dlight_t *dl = &glr.fd.dlights[n];
+            float cone_radians, cone_cos, cone_sin;
 
-            // FIXME: cull cone instead if cone is specified
-            if (GL_CullSphere(dl->origin, dl->radius) == CULL_OUT)
-                continue;
+            if (dl->cone[3]) {
+                cone_radians = DEG2RAD(dl->cone[3]);
+                cone_cos = cosf(cone_radians);
+                cone_sin = sinf(cone_radians);
+
+                vec4_t sphere;
+
+                // this is kinda dumb but it's a quick way
+                // to cull a spotlight in a frustum
+                cone_to_bounding_sphere(dl->origin, dl->cone, dl->radius, cone_radians, cone_cos, cone_sin, sphere);
+
+                if (GL_CullSphere(sphere, sphere[3]) == CULL_OUT)
+                    continue;
+            } else {
+                if (GL_CullSphere(dl->origin, dl->radius) == CULL_OUT)
+                    continue;
+            }
 
             VectorCopy(dl->origin, gls.u_dlights.lights[i].position);
             gls.u_dlights.lights[i].radius = dl->radius;
@@ -1135,7 +1164,7 @@ static void shader_setup_3d(void)
             gls.u_dlights.lights[i].color[3] = dl->intensity * fade_distance_to_light(dl);
             if (dl->cone[3]) {
                 VectorCopy(dl->cone, gls.u_dlights.lights[i].cone);
-                gls.u_dlights.lights[i].cone[3] = cosf(DEG2RAD(dl->cone[3]));
+                gls.u_dlights.lights[i].cone[3] = cone_cos;
             } else {
                 gls.u_dlights.lights[i].cone[3] = 0.0f;
             }

@@ -1325,12 +1325,9 @@ static void Nav_UpdateConditionalNode(nav_node_t *node)
     }
 
     if (node->flags & NodeFlag_CheckHasFloor) {
-        vec3_t flat_mins, flat_maxs;
-        flat_mins[0] = mins[0];
-        flat_mins[1] = mins[1];
-        flat_maxs[0] = maxs[0];
-        flat_maxs[1] = maxs[1];
-        flat_mins[2] = flat_maxs[2] = 0.f;
+        vec3_t flat_mins = { 0 }, flat_maxs = { 0 };
+        Vector2Copy(mins, flat_mins);
+        Vector2Copy(maxs, flat_maxs);
 
         vec3_t floor_end;
         VectorCopy(origin, floor_end);
@@ -1376,13 +1373,20 @@ static void Nav_SetupEntities(void)
 
             if (!game_e->inuse)
                 continue;
-            else if (game_e->solid != SOLID_TRIGGER && game_e->solid != SOLID_BSP)
+
+            if (game_e->s.modelindex != e->model)
                 continue;
 
-            if (game_e->s.modelindex == e->model) {
-                e->game_edict = game_e;
-                break;
-            }
+            // only map-spawned entities
+            if (!game_e->sv.classname || !*game_e->sv.classname)
+                continue;
+
+            if (Q_strncasecmp(game_e->sv.classname, "func_", 5) &&
+                Q_strncasecmp(game_e->sv.classname, "trigger_", 8))
+                Com_WPrintf("Nav entity %i (of type %s) might not be safe as an entity\n", i, game_e->sv.classname);
+
+            e->game_edict = game_e;
+            break;
         }
 
         if (!e->game_edict)

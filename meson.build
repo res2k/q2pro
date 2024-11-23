@@ -34,6 +34,7 @@ common_src = [
   'src/common/prompt.c',
   'src/common/q2proto_shared.c',
   'src/common/sizebuf.c',
+  'src/common/steam.c',
   'src/common/utils.c',
   'src/common/zone.c',
   'src/common/features.h',
@@ -96,6 +97,7 @@ common_src = [
   'inc/common/prompt.h',
   'inc/common/protocol.h',
   'inc/common/sizebuf.h',
+  'inc/common/steam.h',
   'inc/common/tests.h',
   'inc/common/utils.h',
   'inc/common/zone.h',
@@ -311,6 +313,7 @@ bindir = '.'
 datadir = '.'
 libdir = '.'
 homedir = ''
+default_prefix = ''
 
 system_wide = not win32 and get_option('system-wide')
 if system_wide
@@ -318,6 +321,8 @@ if system_wide
   datadir = get_option('prefix') / get_option('datadir') / meson.project_name()
   libdir = get_option('prefix') / get_option('libdir') / meson.project_name()
   homedir = get_option('homedir')
+else
+  default_prefix = get_option('prefix')
 endif
 
 common_args = ['-DHAVE_CONFIG_H', '-DQ2PROTO_CONFIG_H="common/q2proto_config.h"']
@@ -687,6 +692,9 @@ if not win32
   config.set_quoted('DATADIR',    datadir)
   config.set_quoted('LIBDIR',     libdir)
   config.set_quoted('HOMEDIR',    homedir)
+  if default_prefix != ''
+    config.set_quoted('DEFAULT_PREFIX', default_prefix)
+  endif
 endif
 config.set_quoted('R_TEXTURE_FORMATS', ' '.join(texture_formats))
 config.set_quoted('VID_GEOMETRY', get_option('vid-geometry'))

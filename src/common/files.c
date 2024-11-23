@@ -3949,52 +3949,30 @@ static void FS_FindBaseDir(void)
     //static const char *defgame = "baseq2";
 
     // Don't try to detect the base directory if it was already explicitly specified
-    bool detect_base_dir = !strcmp(sys_basedir->string, sys_basedir->default_string) &&
-                           !strcmp(sys_libdir->string, sys_libdir->default_string);
+    bool detect_base_dir = !strcmp(sys_basedir->string, sys_basedir->default_string);
+    /* Only detect libdir on Windows:
+     * At least on Linux, a detected game directory probably contains a game .DLL, but no .SO,
+     * so we're better off using our own game .SOs from the default dir */
+#ifdef _WIN32
+    detect_base_dir &= !strcmp(sys_libdir->string, sys_libdir->default_string);
+#endif
 
     if (detect_base_dir) {
         // find Steam installation dir first
         char client_dir[MAX_OSPATH] = { 0 };
 
-        if (Sys_GetInstalledGamePath(GAME_PATH_STEAM, client_dir, sizeof(client_dir))) {
-
-            // found Steam dir - see if the mode we want is available
-            listfiles_t list = {
-                .flags = FS_SEARCH_DIRSONLY,
-                .baselen = strlen(client_dir) + 1,
-            };
-
-            Sys_ListFiles_r(&list, client_dir, 0);
-
-            bool has_rerelease = false;
-
-            for (int i = 0; i < list.count; i++) {
-                char *s = list.files[i];
-
-                if (!Q_stricmp(s, "rerelease")) {
-                    has_rerelease = true;
-                }
-
-                Z_Free(s);
-            }
-
-            Z_Free(list.files);
-
-            if (com_rerelease->integer == RERELEASE_MODE_YES && has_rerelease) {
-                Q_strlcat(client_dir, PATH_SEP_STRING "rerelease", sizeof(client_dir));
-            }
-        } else if (com_rerelease->integer == RERELEASE_MODE_YES && Sys_GetInstalledGamePath(GAME_PATH_GOG_RERELEASE, client_dir, sizeof(client_dir))) {
-            //
-        } else if (com_rerelease->integer == RERELEASE_MODE_YES && Sys_GetInstalledGamePath(GAME_PATH_XBOX_RERELEASE, client_dir, sizeof(client_dir))) {
-            //
-        } else if (com_rerelease->integer == RERELEASE_MODE_NO && Sys_GetInstalledGamePath(GAME_PATH_GOG_CLASSIC, client_dir, sizeof(client_dir))) {
-            //
+        const sys_getinstalledgamepath_func_t *gamepath_func = gamepath_funcs;
+        while (*gamepath_func && !(*gamepath_func)(com_rerelease->integer, client_dir, sizeof(client_dir)))
+        {
+            gamepath_func++;
         }
 
         // Don't set an "empty" base dir, use defaults instead
         if (*client_dir) {
             Cvar_Set("basedir", client_dir);
+        #ifdef _WIN32
             Cvar_Set("libdir", client_dir);
+        #endif
         }
     }
 

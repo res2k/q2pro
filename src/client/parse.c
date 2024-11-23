@@ -948,8 +948,11 @@ static void CL_ParsePrint(const q2proto_svc_print_t *print)
     SHOWNET(2, "    %i \"%s\"\n", level, Com_MakePrintable(s));
 
     if (level != PRINT_CHAT) {
-        if (cl.csr.extended && (level == PRINT_TYPEWRITER || level == PRINT_CENTER))
+        if (cl.csr.extended && (level == PRINT_TYPEWRITER || level == PRINT_CENTER)) {
+            Con_SkipNotify(true);
             cgame->ParseCenterPrint(s, 0, level == PRINT_CENTER);
+            Con_SkipNotify(false);
+        }
         else
             Com_Printf("%s", s);
         if (!cls.demo.playback && cl.serverstate != ss_broadcast) {

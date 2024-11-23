@@ -59,6 +59,7 @@ cvar_t  *cl_disable_particles;
 cvar_t  *cl_disable_explosions;
 cvar_t  *cl_dlight_hacks;
 
+cvar_t  *cl_cgame_notify;
 cvar_t  *cl_chat_notify;
 cvar_t  *cl_chat_sound;
 cvar_t  *cl_chat_filter;
@@ -2784,6 +2785,7 @@ static void CL_InitLocal(void)
     cl_updaterate->changed = cl_updaterate_changed;
 #endif
 
+    cl_cgame_notify = Cvar_Get("cl_cgame_notify", "1", 0);
     cl_chat_notify = Cvar_Get("cl_chat_notify", "1", 0);
     cl_chat_sound = Cvar_Get("cl_chat_sound", "1", 0);
     cl_chat_sound->changed = cl_chat_sound_changed;

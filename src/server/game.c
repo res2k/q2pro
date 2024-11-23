@@ -159,7 +159,7 @@ Sends text to all active clients.
 Archived in MVD stream.
 =================
 */
-static void PF_Broadcast_Print(int level, const char *msg)
+void PF_Broadcast_Print(int level, const char *msg)
 {
     char        string[MAX_STRING_CHARS];
     client_t    *client;
@@ -782,15 +782,42 @@ static bool PF_GetPathToGoal(const PathRequest* request, PathInfo* info)
     return result.returnCode < PathReturnCode_StartPathErrors;
 }
 
+#define SAY_CMD_RESULT      "invalid game command \"say\"\n"
+#define SAY_CMD_HASH        558
+#define SAY_TEAM_CMD_RESULT "invalid game command \"say_team\"\n"
+#define SAY_TEAM_CMD_HASH   909
+
 static void PF_Loc_Print(edict_t* ent, int level, const char* base, const char** args, size_t num_args)
 {
     /* FIXME - actually support localization & perform formatting.
      * Also, the rerelease game docs call this "The new primary entry point for printing." and
      * "This function replaces all of the others (except Com_Print).",
-     * suggesting all other print functions should be wrappers of this one. */
+     * suggesting all other print functions should be wrappers of this one.
+     * Other things that need fixing:
+       - PRINT_TTS is just PRINT_HIGH with text to speech
+       - BROADCAST can support any type, but it doesn't support NO_NOTIFY
+       - NO_NOTIFY is just sent as a bit which is used to not print it on notify.
+         the code is there in the client now, just needs hooked up here.
+       - the client is supposed to translate `##P<n>` to player names. This
+         isn't required to be done on the client side here, since we aren't
+         supporting censoring. ##P0 translates to player 0's configstring name,
+         etc etc. It only occurs for BROADCAST prints.
+     */
 
     char string[MAX_STRING_CHARS];
     Loc_Localize(base, true, args, num_args, string, sizeof(string));
+    
+    // HACK: check for missing "say/say_team"
+    if (ent && svs.scan_for_say_cmd) {
+        size_t h = Com_HashString(string, MAX_STRING_CHARS);
+
+        if ((h == SAY_CMD_HASH && !Q_strcasecmp(string, SAY_CMD_RESULT)) ||
+            (h == SAY_TEAM_CMD_HASH && !Q_strcasecmp(string, SAY_TEAM_CMD_RESULT))) {
+            svs.server_supplied_say = true;
+            Com_DPrintf("Server-supplied `say`/`say_team` enabled\n");
+            return;
+        }
+    }
 
     if (level & PRINT_BROADCAST) {
         int broadcast_level = level & ~(PRINT_BROADCAST | PRINT_NO_NOTIFY);

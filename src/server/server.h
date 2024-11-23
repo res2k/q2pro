@@ -493,6 +493,10 @@ typedef struct {
     challenge_t     challenges[MAX_CHALLENGES]; // to prevent invalid IPs from connecting
 
     q2proto_server_info_t server_info;
+
+    // if true, we will scan for if the game DLL is a re-release
+    // DLL that is meant for Playfab.
+    bool            scan_for_say_cmd, scanned_for_say_cmd, server_supplied_say;
 } server_static_t;
 
 //=============================================================================

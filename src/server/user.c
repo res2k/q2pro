@@ -871,6 +871,19 @@ static void handle_filtercmd(const filtercmd_t *filter)
         SV_DropClient(sv_client, "?was kicked");
 }
 
+void PF_Broadcast_Print(int level, const char *msg);
+
+/*
+==================
+SV_StubbedSayCommand
+==================
+*/
+static void SV_StubbedSayCommand(client_t *sender, bool is_team)
+{
+    // FIXME: make this better
+    PF_Broadcast_Print(PRINT_CHAT, va("%s: %s\n", sender->name, Cmd_Args()));
+}
+
 /*
 ==================
 SV_ExecuteUserCommand
@@ -912,12 +925,30 @@ static void SV_ExecuteUserCommand(const char *s)
         }
     }
 
+    bool is_say = false;
+
     if (!strcmp(c, "say") || !strcmp(c, "say_team")) {
         // don't timeout. only chat commands count as activity.
         sv_client->lastactivity = svs.realtime;
+        is_say = true;
+
+        if (svs.csr.extended) {
+            if (!svs.server_supplied_say && !svs.scanned_for_say_cmd) {
+                svs.scan_for_say_cmd = true;
+                svs.scanned_for_say_cmd = true;
+            }
+        }
     }
 
-    ge->ClientCommand(sv_player);
+    if (is_say && !svs.server_supplied_say)
+        ge->ClientCommand(sv_player);
+
+    svs.scan_for_say_cmd = false;
+    
+    if (is_say && svs.server_supplied_say)
+        // `say`/`say_team` isn't handled by the game code
+        // so we have to basically make our own version of it.
+        SV_StubbedSayCommand(sv_client, strcmp(c, "say_team") == 0);
 }
 
 /*

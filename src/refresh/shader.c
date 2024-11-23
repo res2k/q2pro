@@ -1138,7 +1138,7 @@ static void shader_setup_3d(void)
 
         for (int n = 0; n < min(q_countof(gls.u_dlights.lights), glr.fd.num_dlights); n++) {
             const dlight_t *dl = &glr.fd.dlights[n];
-            float cone_radians, cone_cos, cone_sin;
+            float cone_radians, cone_cos = 0.0f, cone_sin;
 
             if (dl->cone[3]) {
                 cone_radians = DEG2RAD(dl->cone[3]);
@@ -1164,10 +1164,8 @@ static void shader_setup_3d(void)
             gls.u_dlights.lights[i].color[3] = dl->intensity * fade_distance_to_light(dl);
             if (dl->cone[3]) {
                 VectorCopy(dl->cone, gls.u_dlights.lights[i].cone);
-                gls.u_dlights.lights[i].cone[3] = cone_cos;
-            } else {
-                gls.u_dlights.lights[i].cone[3] = 0.0f;
             }
+            gls.u_dlights.lights[i].cone[3] = cone_cos;
 
             i++;
         }

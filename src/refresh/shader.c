@@ -1096,7 +1096,7 @@ static inline float fade_distance_to_light(const dlight_t *dl)
     return 1.0f - smoothstep(min_frag_dist, 1.0f, frac_to_end);
 }
 
-static void cone_to_bounding_sphere(vec3_t origin, vec3_t forward, float size, float angle_radians, float c, float s, vec4_t out)
+static void cone_to_bounding_sphere(const vec3_t origin, const vec3_t forward, float size, float angle_radians, float c, float s, vec4_t out)
 {
     if(angle_radians > M_PI/4.0f)
     {

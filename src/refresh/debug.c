@@ -87,6 +87,7 @@ void R_AddDebugLine(const vec3_t start, const vec3_t end, color_t color, uint32_
                 if (R_DebugTimeExpired(l->time)) {
                     List_Remove(&l->entry);
                     List_Insert(&debug_lines_free, &l->entry);
+                    break;
                 }
             }
         }
@@ -354,6 +355,7 @@ static void R_AddDebugTextInternal(const vec3_t origin, const vec3_t angles, con
                 if (R_DebugTimeExpired(t->time)) {
                     List_Remove(&t->entry);
                     List_Insert(&debug_texts_free, &t->entry);
+                    break;
                 }
             }
         }

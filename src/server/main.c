@@ -2104,7 +2104,7 @@ void SV_Init(void)
     Cvar_Get("protocol", STRINGIFY(PROTOCOL_VERSION_DEFAULT), CVAR_SERVERINFO | CVAR_ROM);
 
     Cvar_Get("skill", "1", CVAR_LATCH);
-    Cvar_Get("deathmatch", "0", CVAR_SERVERINFO | CVAR_LATCH);
+    Cvar_Get("deathmatch", COM_DEDICATED ? "1" : "0", CVAR_SERVERINFO | CVAR_LATCH);
     Cvar_Get("coop", "0", /*CVAR_SERVERINFO|*/CVAR_LATCH);
     Cvar_Get("cheats", "0", CVAR_SERVERINFO | CVAR_LATCH);
     Cvar_Get("dmflags", va("%i", DF_INSTANT_ITEMS), CVAR_SERVERINFO);

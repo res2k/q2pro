@@ -1184,104 +1184,10 @@ GAME PATH DETECTION
 ========================================================================
 */
 
-#define COM_ParseExpect(d, s) \
-    !strcmp(COM_Parse((d)), (s))
-
-static void skip_vdf_value(const char **file_contents)
-{
-    char *value = COM_Parse(file_contents);
-
-    if (!strcmp(value, "{")) {
-        while (true) {
-            COM_Parse(file_contents);
-            skip_vdf_value(file_contents);
-        }
-    }
-}
-
 #define QUAKE_II_STEAM_APP_ID           "2320"
 #define QUAKE_II_GOG_CLASSIC_APP_ID     "1441704824"
 #define QUAKE_II_GOG_RERELEASE_APP_ID   "1947927225"
 #define QUAKE_II_XBOX_FAMILY_NAME       L"BethesdaSoftworks.ProjAthena_3275kfvn8vcwc"
-
-static bool parse_vdf_apps_list(const char **file_contents)
-{
-    if (!COM_ParseExpect(file_contents, "{")) {
-        return false;
-    }
-
-    bool game_found = false;
-
-    while (true) {
-        char *key = COM_Parse(file_contents);
-
-        if (!*key || !strcmp(key, "}")) {
-            return game_found;
-        }
-
-        COM_Parse(file_contents);
-
-        if (!strcmp(key, QUAKE_II_STEAM_APP_ID)) {
-            game_found = true;
-        }
-    }
-
-    return game_found;
-}
-
-static bool parse_library_vdf(const char **file_contents, char *out_dir, size_t out_dir_length)
-{
-    char library_path[MAX_OSPATH];
-
-    while (true) {
-        char *key = COM_Parse(file_contents);
-
-        if (!*key || !strcmp(key, "}")) {
-            return false;
-        } else if (!strcmp(key, "path")) {
-            COM_ParseToken(file_contents, library_path, sizeof(library_path), PARSE_FLAG_ESCAPE);
-        } else if (!strcmp(key, "apps")) {
-            if (parse_vdf_apps_list(file_contents)) {
-                Q_strlcat(library_path, "\\steamapps\\common\\Quake 2", sizeof(library_path));
-                Q_strlcpy(out_dir, library_path, out_dir_length);
-                return true;
-            }
-        } else {
-            skip_vdf_value(file_contents);
-        }
-    }
-
-    return false;
-}
-
-static bool parse_vdf_libraryfolders(const char **file_contents, char *out_dir, size_t out_dir_length)
-{
-    // parse library folders VDF
-    if (!COM_ParseExpect(file_contents, "libraryfolders") ||
-        !COM_ParseExpect(file_contents, "{")) {
-        return false;
-    }
-
-    while (true) {
-        char *token = COM_Parse(file_contents);
-
-        // done with folders
-        if (!*token || !strcmp(token, "}")) {
-            break;
-        }
-
-        // should be an integer; check the entrance of the folder
-        if (!COM_ParseExpect(file_contents, "{")) {
-            break;
-        }
-
-        if (parse_library_vdf(file_contents, out_dir, out_dir_length)) {
-            return true;
-        }
-    }
-
-    return false;
-}
 
 static bool find_steam_installation_base(char *out_dir, size_t out_dir_length)
 {

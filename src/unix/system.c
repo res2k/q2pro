@@ -21,6 +21,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "common/common.h"
 #include "common/cvar.h"
 #include "common/files.h"
+#include "common/steam.h"
 #if USE_REF
 #include "client/video.h"
 #endif
@@ -434,6 +435,56 @@ void Sys_ListFiles_r(listfiles_t *list, const char *path, int depth)
 /*
 ========================================================================
 
+STEAM INSTALL
+
+========================================================================
+*/
+
+static char* home_expand(const char *dir)
+{
+    char *s = getenv("HOME");
+    if (!s) return NULL;
+    return strdup(va("%s/%s", s, dir));
+}
+
+bool Steam_GetInstallationPath(char *out_dir, size_t out_dir_length)
+{
+    bool result = false;
+
+    char* check_paths[] = 
+    {
+        // FIXME: What should have precedence? I don't know!
+        home_expand(".var/app/com.valvesoftware.Steam/data/Steam"), // FlatPak install
+        home_expand(".steam/root"), // local installation
+    };
+
+    for(int i = 0; i < q_countof(check_paths); i++)
+    {
+        Com_DPrintf("Looking for Steam in %s\n", check_paths[i]);
+
+        Q_STATBUF st;
+
+        if (os_stat(check_paths[i], &st) == -1)
+            continue;
+
+        if (Q_ISDIR(st.st_mode))
+        {
+            Q_strlcpy(out_dir, check_paths[i], out_dir_length);
+            result = true;
+            goto cleanup;
+        }
+    }
+
+cleanup:
+    for(int i = 0; i < q_countof(check_paths); i++)
+        free(check_paths[i]);
+
+    return result;
+}
+
+/*
+========================================================================
+
 GAME PATH DETECTION
 
 ========================================================================
@@ -477,6 +528,7 @@ static bool find_system_installation_path(rerelease_mode_t rr_mode, char *out_di
 #endif
 
 const sys_getinstalledgamepath_func_t gamepath_funcs[] = {
+    &Steam_FindQuake2Path,
 #if defined(DEFAULT_PREFIX)
     &find_system_installation_path,
 #endif

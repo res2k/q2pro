@@ -439,7 +439,47 @@ GAME PATH DETECTION
 ========================================================================
 */
 
+#if defined(DEFAULT_PREFIX)
+
+static const char* check_paths_classic[] = {
+    DEFAULT_PREFIX "/share/q2pro",
+    // TODO: consider other default data locations
+    NULL
+    };
+static const char* check_paths_rr[] = {
+    DEFAULT_PREFIX "/share/q2repro",
+    NULL
+    };
+
+static bool find_system_installation_path(rerelease_mode_t rr_mode, char *out_dir, size_t out_dir_length)
+{
+    const char** check_paths = rr_mode == RERELEASE_MODE_YES ? check_paths_rr : check_paths_classic;
+
+    while(*check_paths)
+    {
+        const char* path = *check_paths++;
+        Com_DPrintf("Checking for installation: %s\n", path);
+
+        Q_STATBUF st;
+
+        if (os_stat(path, &st) == -1)
+            continue;
+
+        if (Q_ISDIR(st.st_mode))
+        {
+            Q_strlcpy(out_dir, path, out_dir_length);
+            return true;
+        }
+    }
+
+    return false;
+}
+#endif
+
 const sys_getinstalledgamepath_func_t gamepath_funcs[] = {
+#if defined(DEFAULT_PREFIX)
+    &find_system_installation_path,
+#endif
     NULL
 };
 

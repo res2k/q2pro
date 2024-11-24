@@ -1186,7 +1186,7 @@ static void Nav_RenderLink(const nav_node_t *node, int node_id, const vec3_t nod
 {
     const vec3_t e = { link->target->origin[0], link->target->origin[1], link->target->origin[2] + 24.f };
 
-    if (link->edict)
+    if (link->edict && link->edict->game_edict)
         Nav_RenderLinkEdict(node_origin, e, link->edict);
             
     const byte *target_bits = nav_data.node_link_bitmap + (nav_data.node_link_bitmap_size * link->target->id);

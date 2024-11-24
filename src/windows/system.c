@@ -28,18 +28,11 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include <setjmp.h>
 #endif
 
-#if _MSC_VER >= 1930
-#define XBOX_SUPPORT
-#include <appmodel.h>
-#include <VersionHelpers.h>
-#pragma message("Xbox support enabled")
-#else
-#pragma message("No Xbox support")
-#endif
-
 #if defined(_WIN32)
+#include <appmodel.h>
 #include <knownfolders.h>
 #include <shlobj.h>
+#include <versionhelpers.h>
 #endif
 
 HINSTANCE                       hGlobalInstance;
@@ -1251,7 +1244,6 @@ static bool find_gog_installation_path_classic(rerelease_mode_t rr_mode, char *o
     return find_gog_installation_path(QUAKE_II_GOG_CLASSIC_APP_ID, out_dir, out_dir_length);
 }
 
-#ifdef XBOX_SUPPORT
 static bool find_xbox_installation_path(rerelease_mode_t rr_mode, char *out_dir, size_t out_dir_length)
 {
     if (com_rerelease->integer != RERELEASE_MODE_YES)
@@ -1279,15 +1271,12 @@ static bool find_xbox_installation_path(rerelease_mode_t rr_mode, char *out_dir,
     WideCharToMultiByte(CP_ACP, 0, path, pathLength, out_dir, out_dir_length, NULL, NULL);
     return true;
 }
-#endif
 
 // Installation detection functions, called by FS_FindBaseDir in order
 const sys_getinstalledgamepath_func_t gamepath_funcs[] = {
     &Steam_FindQuake2Path,
     &find_gog_installation_path_rr,
-#ifdef XBOX_SUPPORT
     &find_xbox_installation_path,
-#endif
     &find_gog_installation_path_classic,
     NULL
 };

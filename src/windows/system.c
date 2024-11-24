@@ -37,6 +37,11 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #pragma message("No Xbox support")
 #endif
 
+#if defined(_WIN32)
+#include <knownfolders.h>
+#include <shlobj.h>
+#endif
+
 HINSTANCE                       hGlobalInstance;
 
 #if USE_WINSVC
@@ -1286,6 +1291,33 @@ const sys_getinstalledgamepath_func_t gamepath_funcs[] = {
     &find_gog_installation_path_classic,
     NULL
 };
+
+// Locate rerelease home dir
+bool Sys_GetRereleaseHomeDir(char *path, size_t path_length)
+{
+    bool result = false;
+    PWSTR saved_games_path = NULL;
+    HRESULT hr = SHGetKnownFolderPath(&FOLDERID_SavedGames, KF_FLAG_CREATE | KF_FLAG_INIT, NULL, &saved_games_path);
+    if (!SUCCEEDED(hr))
+    {
+        Com_WPrintf("Failed to retrieve Saved Games path (%.8lx)\n", (long)hr);
+        goto done;
+    }
+
+    if (WideCharToMultiByte(CP_UTF8, 0, saved_games_path, -1, path, (int)path_length, NULL, NULL) == 0)
+    {
+        DWORD err = GetLastError();
+        Com_WPrintf("Failed to convert Saved Games path (%lu)\n", err);
+        goto done;
+    }
+
+    Q_strlcat(path, "\\NightDive Studios\\Quake II", path_length);
+    result = true;
+
+done:
+    CoTaskMemFree(saved_games_path);
+    return result;
+}
 
 /*
 ========================================================================

@@ -3980,7 +3980,7 @@ static void FS_FindBaseDir(void)
 #ifdef _WIN32
     if (com_rerelease->integer == RERELEASE_MODE_YES) {
         char homedir[MAX_OSPATH];
-        if (ExpandEnvironmentStringsA("%userprofile%\\Saved Games\\NightDive Studios\\Quake II", homedir, sizeof(homedir) - 2)) {
+        if (Sys_GetRereleaseHomeDir(homedir, sizeof(homedir) - 2)) {
             FS_NormalizePath(homedir);
             Cvar_Set("homedir", homedir);
         }

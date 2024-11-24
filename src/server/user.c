@@ -940,7 +940,7 @@ static void SV_ExecuteUserCommand(const char *s)
         }
     }
 
-    if (is_say && !svs.server_supplied_say)
+    if (!is_say || !svs.server_supplied_say)
         ge->ClientCommand(sv_player);
 
     svs.scan_for_say_cmd = false;

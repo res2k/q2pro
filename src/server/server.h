@@ -779,6 +779,8 @@ void SV_InitGameProgs(void);
 void SV_ShutdownGameProgs(void);
 
 void PF_Pmove(void *pm);
+// TODO: remove this prototype
+void PF_Broadcast_Print(int level, const char *msg);
 
 //
 // sv_save.c

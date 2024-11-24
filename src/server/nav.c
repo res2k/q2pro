@@ -1076,23 +1076,201 @@ static void Nav_GetNodeTraceOrigin(const nav_node_t *node, vec3_t origin)
 const float NavFloorDistance = 96.0f;
 
 #if USE_REF
-static void Nav_Debug(void)
+static struct {
+    nav_node_flags_t    flag;
+    const char          *text;
+} flags_to_text[] = {
+    { NodeFlag_Disabled, "DISABLED\n\n" },
+    { NodeFlag_Teleporter, "TELEPORTER\n" },
+    { NodeFlag_Pusher, "PUSHER\n" },
+    { NodeFlag_Elevator, "ELEVATOR\n" },
+    { NodeFlag_Ladder, "LADDER\n" },
+    { NodeFlag_UnderWater, "UNDERWATER\n" },
+    { NodeFlag_CheckForHazard, "CHECK HAZARD\n" },
+    { NodeFlag_CheckHasFloor, "CHECK FLOOR\n" },
+    { NodeFlag_CheckInSolid, "CHECK SOLID\n" },
+    { NodeFlag_NoMonsters, "NO MOBS\n" },
+    { NodeFlag_Crouch, "CROUCH\n" },
+    { NodeFlag_NoPOI, "NO POI\n" },
+    { NodeFlag_CheckInLiquid, "CHECK LIQUID\n" },
+    { NodeFlag_CheckDoorLinks, "CHECK DOORS\n" },
+};
+
+static const char *Nav_NodeFlagsToString(nav_node_flags_t flags)
 {
-    if (!nav_debug->integer) {
+    // although it's very unlikely that a node will have
+    // all flags, 256 covers all of the strings in the list.
+    static char node_text_buffer[256];
+    *node_text_buffer = 0;
+
+    for (size_t i = 0; i < q_countof(flags_to_text); i++)
+        if (flags & flags_to_text[i].flag)
+            Q_strlcat(node_text_buffer, flags_to_text[i].text, sizeof(node_text_buffer));
+
+    return node_text_buffer;
+}
+
+static inline void Nav_GetCurveControlPoint(const vec3_t a, const vec3_t b, vec3_t c)
+{
+    if (a[2] > b[2]) {
+        VectorCopy(b, c);
+        c[2] = a[2];
+    } else {
+        VectorCopy(a, c);
+        c[2] = b[2];
+    }
+}
+
+// just to reduce verbosity at call sites
+static inline void Nav_AddDebugLine(const vec3_t s, const vec3_t e, const color_t c)
+{
+    R_AddDebugLine(s, e, c, SV_FRAMETIME, true);
+}
+static inline void Nav_AddDebugArrow(const vec3_t s, const vec3_t e, const color_t lc, const color_t ac)
+{
+    R_AddDebugArrow(s, e, 8.0f, lc, ac, SV_FRAMETIME, true);
+}
+static inline void Nav_AddDebugCurveArrow(const vec3_t s, const vec3_t c, const vec3_t e, const color_t lc, const color_t ac)
+{
+    R_AddDebugCurveArrow(s, c, e, 8.0f, lc, ac, SV_FRAMETIME, true);
+}
+static inline void Nav_AddDebugCircle(const vec3_t o, const float r, const color_t c)
+{
+    R_AddDebugCircle(o, r, c, SV_FRAMETIME, true);
+}
+static inline void Nav_AddDebugBounds(const vec3_t min, const vec3_t max, const color_t c)
+{
+    R_AddDebugBounds(min, max, c, SV_FRAMETIME, true);
+}
+static inline void Nav_AddDebugText(const vec3_t o, const vec3_t a, const char *t, float s, color_t c)
+{
+    R_AddDebugText(o, a, t, s, c, SV_FRAMETIME, true);
+}
+
+static void Nav_RenderLinkEdict(const vec3_t start, const vec3_t end, const nav_edict_t *edict)
+{
+    // draw entity link a bit above the line
+    static const vec3_t u = { 0.f, 0.f, 1.f };
+    vec3_t e;
+    LerpVector(start, end, 0.5f, e);
+    VectorMA(e, 24.f, u, e);
+    
+    R_AddDebugLine(start, e, COLOR_BLUE, SV_FRAMETIME, true);
+    R_AddDebugLine(end, e, COLOR_BLUE, SV_FRAMETIME, true);
+    R_AddDebugSphere(e, 8.0f, COLOR_RED, SV_FRAMETIME, true);
+
+    vec3_t d;
+    VectorSubtract(glr.fd.vieworg, e, d);
+    VectorNormalize(d);
+
+    if (DotProduct(d, glr.viewaxis[0]) < -0.99f) {
+        
+        vec3_t org;
+
+        for (int i = 0; i < 3; i++)
+            org[i] = (e[i] < edict->game_edict->absmin[i]) ? edict->game_edict->absmin[i] :
+                     (e[i] > edict->game_edict->absmax[i]) ? edict->game_edict->absmax[i] :
+                      e[i];
+
+        R_AddDebugLine(org, e, COLOR_GREEN, SV_FRAMETIME, false);
+        R_AddDebugBounds(edict->game_edict->absmin, edict->game_edict->absmax, COLOR_GREEN, SV_FRAMETIME, false);
+    }
+    
+    e[2] += 16.f;
+    R_AddDebugText(e, NULL, va("entity %i\nmodel %i\nclassname %s", 
+        edict->game_edict->s.number, edict->game_edict->s.modelindex, edict->game_edict->sv.classname ? edict->game_edict->sv.classname : "!noclass!"),
+        0.25f, COLOR_YELLOW, SV_FRAMETIME, false);
+}
+
+static void Nav_RenderLink(const nav_node_t *node, int node_id, const vec3_t node_origin, const nav_link_t *link, uint8_t alpha)
+{
+    const vec3_t e = { link->target->origin[0], link->target->origin[1], link->target->origin[2] + 24.f };
+
+    if (link->edict)
+        Nav_RenderLinkEdict(node_origin, e, link->edict);
+            
+    const byte *target_bits = nav_data.node_link_bitmap + (nav_data.node_link_bitmap_size * link->target->id);
+    bool link_disabled = ((node->flags | link->target->flags) & NodeFlag_Disabled);
+    uint8_t link_alpha = link_disabled ? (alpha * 0.5f) : alpha;
+            
+    color_t line_color = COLOR_SETA_U8(link_disabled ? COLOR_RED : COLOR_WHITE, link_alpha);
+    color_t traversal_color = COLOR_SETA_U8(link_disabled ? COLOR_RED : COLOR_BLUE, link_alpha);
+    color_t arrow_color = COLOR_SETA_U8(COLOR_RED, link_alpha);
+    color_t one_way_line_color = COLOR_SETA_U8(link_disabled ? COLOR_RED : COLOR_CYAN, link_alpha);
+    
+    vec3_t ctrl;
+
+    if (link->traversal)
+        Nav_GetCurveControlPoint(node_origin, e, ctrl);
+
+    if (Q_IsBitSet(target_bits, node_id)) {
+        // two-way link
+        if (node_id < link->target->id)
+            return;
+
+        const nav_link_t *other_link = Nav_GetLink(link->target, node);
+
+        Q_assert(other_link);
+                
+        // simple link
+        if (!link->traversal && !other_link->traversal) {
+            Nav_AddDebugLine(node_origin, e, line_color);
+            return;
+        }
+
+        // one or both are traversals
+        // render a->b
+        if (!link->traversal) {
+            Nav_AddDebugArrow(node_origin, e, line_color, arrow_color);
+        } else {
+            Nav_AddDebugCurveArrow(node_origin, ctrl, e, traversal_color, arrow_color);
+        }
+
+        // render b->a
+        if (other_link->traversal) {
+            if (!link->traversal)
+                Nav_GetCurveControlPoint(node_origin, e, ctrl);
+
+            // raise the other side's points slightly
+            ctrl[2] += 32.f;
+
+            Nav_AddDebugCurveArrow((const vec3_t) {
+                e[0], e[1], e[2] + 32.f
+            }, ctrl, (const vec3_t) {
+                node_origin[0], node_origin[1], node_origin[2] + 32.f
+            }, traversal_color, arrow_color);
+
+            return;
+        }
+
+        Nav_AddDebugArrow(e, node_origin, line_color, arrow_color);
         return;
     }
 
+    // one-way link
+    if (link->traversal) {
+        Nav_AddDebugCurveArrow(node_origin, ctrl, e, traversal_color, arrow_color);
+        return;
+    }
+
+    Nav_AddDebugArrow(node_origin, e, one_way_line_color, arrow_color);
+}
+
+static void Nav_Debug(void)
+{
+    if (!nav_debug->integer)
+        return;
+
     for (int i = 0; i < nav_data.num_nodes; i++) {
         const nav_node_t *node = &nav_data.nodes[i];
-        float len = VectorDistance(node->origin, glr.fd.vieworg);
+        const float len = VectorDistance(node->origin, glr.fd.vieworg);
 
-        if (len > nav_debug_range->value) {
+        if (len > nav_debug_range->value)
             continue;
-        }
 
-        uint8_t alpha = Q_clipf((1.0f - ((len - 32.f) / (nav_debug_range->value - 32.f))), 0.0f, 1.0f) * 255.f;
+        const uint8_t alpha = Q_clipf((1.0f - ((len - 32.f) / (nav_debug_range->value - 32.f))), 0.0f, 1.0f) * 255.f;
 
-        R_AddDebugCircle(node->origin, node->radius, COLOR_SETA_U8(COLOR_CYAN, alpha), SV_FRAMETIME, true);
+        Nav_AddDebugCircle(node->origin, node->radius, COLOR_SETA_U8(COLOR_CYAN, alpha));
 
         vec3_t mins, maxs, origin;
         Nav_GetNodeBounds(node, mins, maxs);
@@ -1101,159 +1279,34 @@ static void Nav_Debug(void)
         VectorAdd(mins, origin, mins);
         VectorAdd(maxs, origin, maxs);
 
-        R_AddDebugBounds(mins, maxs, COLOR_SETA_U8((node->flags & NodeFlag_Disabled) ? COLOR_RED : COLOR_YELLOW, alpha), SV_FRAMETIME, true);
+        Nav_AddDebugBounds(mins, maxs, COLOR_SETA_U8((node->flags & NodeFlag_Disabled) ? COLOR_RED : COLOR_YELLOW, alpha));
 
         if (node->flags & NodeFlag_CheckHasFloor) {
             vec3_t floormins, floormaxs;
             VectorCopy(mins, floormins);
             VectorCopy(maxs, floormaxs);
 
-            float mins_z = floormins[2];
+            const float mins_z = floormins[2];
             floormins[2] = origin[2] - NavFloorDistance;
             floormaxs[2] = mins_z;
 
-            R_AddDebugBounds(floormins, floormaxs, COLOR_SETA_U8(COLOR_RED, alpha * 0.5f), SV_FRAMETIME, true);
+            Nav_AddDebugBounds(floormins, floormaxs, COLOR_SETA_U8(COLOR_RED, alpha * 0.5f));
         }
 
-        vec3_t s;
-        VectorCopy(node->origin, s);
-        s[2] += 24;
+        const vec3_t s = { node->origin[0], node->origin[1], node->origin[2] + 24.f };
 
-        R_AddDebugLine(node->origin, s, COLOR_SETA_U8(COLOR_CYAN, alpha), SV_FRAMETIME, true);
+        Nav_AddDebugLine(node->origin, s, COLOR_SETA_U8(COLOR_CYAN, alpha));
 
-        vec3_t t;
-        VectorCopy(node->origin, t);
-        t[2] += 64;
+        vec3_t t = { node->origin[0], node->origin[1], node->origin[2] + 64.f };
 
-        R_AddDebugText(t, NULL, va("%td", node - nav_data.nodes), 0.25f, COLOR_SETA_U8(COLOR_CYAN, alpha), SV_FRAMETIME, true);
+        Nav_AddDebugText(t, NULL, va("%td", node - nav_data.nodes), 0.25f, COLOR_SETA_U8(COLOR_CYAN, alpha));
 
         t[2] -= 18;
 
-        static char node_text_buffer[128];
-        *node_text_buffer = 0;
+        R_AddDebugText(t, NULL, Nav_NodeFlagsToString(node->flags), 0.1f, COLOR_SETA_U8(COLOR_GREEN, alpha), SV_FRAMETIME, false);
         
-        if (node->flags & NodeFlag_Disabled)
-            Q_strlcat(node_text_buffer, "DISABLED\n\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_Teleporter)
-            Q_strlcat(node_text_buffer, "TELEPORTER\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_Pusher)
-            Q_strlcat(node_text_buffer, "PUSHER\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_Elevator)
-            Q_strlcat(node_text_buffer, "ELEVATOR\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_Ladder)
-            Q_strlcat(node_text_buffer, "LADDER\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_UnderWater)
-            Q_strlcat(node_text_buffer, "UNDERWATER\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_CheckForHazard)
-            Q_strlcat(node_text_buffer, "CHECK HAZARD\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_CheckHasFloor)
-            Q_strlcat(node_text_buffer, "CHECK FLOOR\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_CheckInSolid)
-            Q_strlcat(node_text_buffer, "CHECK SOLID\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_NoMonsters)
-            Q_strlcat(node_text_buffer, "NO MOBS\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_Crouch)
-            Q_strlcat(node_text_buffer, "CROUCH\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_NoPOI)
-            Q_strlcat(node_text_buffer, "NO POI\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_CheckInLiquid)
-            Q_strlcat(node_text_buffer, "CHECK LIQUID\n", sizeof(node_text_buffer));
-        if (node->flags & NodeFlag_CheckDoorLinks)
-            Q_strlcat(node_text_buffer, "CHECK DOORS\n", sizeof(node_text_buffer));
-
-        if (*node_text_buffer)
-            R_AddDebugText(t, NULL, node_text_buffer, 0.1f, COLOR_SETA_U8(COLOR_GREEN, alpha), SV_FRAMETIME, true);
-        
-        for (const nav_link_t *link = node->links; link != node->links + node->num_links; link++) {
-            vec3_t e;
-            VectorCopy(link->target->origin, e);
-            e[2] += 24;
-
-            const byte *target_bits = nav_data.node_link_bitmap + (nav_data.node_link_bitmap_size * link->target->id);
-            bool link_disabled = ((node->flags | link->target->flags) & NodeFlag_Disabled);
-            uint8_t link_alpha = link_disabled ? (alpha * 0.5f) : alpha;
-            
-            color_t line_color = COLOR_SETA_U8(link_disabled ? COLOR_RED : COLOR_WHITE, link_alpha);
-            color_t traversal_color = COLOR_SETA_U8(link_disabled ? COLOR_RED : COLOR_BLUE, link_alpha);
-            color_t arrow_color = COLOR_SETA_U8(COLOR_RED, link_alpha);
-            color_t one_way_line_color = COLOR_SETA_U8(link_disabled ? COLOR_RED : COLOR_CYAN, link_alpha);
-
-            if (Q_IsBitSet(target_bits, i)) {
-                // two-way link
-                if (i < link->target->id) {
-                    continue;
-                }
-
-                const nav_link_t *other_link = Nav_GetLink(link->target, node);
-
-                Q_assert(other_link);
-                
-                // simple link
-                if (!link->traversal && !other_link->traversal) {
-                    R_AddDebugLine(s, e, line_color, SV_FRAMETIME, true);
-                } else {
-                    // one or both are traversals
-                    // render a->b
-                    if (!link->traversal) {
-                        R_AddDebugArrow(s, e, 8.0f, line_color, arrow_color, SV_FRAMETIME, true);
-                    } else {
-                        vec3_t ctrl;
-
-                        if (s[2] > e[2]) {
-                            VectorCopy(e, ctrl);
-                            ctrl[2] = s[2];
-                        } else {
-                            VectorCopy(s, ctrl);
-                            ctrl[2] = e[2];
-                        }
-
-                        R_AddDebugCurveArrow(s, ctrl, e, 8.0f, traversal_color, arrow_color, SV_FRAMETIME, true);
-                    }
-
-                    // render b->a
-                    if (!other_link->traversal) {
-                        R_AddDebugArrow(e, s, 8.0f, line_color, arrow_color, SV_FRAMETIME, true);
-                    } else {
-                        vec3_t ctrl;
-
-                        if (s[2] > e[2]) {
-                            VectorCopy(e, ctrl);
-                            ctrl[2] = s[2];
-                        } else {
-                            VectorCopy(s, ctrl);
-                            ctrl[2] = e[2];
-                        }
-
-                        // raise the other side's points slightly
-                        s[2] += 32.f;
-                        ctrl[2] += 32.f;
-                        e[2] += 32.f;
-
-                        R_AddDebugCurveArrow(e, ctrl, s, 8.0f, traversal_color, arrow_color, SV_FRAMETIME, true);
-
-                        s[2] -= 32.f;
-                        e[2] -= 32.f;
-                    }
-                }
-            } else {
-                // one-way link
-                if (link->traversal) {
-                    vec3_t ctrl;
-
-                    if (s[2] > e[2]) {
-                        VectorCopy(e, ctrl);
-                        ctrl[2] = s[2];
-                    } else {
-                        VectorCopy(s, ctrl);
-                        ctrl[2] = e[2];
-                    }
-
-                    R_AddDebugCurveArrow(s, ctrl, e, 8.0f, traversal_color, arrow_color, SV_FRAMETIME, true);
-                } else {
-                    R_AddDebugArrow(s, e, 8.0f, one_way_line_color, arrow_color, SV_FRAMETIME, true);
-                }
-            }
-        }
+        for (const nav_link_t *link = node->links; link != node->links + node->num_links; link++)
+            Nav_RenderLink(node, i, s, link, alpha);
     }
 
 }

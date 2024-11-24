@@ -392,6 +392,9 @@ void R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text,
     vec3_t down, pos, up;
     const char *s, *p;
 
+    if (!text || !*text)
+        return;
+
     if (!angles) {
         R_AddDebugTextInternal(origin, angles, text, strlen(text), size, color, time, depth_test);
         return;

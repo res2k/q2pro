@@ -725,17 +725,23 @@ void R_RenderFrame(const refdef_t *fd)
     glr.fd = *fd;
     glr.num_beams = glr.num_flares   = 0;
     glr.fog_bits  = glr.fog_bits_sky = 0;
+    glr.ppl_bits  = 0;
 
     if (gl_dynamic->integer != 1 || gl_vertexlight->integer)
         glr.fd.num_dlights = 0;
 
-    if (gl_static.use_shaders && gl_fog->integer > 0) {
-        if (glr.fd.fog.density > 0)
-            glr.fog_bits |= GLS_FOG_GLOBAL;
-        if (glr.fd.heightfog.density > 0 && glr.fd.heightfog.falloff > 0)
-            glr.fog_bits |= GLS_FOG_HEIGHT;
-        if (glr.fd.fog.sky_factor > 0)
-            glr.fog_bits_sky |= GLS_FOG_SKY;
+    if (gl_static.use_shaders) {
+        if (gl_fog->integer > 0) {
+            if (glr.fd.fog.density > 0)
+                glr.fog_bits |= GLS_FOG_GLOBAL;
+            if (glr.fd.heightfog.density > 0 && glr.fd.heightfog.falloff > 0)
+                glr.fog_bits |= GLS_FOG_HEIGHT;
+            if (glr.fd.fog.sky_factor > 0)
+                glr.fog_bits_sky |= GLS_FOG_SKY;
+        }
+
+        if (gl_per_pixel_lighting->integer > 0)
+            glr.ppl_bits |= GLS_DYNAMIC_LIGHTS;
     }
 
     if (lm.dirty) {
@@ -1233,6 +1239,12 @@ static void Draw_Stats_s(void)
     SCR_StatKeyValuei("Uniform uploads", c.uniformUploads);
     SCR_StatKeyValuei("Array binds", c.vertexArrayBinds);
     SCR_StatKeyValuei("Occl. queries", c.occlusionQueries);
+    SCR_StatKeyValuei("Total dlights", c.dlightsTotal);
+    SCR_StatKeyValuei("Used dlights", c.dlightsUsed);
+    SCR_StatKeyValuei("Dlights entculled", c.dlightsNotUsed);
+    SCR_StatKeyValuei("Dlight uploads", c.dlightUploads);
+    SCR_StatKeyValuei("Dlight frustum culled", c.dlightsCulled);
+    SCR_StatKeyValuei("Dlight pre-culled", c.dlightsEntCulled);
 }
 
 /*

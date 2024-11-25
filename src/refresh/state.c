@@ -263,6 +263,9 @@ void GL_Setup3D(void)
     // enable depth writes before clearing
     GL_StateBits(GLS_DEFAULT);
 
+    // clear both wanted & active dlight bits
+    gls.dlight_bits = glr.ppl_dlight_bits = 0;
+
     qglClear(GL_DEPTH_BUFFER_BIT | gl_static.stencil_buffer_bit);
 }
 

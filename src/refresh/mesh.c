@@ -433,7 +433,7 @@ static void uniform_mesh_color(float r, float g, float b, float a)
         GL_Color(r, g, b, a);
     } else {
         Vector4Set(gls.u_block.mesh.color, r, g, b, a);
-        gls.u_block_dirtybits |= GLU_BLOCK;
+        gls.u_block_dirty = true;
     }
 }
 
@@ -688,7 +688,7 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
         qglColorMask(1, 1, 1, 1);
     }
 
-    state = GLS_INTENSITY_ENABLE | glr.fog_bits | GLS_DYNAMIC_LIGHTS;
+    state = GLS_INTENSITY_ENABLE | glr.fog_bits;
     if (!gls.currentva)
         state |= meshbits;
     else if (dotshading)
@@ -707,8 +707,8 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
             state |= GLS_BLOOM_SHELL;
     }
 
-    if (state & GLS_MESH_SHELL)
-        state &= ~GLS_DYNAMIC_LIGHTS;
+    if (!(state & GLS_MESH_SHELL) && glr.ppl_dlight_bits)
+        state |= glr.ppl_bits;
 
     GL_StateBits(state);
 
@@ -946,6 +946,49 @@ static void setup_weaponmodel(void)
     GL_Frustum(fov_x, fov_y, reflect_x);
 }
 
+static void cone_to_bounding_sphere(const vec3_t origin, const vec3_t forward, float size, float angle_radians, float c, float s, vec4_t out)
+{
+    if(angle_radians > M_PI/4.0f)
+    {
+        VectorMA(origin, c * size, forward, out);
+        out[3]   = s * size;
+    }
+    else
+    {
+        VectorMA(origin, size / (2.0f * c), forward, out);
+        out[3]   = size / (2.0f * c);
+    }
+}
+
+static bool test_sphere_sphere(const vec4_t a, const vec4_t b)
+{
+    const float sd = DistanceSquared(a, b);
+
+    const float r = (a[3] + b[3]) * (a[3] + b[3]);
+
+    return sd <= r;
+}
+
+// figure out which lights are going to affect
+// the current mesh.
+static void setup_lights(void)
+{
+    glr.ppl_dlight_bits = 0;
+
+    const vec4_t ent_sphere = { glr.ent->origin[0], glr.ent->origin[1], glr.ent->origin[2], m_model->frames[newframenum].radius };
+
+    for (int i = 0; i < glr.fd.num_dlights; i++) {
+        const dlight_t *dl = &glr.fd.dlights[i];
+
+        if (!test_sphere_sphere(dl->sphere, ent_sphere)) {
+            c.dlightsEntCulled++;
+            continue;
+        }
+
+        glr.ppl_dlight_bits |= 1 << i;
+    }
+}
+
 void GL_DrawAliasModel(const model_t *model)
 {
     m_model = model;
@@ -1059,6 +1102,10 @@ void GL_DrawAliasModel(const model_t *model)
 
     if (ent->flags & RF_DEPTHHACK)
         GL_DepthRange(0, 0.25f);
+
+    // set up lights
+    if (drawshadow != SHADOW_ONLY)
+        setup_lights();
 
     // draw all the meshes
 #if USE_MD5

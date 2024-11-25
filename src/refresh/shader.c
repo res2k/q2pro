@@ -109,7 +109,7 @@ static void write_block(sizebuf_t *buf, glStateBits_t bits)
         vec4 u_heightfog_end;
         float u_heightfog_density;
         float u_heightfog_falloff;
-        int num_dlights;
+        float pad_5;
         float pad_4;
         vec4 u_vieworg;
     )
@@ -131,6 +131,10 @@ static void write_dynamic_light_block(sizebuf_t *buf)
     GLSF("layout(std140) uniform DynamicLights {\n");
     GLSF("#define MAX_DLIGHTS " STRINGIFY(MAX_DLIGHTS) "\n");
     GLSL(
+        int             num_dlights;
+        int             dpad_1;
+        int             dpad_2;
+        int             dpad_3;
         dlight_t        dlights[MAX_DLIGHTS];
     )
     GLSF("};\n");
@@ -943,12 +947,29 @@ static void shader_use_program(glStateBits_t key)
     }
 }
 
+// calculate the fade distance from screen to light
+// FIXME: move to client-side
+static inline float fade_distance_to_light(const dlight_t *dl)
+{
+    if (dl->fade[0] <= 1.0f && dl->fade[1] <= 1.0f)
+        return 1.0f;
+    else if (dl->fade[0] > dl->fade[1])
+        return 1.0f;
+
+    float dist_to_light = VectorDistance(glr.fd.vieworg, dl->origin);
+    float frac_to_end = Q_clipf(dist_to_light / dl->fade[1], 0.0f, 1.0f);
+    float min_frag_dist = dl->fade[0] / dl->fade[1];
+    
+    if (min_frag_dist > 1.0f)
+        return 1.0f;
+    else if (min_frag_dist <= 0)
+        return frac_to_end;
+
+    return 1.0f - smoothstep(min_frag_dist, 1.0f, frac_to_end);
+}
+
 static void shader_state_bits(glStateBits_t bits)
 {
-    // disable per-pixel lighting if requested
-    if (!gl_per_pixel_lighting->integer) {
-        bits &= ~GLS_DYNAMIC_LIGHTS;
-    }
     glStateBits_t diff = bits ^ gls.state_bits;
 
     if (diff & GLS_COMMON_MASK)
@@ -959,11 +980,7 @@ static void shader_state_bits(glStateBits_t bits)
 
     if (diff & GLS_SCROLL_MASK && bits & GLS_SCROLL_ENABLE) {
         GL_ScrollPos(gls.u_block.scroll, bits);
-        gls.u_block_dirtybits |= GLU_BLOCK;
-    }
-
-    if (diff & GLS_DYNAMIC_LIGHTS) {
-        gls.u_block_dirtybits |= GLU_DLIGHT;
+        gls.u_block_dirty = true;
     }
 
     if (diff & GLS_BLOOM_GENERATE && glr.framebuffer_bound) {
@@ -1014,15 +1031,58 @@ static void shader_color(GLfloat r, GLfloat g, GLfloat b, GLfloat a)
 
 static void shader_load_uniforms(void)
 {
-    if (gls.u_block_dirtybits & GLU_BLOCK) {
+    if (gls.u_block_dirty) {
         GL_BindBuffer(GL_UNIFORM_BUFFER, gl_static.uniform_buffer);
         qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(gls.u_block), &gls.u_block);
         c.uniformUploads++;
     }
-    if (gls.u_block_dirtybits & GLU_DLIGHT) {
-        GL_BindBuffer(GL_UNIFORM_BUFFER, gl_static.dlight_buffer);
-        qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(gls.u_dlights.lights[0]) * gls.u_block.num_dlights, &gls.u_dlights);
-        c.uniformUploads++;
+
+    if (gls.dlight_bits != glr.ppl_dlight_bits) {
+        // dlight bits changed, set up the buffer.
+        // if you didn't modify dlights just leave the bits
+        // # alone or set to 0.
+        if (glr.ppl_dlight_bits) {
+            int i = 0;
+            int nl = min(q_countof(gls.u_dlights.lights), glr.fd.num_dlights);
+
+            c.dlightsTotal += nl;
+
+            for (int n = 0; n < nl; n++) {
+                if (!(glr.ppl_dlight_bits & 1 << n)) {
+                    c.dlightsNotUsed++;
+                    continue;
+                }
+
+                const dlight_t *dl = &glr.fd.dlights[n];
+
+                if (GL_CullSphere(dl->sphere, dl->sphere[3]) == CULL_OUT) {
+                    c.dlightsCulled++;
+                    continue;
+                }
+
+                VectorCopy(dl->origin, gls.u_dlights.lights[i].position);
+                gls.u_dlights.lights[i].radius = dl->radius;
+                VectorCopy(dl->color, gls.u_dlights.lights[i].color);
+                gls.u_dlights.lights[i].color[3] = dl->intensity * fade_distance_to_light(dl);
+                if (dl->conecos) {
+                    VectorCopy(dl->cone, gls.u_dlights.lights[i].cone);
+                }
+                gls.u_dlights.lights[i].cone[3] = dl->conecos;
+
+                i++;
+            }
+
+            gls.u_dlights.num_dlights = i;
+            gls.dlight_bits = glr.ppl_dlight_bits;
+            c.dlightsUsed += i;
+
+            GL_BindBuffer(GL_UNIFORM_BUFFER, gl_static.dlight_buffer);
+            qglBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(GLint[4]) + (sizeof(gls.u_dlights.lights[0]) * gls.u_dlights.num_dlights), &gls.u_dlights);
+            c.uniformUploads++;
+            c.dlightUploads++;
+        } else {
+            gls.dlight_bits = glr.ppl_dlight_bits;
+        }
     }
 }
 
@@ -1040,7 +1100,7 @@ static void shader_load_matrix(GLenum mode, const GLfloat *matrix, const GLfloat
         Q_assert(!"bad mode");
     }
     
-    gls.u_block_dirtybits |= GLU_BLOCK;
+    gls.u_block_dirty = true;
 }
 
 static void shader_setup_2d(void)
@@ -1076,40 +1136,6 @@ static void shader_setup_fog(void)
     gls.u_block.heightfog_falloff = glr.fd.heightfog.falloff;
 }
 
-// calculate the fade distance from screen to light
-static inline float fade_distance_to_light(const dlight_t *dl)
-{
-    if (dl->fade[0] <= 1.0f && dl->fade[1] <= 1.0f)
-        return 1.0f;
-    else if (dl->fade[0] > dl->fade[1])
-        return 1.0f;
-
-    float dist_to_light = VectorDistance(glr.fd.vieworg, dl->origin);
-    float frac_to_end = Q_clipf(dist_to_light / dl->fade[1], 0.0f, 1.0f);
-    float min_frag_dist = dl->fade[0] / dl->fade[1];
-    
-    if (min_frag_dist > 1.0f)
-        return 1.0f;
-    else if (min_frag_dist <= 0)
-        return frac_to_end;
-
-    return 1.0f - smoothstep(min_frag_dist, 1.0f, frac_to_end);
-}
-
-static void cone_to_bounding_sphere(const vec3_t origin, const vec3_t forward, float size, float angle_radians, float c, float s, vec4_t out)
-{
-    if(angle_radians > M_PI/4.0f)
-    {
-        VectorMA(origin, c * size, forward, out);
-        out[3]   = s * size;
-    }
-    else
-    {
-        VectorMA(origin, size / (2.0f * c), forward, out);
-        out[3]   = size / (2.0f * c);
-    }
-}
-
 static void shader_setup_3d(void)
 {
     gls.u_block.time = glr.fd.time;
@@ -1123,6 +1149,8 @@ static void shader_setup_3d(void)
     gls.u_block.w_phase[0] = 4;
     gls.u_block.w_phase[1] = 4;
 
+    gls.dlight_bits = 0;
+
     shader_setup_fog();
 
     R_RotateForSky();
@@ -1132,46 +1160,6 @@ static void shader_setup_3d(void)
     memcpy(gls.u_block.m_model, gl_identity, sizeof(gls.u_block.m_model));
     
     VectorCopy(glr.fd.vieworg, gls.u_block.vieworg);
-
-    if (gl_per_pixel_lighting->integer) {
-        int i = 0;
-
-        for (int n = 0; n < min(q_countof(gls.u_dlights.lights), glr.fd.num_dlights); n++) {
-            const dlight_t *dl = &glr.fd.dlights[n];
-            float cone_radians, cone_cos = 0.0f, cone_sin;
-
-            if (dl->cone[3]) {
-                cone_radians = DEG2RAD(dl->cone[3]);
-                cone_cos = cosf(cone_radians);
-                cone_sin = sinf(cone_radians);
-
-                vec4_t sphere;
-
-                // this is kinda dumb but it's a quick way
-                // to cull a spotlight in a frustum
-                cone_to_bounding_sphere(dl->origin, dl->cone, dl->radius, cone_radians, cone_cos, cone_sin, sphere);
-
-                if (GL_CullSphere(sphere, sphere[3]) == CULL_OUT)
-                    continue;
-            } else {
-                if (GL_CullSphere(dl->origin, dl->radius) == CULL_OUT)
-                    continue;
-            }
-
-            VectorCopy(dl->origin, gls.u_dlights.lights[i].position);
-            gls.u_dlights.lights[i].radius = dl->radius;
-            VectorCopy(dl->color, gls.u_dlights.lights[i].color);
-            gls.u_dlights.lights[i].color[3] = dl->intensity * fade_distance_to_light(dl);
-            if (dl->cone[3]) {
-                VectorCopy(dl->cone, gls.u_dlights.lights[i].cone);
-            }
-            gls.u_dlights.lights[i].cone[3] = cone_cos;
-
-            i++;
-        }
-
-        gls.u_block.num_dlights = i;
-    }
 }
 
 static void shader_disable_state(void)

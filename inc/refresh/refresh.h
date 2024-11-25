@@ -78,6 +78,10 @@ typedef struct {
                        // intensity scalar, not a radius!
     vec4_t  cone;
     vec2_t  fade;
+
+    // for culling, calculated at add time
+    vec4_t  sphere;
+    float   conecos;
 } dlight_t;
 
 typedef struct {

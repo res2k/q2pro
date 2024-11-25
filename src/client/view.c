@@ -108,6 +108,20 @@ void V_AddParticle(const particle_t *p)
     r_particles[r_numparticles++] = *p;
 }
 
+static void cone_to_bounding_sphere(const vec3_t origin, const vec3_t forward, float size, float angle_radians, float c, float s, vec4_t out)
+{
+    if(angle_radians > M_PI/4.0f)
+    {
+        VectorMA(origin, c * size, forward, out);
+        out[3]   = s * size;
+    }
+    else
+    {
+        VectorMA(origin, size / (2.0f * c), forward, out);
+        out[3]   = size / (2.0f * c);
+    }
+}
+
 /*
 =====================
 V_AddLightEx
@@ -131,9 +145,13 @@ void V_AddLightEx(cl_shadow_light_t *light)
 
     if (light->coneangle) {
         VectorCopy(light->conedirection, dl->cone);
-        dl->cone[3] = light->coneangle;
+        dl->cone[3] = DEG2RAD(light->coneangle);
+        dl->conecos = cosf(dl->cone[3]);
+        cone_to_bounding_sphere(dl->origin, dl->cone, dl->radius, dl->cone[3], dl->conecos, sinf(dl->cone[3]), dl->sphere);
     } else {
-        dl->cone[3] = 0.0f;
+        dl->conecos = 0;
+        VectorCopy(dl->origin, dl->sphere);
+        dl->sphere[3] = dl->radius;
     }
 
     dl->fade[0] = light->fade_start;
@@ -159,8 +177,10 @@ void V_AddLight(const vec3_t org, float intensity, float r, float g, float b)
     dl->color[0] = r;
     dl->color[1] = g;
     dl->color[2] = b;
-    dl->cone[3] = 0.0f;
+    dl->conecos = 0;
     dl->fade[0] = dl->fade[1] = 0.0f;
+    VectorCopy(dl->origin, dl->sphere);
+    dl->sphere[3] = dl->radius;
 }
 
 /*

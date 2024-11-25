@@ -153,6 +153,8 @@ typedef struct {
     int             num_beams;
     int             num_flares;
     glStateBits_t   fog_bits, fog_bits_sky;
+    glStateBits_t   ppl_bits;
+    uint64_t        ppl_dlight_bits;
     int             framebuffer_width;
     int             framebuffer_height;
     bool            framebuffer_ok;
@@ -223,6 +225,12 @@ typedef struct {
     int uniformUploads;
     int vertexArrayBinds;
     int occlusionQueries;
+    int dlightsTotal;
+    int dlightUploads;
+    int dlightsCulled;
+    int dlightsNotUsed;
+    int dlightsUsed;
+    int dlightsEntCulled;
 } statCounters_t;
 
 extern statCounters_t c;
@@ -698,19 +706,16 @@ typedef struct {
     vec4_t      heightfog_end;
     GLfloat     heightfog_density;
     GLfloat     heightfog_falloff;
-    GLint       num_dlights;
     GLfloat     pad;
+    GLfloat     pad2;
     vec4_t      vieworg;
 } glUniformBlock_t;
 
 typedef struct {
+    GLint          num_dlights;
+    GLint          pad[3];
     glDlight_t     lights[MAX_DLIGHTS];
 } glUniformDlights_t;
-
-typedef enum {
-    GLU_BLOCK  = BIT(0),
-    GLU_DLIGHT = BIT(1)
-} glUniformBlockDirtyBits_t;
 
 typedef struct {
     glTmu_t             client_tmu;
@@ -726,8 +731,9 @@ typedef struct {
     mat4_t              view_matrix;
     mat4_t              proj_matrix;
     glUniformBlock_t    u_block;
+    bool                u_block_dirty;
     glUniformDlights_t  u_dlights;
-    glUniformBlockDirtyBits_t   u_block_dirtybits;
+    uint64_t            dlight_bits;
 } glState_t;
 
 extern glState_t gls;
@@ -819,9 +825,9 @@ static inline void GL_LoadMatrix(const GLfloat *model, const GLfloat *view)
 
 static inline void GL_LoadUniforms(void)
 {
-    if (gls.u_block_dirtybits && gl_backend->load_uniforms) {
+    if (gls.u_block_dirty && gl_backend->load_uniforms) {
         gl_backend->load_uniforms();
-        gls.u_block_dirtybits = 0;
+        gls.u_block_dirty = false;
     }
 }
 

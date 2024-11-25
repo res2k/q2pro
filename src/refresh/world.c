@@ -582,6 +582,8 @@ void GL_DrawWorld(void)
 
     glr.ent = &gl_world;
 
+    glr.ppl_dlight_bits = 0xFFFFFFFF;
+
     GL_MarkLeaves();
 
     GL_MarkLights();
@@ -592,7 +594,7 @@ void GL_DrawWorld(void)
 
     GL_BindArrays(VA_3D);
 
-        GL_ClearSolidFaces();
+    GL_ClearSolidFaces();
 
     GL_WorldNode_r(gl_static.world.cache->nodes,
                    gl_cull_nodes->integer ? NODE_CLIPPED : NODE_UNCLIPPED);

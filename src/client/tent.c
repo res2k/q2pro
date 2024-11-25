@@ -575,7 +575,7 @@ static void CL_AddExplosions(void)
                 break;
             }
 
-            ent->alpha = (16.0f - frac) / 16.0f;
+            ent->alpha = ((ex->frames - 1) - frac) / (ex->frames - 1);
             ent->alpha = 1.0f - ent->alpha;
             ent->alpha *= ent->alpha * ent->alpha;
             ent->alpha = 1.0f - ent->alpha;

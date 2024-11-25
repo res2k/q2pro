@@ -671,7 +671,8 @@ void GL_Flush3D(void)
                 state |= GLS_GLOWMAP_ENABLE;
         }
 
-        state |= GLS_DYNAMIC_LIGHTS;
+        if (glr.ppl_dlight_bits)
+            state |= glr.ppl_bits;
         array |= GLA_NORMAL;
     }
 

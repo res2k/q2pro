@@ -946,20 +946,6 @@ static void setup_weaponmodel(void)
     GL_Frustum(fov_x, fov_y, reflect_x);
 }
 
-static void cone_to_bounding_sphere(const vec3_t origin, const vec3_t forward, float size, float angle_radians, float c, float s, vec4_t out)
-{
-    if(angle_radians > M_PI/4.0f)
-    {
-        VectorMA(origin, c * size, forward, out);
-        out[3]   = s * size;
-    }
-    else
-    {
-        VectorMA(origin, size / (2.0f * c), forward, out);
-        out[3]   = size / (2.0f * c);
-    }
-}
-
 static bool test_sphere_sphere(const vec4_t a, const vec4_t b)
 {
     const float sd = DistanceSquared(a, b);

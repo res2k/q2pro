@@ -953,11 +953,11 @@ static void CL_ParsePrint(const q2proto_svc_print_t *print)
                 Con_SkipNotify(true);
                 cgame->ParseCenterPrint(s, 0, level == PRINT_CENTER);
                 Con_SkipNotify(false);
-            } else if (cl_cgame_notify->integer) {
-                Con_SkipNotify(true);
-                cgame->NotifyMessage(0, s, level == PRINT_CHAT);
-                Con_Print(s);
             } else {
+                if (cl_cgame_notify->integer) {
+                    Con_SkipNotify(true);
+                    cgame->NotifyMessage(0, s, level == PRINT_CHAT);
+                }
                 Com_Printf("%s", s);
             }
 

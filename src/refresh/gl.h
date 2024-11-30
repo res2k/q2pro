@@ -768,6 +768,7 @@ typedef struct {
     void (*color)(GLfloat r, GLfloat g, GLfloat b, GLfloat a);
 
     bool (*use_per_pixel_lighting)(void);
+    void (*load_lights)(void);
 } glbackend_t;
 
 extern const glbackend_t *gl_backend;
@@ -828,6 +829,14 @@ static inline void GL_LoadUniforms(void)
     if (gls.u_block_dirty && gl_backend->load_uniforms) {
         gl_backend->load_uniforms();
         gls.u_block_dirty = false;
+    }
+}
+
+static inline void GL_LoadLights(void)
+{
+    if (gls.dlight_bits != glr.ppl_dlight_bits && gl_backend->load_lights) {
+        gl_backend->load_lights();
+        gls.dlight_bits = glr.ppl_dlight_bits;
     }
 }
 
@@ -953,6 +962,7 @@ typedef struct {
     int             numverts;
     int             numindices;
     glStateBits_t   flags;
+    uint64_t        dlight_bits;
 } tesselator_t;
 
 extern tesselator_t tess;

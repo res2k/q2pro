@@ -607,6 +607,7 @@ void GL_DrawIndexed(showtris_t showtris)
     Q_assert(gls.currentva != VA_NONE);
 
     GL_LoadUniforms();
+    GL_LoadLights();
 
     GL_LockArrays(tess.numverts);
 
@@ -671,8 +672,10 @@ void GL_Flush3D(void)
                 state |= GLS_GLOWMAP_ENABLE;
         }
 
-        if (glr.ppl_dlight_bits)
+        if (tess.dlight_bits && glr.ppl_bits) {
+            glr.ppl_dlight_bits = tess.dlight_bits;
             state |= glr.ppl_bits;
+        }
         array |= GLA_NORMAL;
     }
 
@@ -720,6 +723,7 @@ void GL_Flush3D(void)
     tess.numindices = 0;
     tess.numverts = 0;
     tess.flags = 0;
+    tess.dlight_bits = 0;
 }
 
 static int GL_CopyVerts(const mface_t *surf)
@@ -779,8 +783,9 @@ static void GL_DrawFace(const mface_t *surf)
 
     if (memcmp(tess.texnum, texnum, sizeof(texnum)) ||
         tess.flags != state ||
-        tess.numindices + numindices > TESS_MAX_INDICES)
+        tess.numindices + numindices > TESS_MAX_INDICES) {
         GL_Flush3D();
+    }
 
     if (q_unlikely(gl_static.world.vertices))
         j = GL_CopyVerts(surf);
@@ -801,6 +806,8 @@ static void GL_DrawFace(const mface_t *surf)
 
     c.facesTris += numtris;
     c.facesDrawn++;
+
+    tess.dlight_bits |= surf->dlightbits;
 }
 
 void GL_ClearSolidFaces(void)
@@ -811,6 +818,8 @@ void GL_ClearSolidFaces(void)
 
 void GL_DrawSolidFaces(void)
 {
+    tess.dlight_bits = 0;
+
     for (int i = 0; i < FACE_HASH_SIZE; i++) {
         for (const mface_t *face = faces_head[i]; face; face = face->next)
             GL_DrawFace(face);
@@ -822,6 +831,8 @@ void GL_DrawAlphaFaces(void)
 {
     if (!faces_alpha)
         return;
+    
+    tess.dlight_bits = 0;
 
     glr.ent = NULL;
 
@@ -840,7 +851,7 @@ void GL_DrawAlphaFaces(void)
     }
 
     faces_alpha = NULL;
-
+    
     GL_Flush3D();
 }
 

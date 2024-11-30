@@ -227,14 +227,15 @@ static void GL_MarkLights_r(const mnode_t *node, const dlight_t *light, uint64_t
     mface_t *face;
     vec_t dot;
     int i;
+    float cutoff = (gl_backend->use_per_pixel_lighting() ? 0 : DLIGHT_CUTOFF);
 
     while (node->plane) {
         dot = PlaneDiffFast(light->transformed, node->plane);
-        if (dot > light->radius - DLIGHT_CUTOFF) {
+        if (dot > light->radius - cutoff) {
             node = node->children[0];
             continue;
         }
-        if (dot < -light->radius + DLIGHT_CUTOFF) {
+        if (dot < -light->radius + cutoff) {
             node = node->children[1];
             continue;
         }
@@ -582,7 +583,7 @@ void GL_DrawWorld(void)
 
     glr.ent = &gl_world;
 
-    glr.ppl_dlight_bits = 0xFFFFFFFF;
+    tess.dlight_bits = 0;
 
     GL_MarkLeaves();
 

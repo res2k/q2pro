@@ -668,6 +668,7 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
 
     uniform_mesh_color(color[0], color[1], color[2], color[3]);
     GL_LoadUniforms();
+    GL_LoadLights();
 
     // avoid drawing hidden faces for transparent gun by pre-filling depth buffer
     // muzzle flashes are excluded by checking for RF_FULLBRIGHT bit

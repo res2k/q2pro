@@ -811,6 +811,8 @@ void R_RenderFrame(const refdef_t *fd)
         glr.framebuffer_bound = false;
     }
 
+    tess.dlight_bits = 0;
+
     // go back into 2D mode
     GL_Setup2D();
 

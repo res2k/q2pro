@@ -122,6 +122,26 @@ static void cone_to_bounding_sphere(const vec3_t origin, const vec3_t forward, f
     }
 }
 
+// calculate the fade distance from screen to light
+static inline float fade_distance_to_light(const vec2_t fade, const vec3_t light_origin, const vec3_t org)
+{
+    if (fade[0] <= 1.0f && fade[1] <= 1.0f)
+        return 1.0f;
+    else if (fade[0] > fade[1])
+        return 1.0f;
+
+    float dist_to_light = VectorDistance(org, light_origin);
+    float frac_to_end = Q_clipf(dist_to_light / fade[1], 0.0f, 1.0f);
+    float min_frag_dist = fade[0] / fade[1];
+    
+    if (min_frag_dist > 1.0f)
+        return 1.0f;
+    else if (min_frag_dist <= 0)
+        return frac_to_end;
+
+    return 1.0f - smoothstep(min_frag_dist, 1.0f, frac_to_end);
+}
+
 /*
 =====================
 V_AddLightEx
@@ -134,11 +154,16 @@ void V_AddLightEx(cl_shadow_light_t *light)
 
     if (r_numdlights >= MAX_DLIGHTS)
         return;
+    
+    float fade = fade_distance_to_light((const vec2_t) { light->fade_start, light->fade_end }, light->origin, cl.refdef.vieworg);
+
+    if (fade <= 0.0f)
+        return;
 
     dl = &r_dlights[r_numdlights++];
     VectorCopy(light->origin, dl->origin);
     dl->radius = light->radius;
-    dl->intensity = light->intensity * (light->lightstyle == -1 ? 1.0f : r_lightstyles[light->lightstyle].white);
+    dl->intensity = light->intensity * (light->lightstyle == -1 ? 1.0f : r_lightstyles[light->lightstyle].white) * fade;
     dl->color[0] = light->color.r / 255.f;
     dl->color[1] = light->color.g / 255.f;
     dl->color[2] = light->color.b / 255.f;

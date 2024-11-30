@@ -285,7 +285,7 @@ static void apply_playerstate(const q2proto_svc_playerstate_t *playerstate,
         if(cls.serverProtocol == PROTOCOL_VERSION_RERELEASE)
             to->pmove.pm_flags = playerstate->pm_flags;
         else
-            to->pmove.pm_flags = pmflags_from_game3(playerstate->pm_flags, cls.q2proto_ctx.features.server_game_type != Q2PROTO_GAME_VANILLA);
+            to->pmove.pm_flags = pmflags_from_game3(playerstate->pm_flags, cls.q2proto_ctx.features.server_game_api != Q2PROTO_GAME_VANILLA);
     }
 
     if (playerstate->delta_bits & Q2P_PSD_PM_GRAVITY)
@@ -312,10 +312,8 @@ static void apply_playerstate(const q2proto_svc_playerstate_t *playerstate,
 
     if (playerstate->delta_bits & Q2P_PSD_GUNFRAME)
         to->gunframe = playerstate->gunframe;
-    if (playerstate->delta_bits & Q2P_PSD_GUNOFFSET)
-        q2proto_var_small_offsets_get_float(&playerstate->gunoffset, to->gunoffset);
-    if (playerstate->delta_bits & Q2P_PSD_GUNANGLES)
-        q2proto_var_small_angles_get_float(&playerstate->gunangles, to->gunangles);
+    Q2PROTO_APPLY_SMALL_OFFSETS_DELTA(to->gunoffset, playerstate->gunoffset, float);
+    Q2PROTO_APPLY_SMALL_ANGLES_DELTA(to->gunangles, playerstate->gunangles, float);
 
     for (int i = 0; i < 4; i++) {
         if(playerstate->blend.delta_bits & BIT(i))
@@ -738,10 +736,10 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
         cls.protocolVersion = serverdata->protocol_version;
         cl.serverstate = serverdata->q2pro.server_state;
         cinematic = cl.serverstate == ss_pic || cl.serverstate == ss_cinematic;
-        cl.game_type = cls.q2proto_ctx.features.server_game_type;
-        if (cl.game_type == Q2PROTO_GAME_RERELEASE)
+        cl.game_api = cls.q2proto_ctx.features.server_game_api;
+        if (cl.game_api == Q2PROTO_GAME_RERELEASE)
             cl.csr = cs_remap_rerelease;
-        else if (cl.game_type >= Q2PROTO_GAME_Q2PRO_EXTENDED)
+        else if (cl.game_api >= Q2PROTO_GAME_Q2PRO_EXTENDED)
             cl.csr = cs_remap_q2pro_new;
         cl.psFlags |= MSG_PS_RERELEASE | MSG_PS_EXTENSIONS;
         cl.esFlags |= MSG_ES_RERELEASE | CL_ES_EXTENDED_MASK;
@@ -750,7 +748,7 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
          * non-rerelease games w/ variable FPS (eg OpenFFA) seem to assume
          * certain things still happen at 10Hz.
          * (For one, view weapon looks janky if the divider is 1.)*/
-        if (cl.game_type == Q2PROTO_GAME_RERELEASE)
+        if (cl.game_api == Q2PROTO_GAME_RERELEASE)
             cl.frametime.div = 1;
 
         cl.pmp.speedmult = 2;
@@ -790,7 +788,7 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
     }
 
     // Load cgame (after we know all the timings)
-    CG_Load(cl.gamedir, cl.game_type == Q2PROTO_GAME_RERELEASE);
+    CG_Load(cl.gamedir, cl.game_api == Q2PROTO_GAME_RERELEASE);
     cgame->Init();
 
     if (cinematic) {

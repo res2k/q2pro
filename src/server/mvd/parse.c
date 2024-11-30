@@ -933,13 +933,13 @@ static void MVD_ParseServerData(mvd_t *mvd, int extrabits)
     /* HACKY: is_game_rerelease must match the value that was used on the server
      * so matching CS limits are used */
     if (mvd->version == PROTOCOL_VERSION_MVD_RERELEASE)
-        svs.game_type = Q2PROTO_GAME_RERELEASE;
+        svs.game_api = Q2PROTO_GAME_RERELEASE;
     else if (mvd->version >= PROTOCOL_VERSION_MVD_EXTENDED_LIMITS_2 && mvd->flags & MVF_EXTLIMITS_2) {
-        svs.game_type = Q2PROTO_GAME_Q2PRO_EXTENDED_V2;
+        svs.game_api = Q2PROTO_GAME_Q2PRO_EXTENDED_V2;
     } else if (mvd->version >= PROTOCOL_VERSION_MVD_EXTENDED_LIMITS && mvd->flags & MVF_EXTLIMITS) {
-        svs.game_type = Q2PROTO_GAME_Q2PRO_EXTENDED;
+        svs.game_api = Q2PROTO_GAME_Q2PRO_EXTENDED;
     } else
-        svs.game_type = Q2PROTO_GAME_VANILLA;
+        svs.game_api = Q2PROTO_GAME_VANILLA;
 
 #if 0
     // change gamedir unless playing a demo

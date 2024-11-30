@@ -504,7 +504,7 @@ static void CL_Record_f(void)
 
     // Set up q2proto structures
     memset(&cls.demo.server_info, 0, sizeof(cls.demo.server_info));
-    cls.demo.server_info.game_type = cls.q2proto_ctx.features.server_game_type;
+    cls.demo.server_info.game_api = cls.q2proto_ctx.features.server_game_api;
     cls.demo.server_info.default_packet_length = size;
 
     q2proto_error_t err = q2proto_init_servercontext_demo(&cls.demo.q2proto_context, &cls.demo.server_info, &size);
@@ -901,7 +901,7 @@ static void CL_PlayDemo_f(void)
 
     // Set up cls.demo.q2proto_context for demo snaps, with same protocol as server
     memset(&cls.demo.server_info, 0, sizeof(cls.demo.server_info));
-    cls.demo.server_info.game_type = cls.q2proto_ctx.features.server_game_type;
+    cls.demo.server_info.game_api = cls.q2proto_ctx.features.server_game_api;
     q2proto_connect_t connect_info;
     memset(&connect_info, 0, sizeof(connect_info));
     connect_info.protocol = q2proto_protocol_from_netver(cls.serverProtocol);
@@ -1347,7 +1347,7 @@ bool CL_GetDemoInfo(const char *path, demoInfo_t *info)
         if (message.type != Q2P_SVC_SERVERDATA) {
             goto fail;
         }
-        switch(demo_context.features.server_game_type)
+        switch(demo_context.features.server_game_api)
         {
         case Q2PROTO_GAME_VANILLA:
             break;

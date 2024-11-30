@@ -968,7 +968,7 @@ static void CL_AddPacketEntities(void)
         if (s1->modelindex2) {
             if (s1->modelindex2 == MODELINDEX_PLAYER) {
                 // custom weapon
-                if (cl.game_type == Q2PROTO_GAME_RERELEASE) {
+                if (cl.game_api == Q2PROTO_GAME_RERELEASE) {
                     player_skinnum_t unpacked = { .skinnum = s1->skinnum };
                     ci = &cl.clientinfo[unpacked.client_num];
                     i = unpacked.vwep_index;
@@ -1263,7 +1263,7 @@ static void CL_AddViewWeapon(void)
         gun.oldframe = gun_frame;   // development tool
     } else {
 // KEX
-        if (cl.game_type == Q2PROTO_GAME_RERELEASE) {
+        if (cl.game_api == Q2PROTO_GAME_RERELEASE) {
             if (ops->gunindex != ps->gunindex) { // just changed weapons, don't lerp from old
                 cl.weapon.frame = cl.weapon.last_frame = ps->gunframe;
                 cl.weapon.server_time = cl.servertime;

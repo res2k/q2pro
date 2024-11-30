@@ -134,7 +134,7 @@ void SV_SpawnServer(const mapcmd_t *cmd)
     }
 
     // set framerate parameters
-    if (svs.game_type == Q2PROTO_GAME_RERELEASE) {
+    if (svs.game_api == Q2PROTO_GAME_RERELEASE) {
         // configured tick rate
         set_frame_time(sv_fps->integer, false);
     } else {

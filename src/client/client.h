@@ -346,7 +346,7 @@ typedef struct {
     configstring_t  baseconfigstrings[MAX_CONFIGSTRINGS];
     configstring_t  configstrings[MAX_CONFIGSTRINGS];
     cs_remap_t      csr;
-    q2proto_game_type_t game_type;
+    q2proto_game_api_t game_api;
 
     char        mapname[MAX_QPATH]; // short format - q2dm1, etc
 

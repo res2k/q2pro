@@ -1286,8 +1286,8 @@ static void CL_ConnectionlessPacket(void)
             accepted_protocols[0] = user_protocol;
             num_accepted_protocols = 1;
         } else {
-            const q2proto_game_type_t supported_game_types[] = {Q2PROTO_GAME_VANILLA, Q2PROTO_GAME_Q2PRO_EXTENDED, Q2PROTO_GAME_Q2PRO_EXTENDED_V2, Q2PROTO_GAME_RERELEASE};
-            num_accepted_protocols = q2proto_get_protocols_for_gametypes(accepted_protocols, q_countof(accepted_protocols), supported_game_types, q_countof(supported_game_types));
+            const q2proto_game_api_t supported_game_apis[] = {Q2PROTO_GAME_VANILLA, Q2PROTO_GAME_Q2PRO_EXTENDED, Q2PROTO_GAME_Q2PRO_EXTENDED_V2, Q2PROTO_GAME_RERELEASE};
+            num_accepted_protocols = q2proto_get_protocols_for_gametypes(accepted_protocols, q_countof(accepted_protocols), supported_game_apis, q_countof(supported_game_apis));
         }
 
         q2proto_challenge_t challenge;
@@ -3228,7 +3228,7 @@ void CL_AddHitMarker(void)
 
 static void CL_UpdateHitMarkers(void)
 {
-    if (cl.game_type != Q2PROTO_GAME_RERELEASE || !cl_hit_markers->integer)
+    if (cl.game_api != Q2PROTO_GAME_RERELEASE || !cl_hit_markers->integer)
         return;
 
     if (cgame->GetHitMarkerDamage(&cl.frame.ps))

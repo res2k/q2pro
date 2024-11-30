@@ -620,13 +620,13 @@ static void emit_gamestate(void)
         flags |= MVF_NOMSGS;
 
     // send the serverdata
-    if (svs.game_type == Q2PROTO_GAME_RERELEASE) {
+    if (svs.game_api == Q2PROTO_GAME_RERELEASE) {
         MSG_WriteByte(mvd_serverdata | (flags << SVCMD_BITS));
         MSG_WriteLong(PROTOCOL_VERSION_MVD);
         MSG_WriteShort(PROTOCOL_VERSION_MVD_RERELEASE);
-    } else if (svs.game_type == Q2PROTO_GAME_Q2PRO_EXTENDED || svs.game_type == Q2PROTO_GAME_Q2PRO_EXTENDED_V2) {
+    } else if (svs.game_api == Q2PROTO_GAME_Q2PRO_EXTENDED || svs.game_api == Q2PROTO_GAME_Q2PRO_EXTENDED_V2) {
         flags |= MVF_EXTLIMITS;
-        if (svs.game_type == Q2PROTO_GAME_Q2PRO_EXTENDED_V2)
+        if (svs.game_api == Q2PROTO_GAME_Q2PRO_EXTENDED_V2)
             flags |= MVF_EXTLIMITS_2;
         MSG_WriteByte(mvd_serverdata);
         MSG_WriteLong(PROTOCOL_VERSION_MVD);
@@ -2140,16 +2140,16 @@ void SV_MvdPostInit(void)
         mvd.psFlags |= MSG_PS_IGNORE_GUNINDEX | MSG_PS_IGNORE_GUNFRAMES;
     }
 
-    if (svs.game_type == Q2PROTO_GAME_Q2PRO_EXTENDED || svs.game_type == Q2PROTO_GAME_Q2PRO_EXTENDED_V2) {
+    if (svs.game_api == Q2PROTO_GAME_Q2PRO_EXTENDED || svs.game_api == Q2PROTO_GAME_Q2PRO_EXTENDED_V2) {
         mvd.esFlags |= MSG_ES_LONGSOLID | MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS;
         mvd.psFlags |= MSG_PS_EXTENSIONS;
 
-        if (svs.game_type == Q2PROTO_GAME_Q2PRO_EXTENDED_V2) {
+        if (svs.game_api == Q2PROTO_GAME_Q2PRO_EXTENDED_V2) {
             mvd.esFlags |= MSG_ES_EXTENSIONS_2;
             mvd.psFlags |= MSG_PS_EXTENSIONS_2 | MSG_PS_MOREBITS;
         }
     }
-    if (svs.game_type == Q2PROTO_GAME_RERELEASE) {
+    if (svs.game_api == Q2PROTO_GAME_RERELEASE) {
         mvd.esFlags |= MSG_ES_LONGSOLID | MSG_ES_SHORTANGLES | MSG_ES_EXTENSIONS | MSG_ES_RERELEASE;
         mvd.psFlags |= MSG_PS_EXTENSIONS | MSG_PS_RERELEASE;
     }

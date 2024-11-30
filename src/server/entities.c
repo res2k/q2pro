@@ -223,20 +223,9 @@ static void make_playerstate_delta(client_t *client, const q2proto_packed_player
     }
 
     if (flags & MSG_PS_IGNORE_GUNFRAMES) {
-        playerstate->delta_bits &= ~(Q2P_PSD_GUNFRAME | Q2P_PSD_GUNOFFSET | Q2P_PSD_GUNANGLES);
-
-        if(from)
-        {
-            to->gunframe = from->gunframe;
-            memcpy(&to->gunoffset, &from->gunoffset, sizeof(to->gunoffset));
-            memcpy(&to->gunangles, &from->gunangles, sizeof(to->gunangles));
-        }
-        else
-        {
-            to->gunframe = 0;
-            memset(&to->gunoffset, 0, sizeof(to->gunoffset));
-            memset(&to->gunangles, 0, sizeof(to->gunangles));
-        }
+        playerstate->delta_bits &= ~Q2P_PSD_GUNFRAME;
+        playerstate->gunangles.delta_bits = 0;
+        playerstate->gunoffset.delta_bits = 0;
     }
 
     if (flags & MSG_PS_IGNORE_GUNINDEX) {
@@ -670,7 +659,7 @@ void SV_BuildClientFrame(client_t *client)
     // find the client's PVS
     SV_GetClient_ViewOrg(client, org);
     // Rerelease game doesn't include viewheight in viewoffset, vanilla does
-    if (svs.game_type == Q2PROTO_GAME_RERELEASE)
+    if (svs.game_api == Q2PROTO_GAME_RERELEASE)
         org[2] += clent->client->ps.pmove.viewheight;
 
     leaf = CM_PointLeaf(client->cm, org);

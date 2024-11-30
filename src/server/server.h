@@ -478,7 +478,7 @@ typedef struct {
 #endif
 
     cs_remap_t      csr;
-    q2proto_game_type_t game_type;
+    q2proto_game_api_t game_api;
     pmoveParams_t   pmp;
 
     unsigned        last_heartbeat;

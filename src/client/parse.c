@@ -21,6 +21,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "q2proto/q2proto.h"
 #include "shared/m_flash.h"
 #include "shared/game3_shared.h"
+#include "common/loc.h"
 
 /*
 =====================================================================
@@ -611,7 +612,10 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
                       cls.serverProtocol, protocol);
         }
         // BIG HACK to let demos from release work with the 3.0x patch!!!
-        if (!EXTENDED_SUPPORTED(protocol) && (protocol != PROTOCOL_VERSION_RERELEASE)
+        if (!EXTENDED_SUPPORTED(protocol)
+            && (protocol != PROTOCOL_VERSION_RERELEASE)
+            && (protocol != PROTOCOL_VERSION_KEX_DEMOS)
+            && (protocol != PROTOCOL_VERSION_KEX)
             && (protocol < PROTOCOL_VERSION_OLD || protocol > PROTOCOL_VERSION_DEFAULT)) {
             Com_Error(ERR_DROP, "Demo uses unsupported protocol version %d.", protocol);
         } else {
@@ -754,6 +758,11 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
         cl.pmp.speedmult = 2;
         cl.pmp.flyhack = true; // fly hack is unconditionally enabled
         cl.pmp.flyfriction = 4;
+    } else if (cls.serverProtocol == PROTOCOL_VERSION_KEX_DEMOS || cls.serverProtocol == PROTOCOL_VERSION_KEX) {
+        cl.game_api = cls.q2proto_ctx.features.server_game_api;
+        cl.csr = cs_remap_rerelease;
+        set_server_fps(serverdata->kex.server_fps);
+        cl.frametime.div = 1;
     } else {
         // Demo protocol, or vanilla
         if (serverdata->q2pro.extensions)
@@ -934,16 +943,9 @@ static void CL_CheckForIP(const char *s)
     }
 }
 
-static void CL_ParsePrint(const q2proto_svc_print_t *print)
+static void CL_HandlePrint(int level, char *s)
 {
-    int level;
-    char s[MAX_STRING_CHARS];
     const char *fmt;
-
-    level = print->level;
-    q2pslcpy(s, sizeof(s), &print->string);
-
-    SHOWNET(2, "    %i \"%s\"\n", level, Com_MakePrintable(s));
 
     if (level != PRINT_CHAT) {
         if (cl.csr.extended) {
@@ -1010,6 +1012,16 @@ static void CL_ParsePrint(const q2proto_svc_print_t *print)
         S_StartLocalSoundOnce("misc/talk1.wav");
     else if (cl_chat_sound->integer > 0)
         S_StartLocalSoundOnce("misc/talk.wav");
+}
+
+static void CL_ParsePrint(const q2proto_svc_print_t *print)
+{
+    char s[MAX_STRING_CHARS];
+    q2pslcpy(s, sizeof(s), &print->string);
+
+    SHOWNET(2, "    %i \"%s\"\n", print->level, Com_MakePrintable(s));
+
+    CL_HandlePrint(print->level, s);
 }
 
 static void CL_ParseCenterPrint(const q2proto_svc_centerprint_t *centerprint)
@@ -1178,6 +1190,31 @@ static void CL_ParsePOI(const q2proto_svc_poi_t *poi)
         SCR_AddPOI(id, time, poi->pos, poi->image, poi->color, poi->flags);
 }
 
+static void CL_ParseLocPrint(const q2proto_svc_locprint_t *locprint)
+{
+    char base_str[MAX_STRING_CHARS];
+    q2pslcpy(base_str, sizeof(base_str), &locprint->base);
+
+    SHOWNET(2, "    %i \"%s\"\n", locprint->flags, Com_MakePrintable(base_str));
+
+    Q_assert(locprint->num_args <= MAX_LOCALIZATION_ARGS);
+    char loc_args[MAX_LOCALIZATION_ARGS][MAX_STRING_CHARS];
+    const char *loc_args_p[MAX_LOCALIZATION_ARGS];
+    for (int i = 0; i < locprint->num_args; i++)
+    {
+        q2pslcpy(loc_args[i], sizeof(loc_args[0]), &locprint->args[i]);
+        loc_args_p[i] = loc_args[i];
+
+        SHOWNET(2, "    ... arg %i: \"%s\"\n", i, Com_MakePrintable(loc_args[i]));
+    }
+
+    char string[MAX_STRING_CHARS];
+    Loc_Localize(base_str, true, loc_args_p, locprint->num_args, string, sizeof(string));
+
+    CL_HandlePrint(locprint->flags, string);
+}
+
+
 #if USE_FPS
 static void set_server_fps(int value)
 {
@@ -1327,6 +1364,10 @@ void CL_ParseServerMessage(void)
 
         case Q2P_SVC_ACHIEVEMENT:
             // ignore
+            break;
+
+        case Q2P_SVC_LOCPRINT:
+            CL_ParseLocPrint(&svc_msg.locprint);
             break;
         // KEX
         }

@@ -51,6 +51,7 @@ common_src = [
   'q2proto/src/q2proto_internal_maybe_zpacket.c',
   'q2proto/src/q2proto_internal_packing.c',
   'q2proto/src/q2proto_multicast.c',
+  'q2proto/src/q2proto_proto_kex.c',
   'q2proto/src/q2proto_proto_q2pro_extdemo.c',
   'q2proto/src/q2proto_proto_q2pro.c',
   'q2proto/src/q2proto_proto_q2repro.c',

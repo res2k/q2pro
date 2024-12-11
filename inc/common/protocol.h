@@ -30,6 +30,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #define PROTOCOL_VERSION_Q2PRO          36
 #define PROTOCOL_VERSION_MVD            37      // not used for UDP connections
 #define PROTOCOL_VERSION_RERELEASE      1038
+#define PROTOCOL_VERSION_KEX_DEMOS      2022
+#define PROTOCOL_VERSION_KEX            2023
 
 #define PROTOCOL_VERSION_EXTENDED_MINIMUM       3434    // r2894
 #define PROTOCOL_VERSION_EXTENDED_LIMITS_2      3435    // r3300

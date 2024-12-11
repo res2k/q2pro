@@ -117,18 +117,26 @@ const void* q2protoio_read_raw(uintptr_t io_arg, size_t size, size_t* readcount)
     return io_read_data(io_arg, size, readcount);
 }
 
+size_t q2protoio_read_available(uintptr_t io_arg)
+{
+    const q2protoio_ioarg_t *io_data = (const q2protoio_ioarg_t *)io_arg;
+    sizebuf_t *sz = io_data->sz_read;
+    return sz->cursize - sz->readcount;
+}
+
 #if USE_ZLIB
-q2proto_error_t q2protoio_inflate_begin(uintptr_t io_arg, uintptr_t* inflate_io_arg)
+q2proto_error_t q2protoio_inflate_begin(uintptr_t io_arg, q2proto_inflate_deflate_header_mode_t header_mode, uintptr_t* inflate_io_arg)
 {
     if (io_arg != _Q2PROTO_IOARG_DEFAULT) {
         Com_Error(ERR_DROP, "%s: recursively entered", __func__);
     }
 
+    int window_bits = header_mode == Q2P_INFL_DEFL_RAW ? -MAX_WBITS : MAX_WBITS;
     int ret;
     if (io_inflate.z.state)
-        ret = inflateReset(&io_inflate.z);
+        ret = inflateReset2(&io_inflate.z, window_bits);
     else
-        ret = inflateInit2(&io_inflate.z, -MAX_WBITS);
+        ret = inflateInit2(&io_inflate.z, window_bits);
     if (ret != Z_OK) {
         Com_Error(ERR_DROP, "%s: inflate initialization failed with error %d", __func__, ret);
     }
@@ -185,18 +193,31 @@ q2proto_error_t q2protoio_inflate_end(uintptr_t inflate_io_arg)
 
 static void reset_deflate_input(q2protoio_deflate_args_t* deflate_args)
 {
-    deflate_args->z->next_in = (Byte*)deflate_buf;
-    deflate_args->z->next_out = deflate_args->z_buffer;
-    deflate_args->z->avail_out = deflate_args->z_buffer_size;
-    deflate_args->z->total_in = 0;
-    deflate_args->z->total_out = 0;
+    deflate_args->z_current->next_in = (Byte*)deflate_buf;
+    deflate_args->z_current->next_out = deflate_args->z_buffer;
+    deflate_args->z_current->avail_out = deflate_args->z_buffer_size;
+    deflate_args->z_current->total_in = 0;
+    deflate_args->z_current->total_out = 0;
 }
 
-q2proto_error_t q2protoio_deflate_begin(q2protoio_deflate_args_t* deflate_args, size_t max_deflated, uintptr_t *deflate_io_arg)
+q2proto_error_t q2protoio_deflate_begin(q2protoio_deflate_args_t* deflate_args, size_t max_deflated, q2proto_inflate_deflate_header_mode_t header_mode, uintptr_t *deflate_io_arg)
 {
     Q_assert(!deflate_q2protoio_ioarg.deflate);
 
-    deflateReset(deflate_args->z);
+    if (header_mode == Q2P_INFL_DEFL_RAW)
+    {
+        deflateReset(deflate_args->z_raw);
+        deflate_args->z_current = deflate_args->z_raw;
+    }
+    else
+    {
+        if (!deflate_args->z_header.state)
+            Q_assert(deflateInit2(&deflate_args->z_header, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+                     MAX_WBITS, 9, Z_DEFAULT_STRATEGY) == Z_OK);
+        else
+            deflateReset(&deflate_args->z_header);
+        deflate_args->z_current = &deflate_args->z_header;
+    }
     reset_deflate_input(deflate_args);
 
     SZ_InitWrite(&msg_deflate, deflate_buf, MAX_MSGLEN);
@@ -215,17 +236,17 @@ q2proto_error_t q2protoio_deflate_get_data(uintptr_t deflate_io_arg, size_t* in_
     q2protoio_ioarg_t *io_data = (q2protoio_ioarg_t *)deflate_io_arg;
     q2protoio_deflate_args_t *deflate_args = io_data->deflate;
 
-    deflate_args->z->avail_in = msg_deflate.cursize - deflate_args->z->total_in;
-    int ret = deflate(deflate_args->z, Z_FINISH);
+    deflate_args->z_current->avail_in = msg_deflate.cursize - deflate_args->z_current->total_in;
+    int ret = deflate(deflate_args->z_current, Z_FINISH);
     if (ret != Z_OK && ret != Z_STREAM_END) {
-        deflateEnd(deflate_args->z);
+        deflateEnd(deflate_args->z_current);
         Com_Error(ERR_DROP, "%s: deflate() failed with error %d", __func__, ret);
     }
 
     if (in_size)
-        *in_size = deflate_args->z->total_in;
+        *in_size = deflate_args->z_current->total_in;
     *out = deflate_args->z_buffer;
-    *out_size = deflate_args->z->total_out;
+    *out_size = deflate_args->z_current->total_out;
     SZ_Clear(&msg_deflate);
     reset_deflate_input(deflate_args);
 
@@ -316,11 +337,11 @@ void q2protoio_write_raw(uintptr_t io_arg, const void* data, size_t size, size_t
 static void compress_accumulated(q2protoio_deflate_args_t *deflate_args)
 {
     // Compress data accumulated in deflate_buf
-    deflate_args->z->avail_in = msg_deflate.cursize - deflate_args->z->total_in;
+    deflate_args->z_current->avail_in = msg_deflate.cursize - deflate_args->z_current->total_in;
 
-    int ret = deflate(deflate_args->z, Z_PARTIAL_FLUSH);
+    int ret = deflate(deflate_args->z_current, Z_PARTIAL_FLUSH);
     if (ret != Z_OK && ret != Z_STREAM_END) {
-        deflateEnd(deflate_args->z);
+        deflateEnd(deflate_args->z_current);
         Com_Error(ERR_DROP, "%s: deflate() failed with error %d", __func__, ret);
     }
 }
@@ -331,17 +352,17 @@ size_t q2protoio_write_available(uintptr_t io_arg)
     sizebuf_t *sz = io_data->sz_write;
     if (io_data->deflate)
     {
-        size_t already_compressed = io_data->deflate->z->total_out;
-        size_t yet_uncompressed = sz->cursize - io_data->deflate->z->total_in;
+        size_t already_compressed = io_data->deflate->z_current->total_out;
+        size_t yet_uncompressed = sz->cursize - io_data->deflate->z_current->total_in;
 
-        size_t used_size = already_compressed + deflateBound(io_data->deflate->z, yet_uncompressed);
+        size_t used_size = already_compressed + deflateBound(io_data->deflate->z_current, yet_uncompressed);
         size_t max_msg_len = io_data->max_msg_len - DEFLATE_OUTPUT_MARGIN;
         size_t write_available = max_msg_len - min(used_size, max_msg_len);
         if (write_available == 0 && yet_uncompressed > 0)
         {
             // Actually compress yet-uncompressed data to get an "available" number closer to reality
             compress_accumulated(io_data->deflate);
-            already_compressed = io_data->deflate->z->total_out;
+            already_compressed = io_data->deflate->z_current->total_out;
             write_available = max_msg_len - min(already_compressed, max_msg_len);
         }
         return write_available;

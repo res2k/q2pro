@@ -32,8 +32,12 @@ struct q2protoio_deflate_args_s
     byte *z_buffer;
     /// Size of deflated data buffer
     unsigned z_buffer_size;
-    /// Deflate stream
-    z_streamp z;
+    /// Deflate stream (raw)
+    z_streamp z_raw;
+    /// Deflate stream (headered)
+    z_stream z_header;
+    /// Currently active stream
+    z_streamp z_current;
 };
 #endif // USE_ZLIB
 

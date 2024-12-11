@@ -1488,6 +1488,10 @@ bool CL_SeekDemoMessage(void)
         case Q2P_SVC_LAYOUT:
             CL_ParseLayout(&svc_msg.layout);
             break;
+
+        case Q2P_SVC_FOG:
+            CL_ParseFog(&svc_msg.fog);
+            break;
         }
     }
 

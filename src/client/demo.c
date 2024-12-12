@@ -441,6 +441,10 @@ static const cmd_option_t o_record[] = {
     { NULL }
 };
 
+// Data needed for write_gamestate in CL_Record_f. Too large for stack, so store statically.
+static q2proto_svc_configstring_t configstrings[MAX_CONFIGSTRINGS];
+static q2proto_svc_spawnbaseline_t spawnbaselines[MAX_EDICTS];
+
 /*
 ====================
 CL_Record_f
@@ -556,8 +560,6 @@ static void CL_Record_f(void)
     message_svcdata.serverdata.q2repro.server_fps = cl.frametime_inv * 1000;
     q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message_svcdata);
 
-    q2proto_svc_configstring_t configstrings[MAX_CONFIGSTRINGS];
-    q2proto_svc_spawnbaseline_t spawnbaselines[MAX_PACKET_ENTITIES];
     q2proto_gamestate_t gamestate = {.num_configstrings = 0, .configstrings = configstrings, .num_spawnbaselines = 0, .spawnbaselines = spawnbaselines};
     memset(spawnbaselines, 0, sizeof(spawnbaselines));
 

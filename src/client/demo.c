@@ -915,6 +915,7 @@ static void CL_PlayDemo_f(void)
         return;
     }
     SZ_InitWrite(&cls.demo.buffer, demo_buffer, MAX_MSGLEN);
+    demo_q2protoio_ioarg.max_msg_len = MAX_MSGLEN;
 
     // read and parse messages util `precache' command
     for (int i = 0; cls.state == ca_connected && i < 1000; i++) {
@@ -946,7 +947,6 @@ void CL_EmitDemoSnapshot(void)
     demosnap_t *snap;
     int64_t pos;
     char *from, *to;
-    size_t len;
     server_frame_t *lastframe, *frame;
     int i, j, lastnum;
 
@@ -969,6 +969,42 @@ void CL_EmitDemoSnapshot(void)
     if (pos < cls.demo.file_offset)
         return;
 
+    q2proto_gamestate_t gamestate = {.num_configstrings = 0, .configstrings = configstrings, .num_spawnbaselines = 0, .spawnbaselines = spawnbaselines};
+    memset(spawnbaselines, 0, sizeof(spawnbaselines));
+
+    // configstrings
+    for (i = 0; i < cl.csr.end; i++) {
+        from = cl.baseconfigstrings[i];
+        to = cl.configstrings[i];
+
+        if (!strcmp(from, to))
+            continue;
+
+        char* string = cl.configstrings[i];
+        q2proto_svc_configstring_t *cfgstr = &configstrings[gamestate.num_configstrings++];
+        cfgstr->index = i;
+        cfgstr->value.str = string;
+        cfgstr->value.len = Q_strnlen(string, CS_MAX_STRING_LENGTH);
+    }
+
+    /* baselines, for more robustness
+     * Mainly for when the 2022 protocol is used, as "solid" values affect encoding,
+     * so they really need to be right, and they need to be "seen" by q2proto
+     * during both reading demo messages and writing snaps. */
+    for (i = 1; i < cl.csr.max_edicts; i++) {
+        entity_state_t *ent = &cl.baselines[i];
+        if (!ent->number) {
+            continue;
+        }
+        q2proto_svc_spawnbaseline_t *baseline = &spawnbaselines[gamestate.num_spawnbaselines++];
+        baseline->entnum = ent->number;
+        q2proto_packed_entity_state_t packed_entity;
+        PackEntity(&cls.demo.q2proto_context, ent, &packed_entity);
+        Q2PROTO_MakeEntityDelta(&cls.demo.q2proto_context, &baseline->delta_state, NULL, &packed_entity, 0);
+    }
+
+    q2proto_server_write_gamestate(&cls.demo.q2proto_context, NULL, Q2PROTO_IOARG_DEMO_WRITE, &gamestate);;
+
     // write all the backups, since we can't predict what frame the next
     // delta will come from
     lastframe = NULL;
@@ -984,22 +1020,6 @@ void CL_EmitDemoSnapshot(void)
         emit_delta_frame(lastframe, frame, lastnum, j);
         lastframe = frame;
         lastnum = frame->number;
-    }
-
-    // write configstrings
-    for (i = 0; i < cl.csr.end; i++) {
-        from = cl.baseconfigstrings[i];
-        to = cl.configstrings[i];
-
-        if (!strcmp(from, to))
-            continue;
-
-        len = Q_strnlen(to, CS_MAX_STRING_LENGTH);
-        q2proto_svc_message_t message = {.type = Q2P_SVC_CONFIGSTRING};
-        message.configstring.index = i;
-        message.configstring.value.str = to;
-        message.configstring.value.len = len;
-        q2proto_server_write(&cls.demo.q2proto_context, Q2PROTO_IOARG_DEMO_WRITE, &message);
     }
 
     // write layout

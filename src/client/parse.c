@@ -1441,6 +1441,11 @@ bool CL_SeekDemoMessage(void)
         case Q2P_SVC_PRINT:
         case Q2P_SVC_CENTERPRINT:
         case Q2P_SVC_STUFFTEXT:
+        case Q2P_SVC_DAMAGE:
+        case Q2P_SVC_POI:
+        case Q2P_SVC_HELP_PATH:
+        case Q2P_SVC_ACHIEVEMENT:
+        case Q2P_SVC_LOCPRINT:
             // Ignore
             break;
 

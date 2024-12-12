@@ -3538,6 +3538,7 @@ void CL_Shutdown(void)
 
 #if USE_ZLIB
     inflateEnd(&cls.z);
+    Z_Free(cls.demo.z_buffer);
 #endif
 
     HTTP_Shutdown();

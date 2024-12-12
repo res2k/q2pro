@@ -917,6 +917,19 @@ static void CL_PlayDemo_f(void)
     SZ_InitWrite(&cls.demo.buffer, demo_buffer, MAX_MSGLEN);
     demo_q2protoio_ioarg.max_msg_len = MAX_MSGLEN;
 
+#if USE_ZLIB
+    if (!cls.demo.z_buffer) {
+        Q_assert(deflateInit2(&cls.demo.z, Z_DEFAULT_COMPRESSION, Z_DEFLATED,
+                -MAX_WBITS, 9, Z_DEFAULT_STRATEGY) == Z_OK);
+        cls.demo.z_buffer_size = deflateBound(&cls.demo.z, MAX_MSGLEN) + 6 /* zlib header/footer */;
+        cls.demo.z_buffer = Z_Malloc(cls.demo.z_buffer_size);
+    }
+
+    cls.demo.q2proto_deflate.z_buffer = cls.demo.z_buffer;
+    cls.demo.q2proto_deflate.z_buffer_size = cls.demo.z_buffer_size;
+    cls.demo.q2proto_deflate.z_raw = &cls.demo.z;
+#endif
+
     // read and parse messages util `precache' command
     for (int i = 0; cls.state == ca_connected && i < 1000; i++) {
         Cbuf_Execute(&cl_cmdbuf);
@@ -1003,7 +1016,11 @@ void CL_EmitDemoSnapshot(void)
         Q2PROTO_MakeEntityDelta(&cls.demo.q2proto_context, &baseline->delta_state, NULL, &packed_entity, 0);
     }
 
-    q2proto_server_write_gamestate(&cls.demo.q2proto_context, NULL, Q2PROTO_IOARG_DEMO_WRITE, &gamestate);;
+    q2protoio_deflate_args_t *deflate_args = NULL;
+#if USE_ZLIB
+    deflate_args = &cls.demo.q2proto_deflate;
+#endif
+    q2proto_server_write_gamestate(&cls.demo.q2proto_context, deflate_args, Q2PROTO_IOARG_DEMO_WRITE, &gamestate);;
 
     // write all the backups, since we can't predict what frame the next
     // delta will come from

@@ -40,15 +40,17 @@ static struct {
     bool stream_end;
 } io_inflate;
 
-#endif
-
 // Sizebuf with inflated data
 static sizebuf_t msg_inflate;
 // Sizebuf to buffer data to deflate
 static sizebuf_t msg_deflate;
 static byte deflate_buf[MAX_DEFLATED_SIZE];
 
+#endif // USE_ZLIB
+
 q2protoio_ioarg_t default_q2protoio_ioarg = {.sz_read = &msg_read, .sz_write = &msg_write, .max_msg_len = 1384 /* conservative default */ };
+
+#if USE_ZLIB
 static q2protoio_ioarg_t inflate_q2protoio_ioarg = {.sz_read = &msg_inflate, .sz_write = &msg_write};
 static q2protoio_ioarg_t deflate_q2protoio_ioarg = {.sz_write = &msg_deflate};
 
@@ -56,6 +58,7 @@ static q2protoio_ioarg_t deflate_q2protoio_ioarg = {.sz_write = &msg_deflate};
 #define IOARG_INFLATE      ((uintptr_t)&inflate_q2protoio_ioarg)
 // I/O arg: write w/ deflate
 #define IOARG_DEFLATE      ((uintptr_t)&deflate_q2protoio_ioarg)
+#endif // USE_ZLIB
 
 static byte* io_read_data(uintptr_t io_arg, size_t len, size_t *readcount)
 {
@@ -334,6 +337,7 @@ void q2protoio_write_raw(uintptr_t io_arg, const void* data, size_t size, size_t
     }
 }
 
+#if USE_ZLIB
 static void compress_accumulated(q2protoio_deflate_args_t *deflate_args)
 {
     // Compress data accumulated in deflate_buf
@@ -345,11 +349,13 @@ static void compress_accumulated(q2protoio_deflate_args_t *deflate_args)
         Com_Error(ERR_DROP, "%s: deflate() failed with error %d", __func__, ret);
     }
 }
+#endif // USE_ZLIB
 
 size_t q2protoio_write_available(uintptr_t io_arg)
 {
     const q2protoio_ioarg_t *io_data = (const q2protoio_ioarg_t *)io_arg;
     sizebuf_t *sz = io_data->sz_write;
+#if USE_ZLIB
     if (io_data->deflate)
     {
         size_t already_compressed = io_data->deflate->z_current->total_out;
@@ -368,6 +374,7 @@ size_t q2protoio_write_available(uintptr_t io_arg)
         return write_available;
     }
     else
+#endif // USE_ZLIB
     {
         return io_data->max_msg_len - min(sz->cursize, io_data->max_msg_len);
     }

@@ -137,9 +137,13 @@ static void write_gamestate(void)
         }
     }
 
+    q2protoio_deflate_args_t *deflate_args = NULL;
+#if USE_ZLIB
+    deflate_args = &sv_client->q2proto_deflate;
+#endif
     int write_result;
     do {
-        write_result = q2proto_server_write_gamestate(&sv_client->q2proto_ctx, &sv_client->q2proto_deflate, (uintptr_t)&sv_client->io_data, &gamestate);
+        write_result = q2proto_server_write_gamestate(&sv_client->q2proto_ctx, deflate_args, (uintptr_t)&sv_client->io_data, &gamestate);
         SV_ClientAddMessage(sv_client, MSG_GAMESTATE);
     } while (write_result == Q2P_ERR_NOT_ENOUGH_PACKET_SPACE);
 }

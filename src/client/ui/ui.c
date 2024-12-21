@@ -306,9 +306,9 @@ bool UI_CursorInRect(const vrect_t *rect)
 void UI_DrawString(int x, int y, int flags, color_t color, const char *string)
 {
     if ((flags & UI_CENTER) == UI_CENTER) {
-        x -= strlen(string) * CHAR_WIDTH / 2;
+        x -= strlen(string) * CONCHAR_WIDTH / 2;
     } else if (flags & UI_RIGHT) {
-        x -= strlen(string) * CHAR_WIDTH;
+        x -= strlen(string) * CONCHAR_WIDTH;
     }
 
     R_DrawString(x, y, flags, MAX_STRING_CHARS, string, COLOR_SETA_U8(color, 255), uis.fontHandle);
@@ -322,8 +322,8 @@ void UI_DrawChar(int x, int y, int flags, color_t color, int ch)
 
 void UI_StringDimensions(vrect_t *rc, int flags, const char *string)
 {
-    rc->height = CHAR_HEIGHT;
-    rc->width = CHAR_WIDTH * strlen(string);
+    rc->height = CONCHAR_HEIGHT;
+    rc->width = CONCHAR_WIDTH * strlen(string);
 
     if ((flags & UI_CENTER) == UI_CENTER) {
         rc->x -= rc->width / 2;

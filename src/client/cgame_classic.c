@@ -31,8 +31,8 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 /* Some definitions copied from client.h
  * This file is deliberately not included to make sure only functions from
  * the cgame_import struct are used */
-#define CHAR_WIDTH  8
-#define CHAR_HEIGHT 8
+#define CONCHAR_WIDTH  8
+#define CONCHAR_HEIGHT 8
 
 #define UI_LEFT             BIT(0)
 #define UI_RIGHT            BIT(1)
@@ -100,7 +100,7 @@ static void CG_DrawString(int x, int y, int flags, size_t maxlen, const char *s,
     while (maxlen-- && *s) {
         byte c = *s++;
         cgix.DrawCharEx(x, y, flags, c, color);
-        x += CHAR_WIDTH;
+        x += CONCHAR_WIDTH;
     }
 }
 
@@ -118,9 +118,9 @@ static void CG_DrawStringEx(int x, int y, int flags, size_t maxlen, const char *
     }
 
     if ((flags & UI_CENTER) == UI_CENTER) {
-        x -= len * CHAR_WIDTH / 2;
+        x -= len * CONCHAR_WIDTH / 2;
     } else if (flags & UI_RIGHT) {
-        x -= len * CHAR_WIDTH;
+        x -= len * CONCHAR_WIDTH;
     }
 
     CG_DrawString(x, y, flags, maxlen, s, color);
@@ -149,7 +149,7 @@ static void CG_DrawStringMulti(int x, int y, int flags, size_t maxlen, const cha
         }
         CG_DrawStringEx(x, y, flags, len, s, color);
 
-        y += CHAR_HEIGHT;
+        y += CONCHAR_HEIGHT;
         s = p + 1;
     }
 }
@@ -340,13 +340,13 @@ static void layout_client(vrect_t hud_vrect, const char **s, const player_state_
     time = atoi(token);
 
     HUD_DrawAltString(x + 32, y, cgi.CL_GetClientName(value));
-    HUD_DrawString(x + 32, y + CHAR_HEIGHT, "Score: ");
+    HUD_DrawString(x + 32, y + CONCHAR_HEIGHT, "Score: ");
     Q_snprintf(buffer, sizeof(buffer), "%i", score);
-    HUD_DrawAltString(x + 32 + 7 * CHAR_WIDTH, y + CHAR_HEIGHT, buffer);
+    HUD_DrawAltString(x + 32 + 7 * CONCHAR_WIDTH, y + CONCHAR_HEIGHT, buffer);
     Q_snprintf(buffer, sizeof(buffer), "Ping:  %i", ping);
-    HUD_DrawString(x + 32, y + 2 * CHAR_HEIGHT, buffer);
+    HUD_DrawString(x + 32, y + 2 * CONCHAR_HEIGHT, buffer);
     Q_snprintf(buffer, sizeof(buffer), "Time:  %i", time);
-    HUD_DrawString(x + 32, y + 3 * CHAR_HEIGHT, buffer);
+    HUD_DrawString(x + 32, y + 3 * CONCHAR_HEIGHT, buffer);
 
     DrawPic(x, y, cgi.CL_GetClientPic(value));
 }
@@ -523,7 +523,7 @@ static void SCR_DrawHealthBar(vrect_t hud_vrect, int x, int y, int value)
     int bar_width = hud_vrect.width / 3;
     float percent = (value - 1) / 254.0f;
     int w = bar_width * percent + 0.5f;
-    int h = CHAR_HEIGHT / 2;
+    int h = CONCHAR_HEIGHT / 2;
 
     x -= bar_width / 2;
     cgi.SCR_DrawColorPic(x, y, w, h, "_white", &rgba_fg);
@@ -721,8 +721,8 @@ static void SCR_ExecuteLayoutString(vrect_t hud_vrect, const char *s, int32_t pl
             }
 
             HUD_DrawCenterString(x + 320 / 2, y, cgi.get_configstring(index));
-            SCR_DrawHealthBar(hud_vrect, x + 320 / 2, y + CHAR_HEIGHT + 4, value & 0xff);
-            SCR_DrawHealthBar(hud_vrect, x + 320 / 2, y + CHAR_HEIGHT + 12, (value >> 8) & 0xff);
+            SCR_DrawHealthBar(hud_vrect, x + 320 / 2, y + CONCHAR_HEIGHT + 4, value & 0xff);
+            SCR_DrawHealthBar(hud_vrect, x + 320 / 2, y + CONCHAR_HEIGHT + 12, (value >> 8) & 0xff);
             continue;
         }
     }
@@ -802,10 +802,10 @@ static void SCR_DrawInventory(vrect_t hud_vrect, const cg_server_data_t *data, c
     x += 24;
 
     HUD_DrawString(x, y, "hotkey ### item");
-    y += CHAR_HEIGHT;
+    y += CONCHAR_HEIGHT;
 
     HUD_DrawString(x, y, "------ --- ----");
-    y += CHAR_HEIGHT;
+    y += CONCHAR_HEIGHT;
 
     for (i = top; i < num && i < top + DISPLAY_ITEMS; i++) {
         item = index[i];
@@ -822,11 +822,11 @@ static void SCR_DrawInventory(vrect_t hud_vrect, const cg_server_data_t *data, c
         } else {    // draw a blinky cursor by the selected item
             HUD_DrawString(x, y, string);
             if ((cgi.CL_ClientRealTime() >> 8) & 1) {
-                cgi.SCR_DrawChar(x - CHAR_WIDTH, y, 1, 15, false);
+                cgi.SCR_DrawChar(x - CONCHAR_WIDTH, y, 1, 15, false);
             }
         }
 
-        y += CHAR_HEIGHT;
+        y += CONCHAR_HEIGHT;
     }
 }
 

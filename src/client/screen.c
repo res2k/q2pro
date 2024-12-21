@@ -123,9 +123,9 @@ int SCR_DrawStringEx(int x, int y, int flags, size_t maxlen,
     }
 
     if ((flags & UI_CENTER) == UI_CENTER) {
-        x -= len * CHAR_WIDTH / 2;
+        x -= len * CONCHAR_WIDTH / 2;
     } else if (flags & UI_RIGHT) {
-        x -= len * CHAR_WIDTH;
+        x -= len * CONCHAR_WIDTH;
     }
 
     return R_DrawString(x, y, flags, maxlen, s, color, font);
@@ -158,7 +158,7 @@ void SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen,
         last_y = y;
         maxlen -= len;
 
-        y += CHAR_HEIGHT;
+        y += CONCHAR_HEIGHT;
         s = p + 1;
     }
 
@@ -385,7 +385,7 @@ static void draw_progress_bar(float progress, bool paused, int framenum)
     size_t len;
 
     w = Q_rint(scr.hud_width * progress);
-    h = Q_rint(CHAR_HEIGHT / scr.hud_scale);
+    h = Q_rint(CONCHAR_HEIGHT / scr.hud_scale);
 
     scr.hud_height -= h;
 
@@ -398,7 +398,7 @@ static void draw_progress_bar(float progress, bool paused, int framenum)
     h = Q_rint(scr.hud_height * scr.hud_scale);
 
     len = Q_scnprintf(buffer, sizeof(buffer), "%.f%%", progress * 100);
-    x = (w - len * CHAR_WIDTH) / 2;
+    x = (w - len * CONCHAR_WIDTH) / 2;
     R_DrawString(x, h, 0, MAX_STRING_CHARS, buffer, COLOR_WHITE, scr.font_pic);
 
     if (scr_demobar->integer > 1) {
@@ -777,7 +777,7 @@ static void SCR_DrawObjects(color_t base_color)
             x += scr.hud_width + 1;
         }
         if (y < 0) {
-            y += scr.hud_height - CHAR_HEIGHT + 1;
+            y += scr.hud_height - CONCHAR_HEIGHT + 1;
         }
 
         color_t color = base_color;
@@ -860,10 +860,10 @@ static void SCR_DrawChatHUD(color_t base_color)
     }
 
     if (y < 0) {
-        y += scr.hud_height - CHAR_HEIGHT + 1;
-        step = -CHAR_HEIGHT;
+        y += scr.hud_height - CONCHAR_HEIGHT + 1;
+        step = -CONCHAR_HEIGHT;
     } else {
-        step = CHAR_HEIGHT;
+        step = CONCHAR_HEIGHT;
     }
 
     lines = scr_chathud_lines->integer;
@@ -908,13 +908,13 @@ static void SCR_DrawTurtle(color_t base_color)
     if (!cl.frameflags)
         return;
 
-    x = CHAR_WIDTH;
-    y = scr.hud_height - 11 * CHAR_HEIGHT;
+    x = CONCHAR_WIDTH;
+    y = scr.hud_height - 11 * CONCHAR_HEIGHT;
 
 #define DF(f) \
     if (cl.frameflags & FF_##f) { \
         SCR_DrawString(x, y, UI_ALTCOLOR, base_color, #f); \
-        y += CHAR_HEIGHT; \
+        y += CONCHAR_HEIGHT; \
     }
 
     if (scr_showturtle->integer > 1) {
@@ -948,8 +948,8 @@ static void SCR_DrawDebugStats(void)
     if (j > MAX_STATS)
         j = MAX_STATS;
 
-    x = CHAR_WIDTH;
-    y = (scr.hud_height - j * CHAR_HEIGHT) / 2;
+    x = CONCHAR_WIDTH;
+    y = (scr.hud_height - j * CONCHAR_HEIGHT) / 2;
     for (i = 0; i < j; i++) {
         Q_snprintf(buffer, sizeof(buffer), "%2d: %d", i, cl.frame.ps.stats[i]);
         color_t color = COLOR_WHITE;
@@ -957,7 +957,7 @@ static void SCR_DrawDebugStats(void)
             color = COLOR_RED;
         }
         R_DrawString(x, y, 0, MAX_STRING_CHARS, buffer, color, scr.font_pic);
-        y += CHAR_HEIGHT;
+        y += CONCHAR_HEIGHT;
     }
 }
 
@@ -977,21 +977,21 @@ static void SCR_DrawDebugPmove(void)
     if (!scr_showpmove->integer)
         return;
 
-    x = CHAR_WIDTH;
-    y = (scr.hud_height - 2 * CHAR_HEIGHT) / 2;
+    x = CONCHAR_WIDTH;
+    y = (scr.hud_height - 2 * CONCHAR_HEIGHT) / 2;
 
     i = cl.frame.ps.pmove.pm_type;
     if (i > PM_FREEZE)
         i = PM_FREEZE;
 
     R_DrawString(x, y, 0, MAX_STRING_CHARS, types[i], COLOR_WHITE, scr.font_pic);
-    y += CHAR_HEIGHT;
+    y += CONCHAR_HEIGHT;
 
     j = cl.frame.ps.pmove.pm_flags;
     for (i = 0; i < 8; i++) {
         if (j & (1 << i)) {
             x = R_DrawString(x, y, 0, MAX_STRING_CHARS, flags[i], COLOR_WHITE, scr.font_pic);
-            x += CHAR_WIDTH;
+            x += CONCHAR_WIDTH;
         }
     }
 }
@@ -1359,13 +1359,13 @@ void SCR_StatTableSize(int key_width, int value_width)
 void SCR_StatKeyValue(const char *key, const char *value)
 {
     int c = (stat_state.key_id & 1) ? 24 : 0;
-    R_DrawFill32(stat_state.x, stat_state.y, CHAR_WIDTH * (stat_state.key_width + stat_state.value_width) + (STAT_MARGIN * 2), CHAR_HEIGHT + (STAT_MARGIN * 2), COLOR_RGBA(c, c, c, 127));
+    R_DrawFill32(stat_state.x, stat_state.y, CONCHAR_WIDTH * (stat_state.key_width + stat_state.value_width) + (STAT_MARGIN * 2), CONCHAR_HEIGHT + (STAT_MARGIN * 2), COLOR_RGBA(c, c, c, 127));
     SCR_DrawString(stat_state.x + STAT_MARGIN, stat_state.y + STAT_MARGIN, UI_DROPSHADOW, COLOR_WHITE, key);
-    stat_state.x += CHAR_WIDTH * stat_state.key_width;
+    stat_state.x += CONCHAR_WIDTH * stat_state.key_width;
     SCR_DrawString(stat_state.x + STAT_MARGIN, stat_state.y + STAT_MARGIN, UI_DROPSHADOW, COLOR_WHITE, value);
 
     stat_state.x = 24;
-    stat_state.y += CHAR_HEIGHT + (STAT_MARGIN * 2);
+    stat_state.y += CONCHAR_HEIGHT + (STAT_MARGIN * 2);
     stat_state.key_id++;
 }
 

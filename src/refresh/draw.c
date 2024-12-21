@@ -429,7 +429,7 @@ void R_DrawChar(int x, int y, int flags, int c, color_t color, qhandle_t font)
     if (gl_fontshadow->integer > 0)
         flags |= UI_DROPSHADOW;
 
-    draw_char(x, y, CHAR_WIDTH, CHAR_HEIGHT, flags, c & 255, color, IMG_ForHandle(font));
+    draw_char(x, y, CONCHAR_WIDTH, CONCHAR_HEIGHT, flags, c & 255, color, IMG_ForHandle(font));
 }
 
 void R_DrawStretchChar(int x, int y, int w, int h, int flags, int c, color_t color, qhandle_t font)
@@ -450,13 +450,13 @@ int R_DrawString(int x, int y, int flags, size_t maxlen, const char *s, color_t 
         byte c = *s++;
 
         if ((flags & UI_MULTILINE) && c == '\n') {
-            y += CHAR_HEIGHT + (1.0 / draw.scale);
+            y += CONCHAR_HEIGHT + (1.0 / draw.scale);
             x = sx;
             continue;
         }
 
-        draw_char(x, y, CHAR_WIDTH, CHAR_HEIGHT, flags, c, color, image);
-        x += CHAR_WIDTH;
+        draw_char(x, y, CONCHAR_WIDTH, CONCHAR_HEIGHT, flags, c, color, image);
+        x += CONCHAR_WIDTH;
     }
 
     return x;

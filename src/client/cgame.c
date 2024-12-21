@@ -232,7 +232,7 @@ static void CG_SCR_SetAltTypeface(bool enabled)
 static float CG_SCR_FontLineHeight(int scale)
 {
     if (!scr.kfont.pic)
-        return CHAR_HEIGHT * scale;
+        return CONCHAR_HEIGHT * scale;
 
     return scr.kfont.line_height;
 }
@@ -244,7 +244,7 @@ static cg_vec2_t CG_SCR_MeasureFontString(const char *str, int scale)
     int x, y = CG_SCR_FontLineHeight(scale);
 
     if (!scr.kfont.pic)
-        x = strlen(str) * CHAR_WIDTH * scale;
+        x = strlen(str) * CONCHAR_WIDTH * scale;
     else {
         x = 0;
 
@@ -277,8 +277,8 @@ static void CG_SCR_DrawFontString(const char *str, int x, int y, int scale, cons
     // FIXME: can contain line breaks
     if (!scr.kfont.pic) {
         while (*str) {
-            R_DrawStretchChar(draw_x, y, CHAR_WIDTH * scale, CHAR_HEIGHT * scale, draw_flags, *str++, draw_color, scr.font_pic);
-            draw_x += CHAR_WIDTH * scale;
+            R_DrawStretchChar(draw_x, y, CONCHAR_WIDTH * scale, CONCHAR_HEIGHT * scale, draw_flags, *str++, draw_color, scr.font_pic);
+            draw_x += CONCHAR_WIDTH * scale;
         }
     } else {
         while (*str) {
@@ -328,7 +328,7 @@ static int32_t CG_SCR_DrawBind(int32_t isplit, const char *binding, const char *
     else
         Q_snprintf(str, sizeof(str), "[%s] %s", key, CG_Localize(purpose, NULL, 0));
     CG_SCR_DrawFontString(str, x, y, scale, &rgba_white, false, CENTER);
-    return CHAR_HEIGHT;
+    return CONCHAR_HEIGHT;
 }
 
 static bool CG_CL_InAutoDemoLoop(void)

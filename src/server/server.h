@@ -159,6 +159,7 @@ typedef struct server_entity_packed_s {
 typedef struct {
     server_state_t  state;      // precache commands are only valid during load
     int             spawncount; // random number generated each server spawn
+    bool            nextserver_pending;
 
     int         framerate;
     frametime_t frametime;

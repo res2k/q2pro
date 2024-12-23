@@ -174,7 +174,7 @@ static void CL_ParsePacketEntities(const server_frame_t *oldframe, server_frame_
 
         while (oldnum < newnum) {
             // one or more entities from the old packet are unchanged
-            SHOWNET(3, "   unchanged:%i\n", oldnum);
+            SHOWNET(4, "   unchanged:%i\n", oldnum);
             CL_ParseDeltaEntity(frame, oldnum, oldstate, NULL);
 
             oldindex++;
@@ -235,7 +235,7 @@ static void CL_ParsePacketEntities(const server_frame_t *oldframe, server_frame_
     // any remaining entities in the old frame are copied over
     while (oldnum != MAX_EDICTS) {
         // one or more entities from the old packet are unchanged
-        SHOWNET(3, "   unchanged:%i\n", oldnum);
+        SHOWNET(4, "   unchanged:%i\n", oldnum);
         CL_ParseDeltaEntity(frame, oldnum, oldstate, NULL);
 
         oldindex++;
@@ -465,7 +465,7 @@ static void CL_ParseFrame(const q2proto_svc_frame_t *frame_msg)
 
     apply_playerfog_change(&fog_change);
 
-    SHOWNET(2, "%3u:packetentities\n", msg_read.readcount);
+    SHOWNET(3, "%3u:packetentities\n", msg_read.readcount);
 
     // parse packetentities
     CL_ParsePacketEntities(oldframe, &frame);
@@ -474,7 +474,7 @@ static void CL_ParseFrame(const q2proto_svc_frame_t *frame_msg)
     cl.frames[currentframe & UPDATE_MASK] = frame;
 
 #if USE_DEBUG
-    if (cl_shownet->integer > 2) {
+    if (cl_shownet->integer >= 3) {
         int seq = cls.netchan.incoming_acknowledged & CMD_MASK;
         int rtt = cls.demo.playback ? 0 : cls.realtime - cl.history[seq].sent;
         Com_LPrintf(PRINT_DEVELOPER, "%3u:frame:%d  delta:%d  rtt:%d\n",
@@ -535,7 +535,7 @@ static void CL_ParseConfigstring(const q2proto_svc_configstring_t *configstring)
     maxlen = Com_ConfigstringSize(&cl.csr, configstring->index);
     q2pslcpy(s, maxlen, &configstring->value);
 
-    SHOWNET(2, "    %d \"%s\"\n", configstring->index, Com_MakePrintable(configstring->value.str));
+    SHOWNET(3, "    %d \"%s\"\n", configstring->index, Com_MakePrintable(configstring->value.str));
 
     if (configstring->value.len >= maxlen) {
         Com_WPrintf(
@@ -863,7 +863,7 @@ static void CL_ParseStartSoundPacket(const q2proto_svc_sound_t* sound)
         Com_Error(ERR_DROP, "%s: bad index: %d", __func__, snd.index);
     if (snd.entity >= cl.csr.max_edicts)
         Com_Error(ERR_DROP, "%s: bad entity: %d", __func__, snd.entity);
-    SHOWNET(2, "    %s\n", cl.configstrings[cl.csr.sounds + snd.index]);
+    SHOWNET(3, "    %s\n", cl.configstrings[cl.csr.sounds + snd.index]);
 }
 
 static void CL_ParseReconnect(void)
@@ -1030,7 +1030,7 @@ static void CL_ParseCenterPrint(const q2proto_svc_centerprint_t *centerprint)
 
     q2pslcpy(s, sizeof(s), &centerprint->message);
 
-    SHOWNET(2, "    \"%s\"\n", Com_MakePrintable(s));
+    SHOWNET(3, "    \"%s\"\n", Com_MakePrintable(s));
     cgame->ParseCenterPrint(s, 0, false);
 
     if (!cls.demo.playback && cl.serverstate != ss_broadcast) {
@@ -1044,14 +1044,14 @@ static void CL_ParseStuffText(const q2proto_svc_stufftext_t *stufftext)
     char s[MAX_STRING_CHARS];
 
     q2pslcpy(s, sizeof(s), &stufftext->string);
-    SHOWNET(2, "    \"%s\"\n", Com_MakePrintable(s));
+    SHOWNET(3, "    \"%s\"\n", Com_MakePrintable(s));
     Cbuf_AddText(&cl_cmdbuf, s);
 }
 
 static void CL_ParseLayout(const q2proto_svc_layout_t *layout)
 {
     q2pslcpy(cl.cgame_data.layout, sizeof(cl.cgame_data.layout), &layout->layout_str);
-    SHOWNET(2, "    \"%s\"\n", Com_MakePrintable(cl.cgame_data.layout));
+    SHOWNET(3, "    \"%s\"\n", Com_MakePrintable(cl.cgame_data.layout));
 }
 
 static void CL_ParseInventory(const q2proto_svc_inventory_t *inventory)
@@ -1244,7 +1244,7 @@ void CL_ParseServerMessage(void)
 #if USE_DEBUG
     if (cl_shownet->integer == 1) {
         Com_LPrintf(PRINT_DEVELOPER, "%u ", msg_read.cursize);
-    } else if (cl_shownet->integer > 1) {
+    } else if (cl_shownet->integer >= 2) {
         Com_LPrintf(PRINT_DEVELOPER, "------------------\n");
     }
 #endif
@@ -1260,7 +1260,7 @@ void CL_ParseServerMessage(void)
         q2proto_svc_message_t svc_msg;
         q2proto_error_t err = q2proto_client_read(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_READ, &svc_msg);
         if (err == Q2P_ERR_NO_MORE_INPUT) {
-            SHOWNET(1, "%3u:END OF MESSAGE\n", readcount);
+            SHOWNET(2, "%3u:END OF MESSAGE\n", readcount);
             break;
         }
 
@@ -1407,7 +1407,7 @@ bool CL_SeekDemoMessage(void)
 #if USE_DEBUG
     if (cl_shownet->integer == 1) {
         Com_LPrintf(PRINT_DEVELOPER, "%u ", msg_read.cursize);
-    } else if (cl_shownet->integer > 1) {
+    } else if (cl_shownet->integer >= 2) {
         Com_LPrintf(PRINT_DEVELOPER, "------------------\n");
     }
 #endif
@@ -1421,7 +1421,7 @@ bool CL_SeekDemoMessage(void)
         q2proto_svc_message_t svc_msg;
         q2proto_error_t err = q2proto_client_read(&cls.q2proto_ctx, Q2PROTO_IOARG_CLIENT_READ, &svc_msg);
         if (err == Q2P_ERR_NO_MORE_INPUT) {
-            SHOWNET(1, "%3u:END OF MESSAGE\n", msg_read.readcount);
+            SHOWNET(2, "%3u:END OF MESSAGE\n", msg_read.readcount);
             break;
         }
         switch(svc_msg.type)

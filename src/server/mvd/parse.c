@@ -27,7 +27,7 @@ static bool match_ended_hack;
 
 #if USE_DEBUG
 #define SHOWNET(level, ...) \
-    do { if (mvd_shownet->integer > level) \
+    do { if (mvd_shownet->integer >= level) \
         Com_LPrintf(PRINT_DEVELOPER, __VA_ARGS__); } while (0)
 
 static const char *MVD_ServerCommandString(int cmd)
@@ -371,7 +371,7 @@ static void MVD_ParseUnicast(mvd_t *mvd, bool reliable, int extrabits)
     while (msg_read.readcount < last) {
         cmd = MSG_ReadByte();
 
-        SHOWNET(1, "%3u:%s\n", msg_read.readcount - 1, MSG_ServerCommandString(cmd, PROTOCOL_VERSION_MVD));
+        SHOWNET(2, "%3u:%s\n", msg_read.readcount - 1, MSG_ServerCommandString(cmd, PROTOCOL_VERSION_MVD));
 
         switch (cmd) {
         case svc_layout:
@@ -387,7 +387,7 @@ static void MVD_ParseUnicast(mvd_t *mvd, bool reliable, int extrabits)
             MVD_UnicastStuff(mvd, reliable, player);
             break;
         default:
-            SHOWNET(1, "%3u:SKIPPING UNICAST\n", msg_read.readcount - 1);
+            SHOWNET(2, "%3u:SKIPPING UNICAST\n", msg_read.readcount - 1);
             // send remaining data and return
             data = msg_read.data + msg_read.readcount - 1;
             length = last - msg_read.readcount + 1;
@@ -398,7 +398,7 @@ static void MVD_ParseUnicast(mvd_t *mvd, bool reliable, int extrabits)
         }
     }
 
-    SHOWNET(1, "%3u:END OF UNICAST\n", msg_read.readcount);
+    SHOWNET(2, "%3u:END OF UNICAST\n", msg_read.readcount);
 
     if (msg_read.readcount > last) {
         MVD_Destroyf(mvd, "%s: read past end of unicast", __func__);
@@ -657,7 +657,7 @@ static void MVD_ParsePacketEntities(mvd_t *mvd)
         ent = &mvd->edicts[number];
 
 #if USE_DEBUG
-        if (mvd_shownet->integer > 2) {
+        if (mvd_shownet->integer >= 3) {
             Com_LPrintf(PRINT_DEVELOPER, "%3u:%s:%d ", readcount,
                        ent->inuse ? "delta" : "baseline", number);
             MSG_ShowDeltaEntityBits(bits);
@@ -677,7 +677,7 @@ static void MVD_ParsePacketEntities(mvd_t *mvd)
 
         // shuffle current origin to old if removed
         if (bits & U_REMOVE) {
-            SHOWNET(2, "%3u:remove:%d\n", readcount, number);
+            SHOWNET(3, "%3u:remove:%d\n", readcount, number);
             if (!(ent->s.renderfx & RF_BEAM)) {
                 VectorCopy(ent->s.origin, ent->s.old_origin);
             }
@@ -731,7 +731,7 @@ static void MVD_ParsePacketPlayers(mvd_t *mvd)
         }
 
 #if USE_DEBUG
-        if (mvd_shownet->integer > 2) {
+        if (mvd_shownet->integer >= 3) {
             Com_LPrintf(PRINT_DEVELOPER, "%3u:%s:%d ", readcount,
                        player->inuse ? "delta" : "baseline", number);
             MSG_ShowDeltaPlayerstateBits_Packet(bits);
@@ -743,7 +743,7 @@ static void MVD_ParsePacketPlayers(mvd_t *mvd)
         MSG_ParseDeltaPlayerstate_Packet(&player->ps, &fog_change, bits, mvd->psFlags);
 
         if (bits & PPS_REMOVE) {
-            SHOWNET(2, "%3u:remove:%d\n", readcount, number);
+            SHOWNET(3, "%3u:remove:%d\n", readcount, number);
             player->inuse = false;
             continue;
         }
@@ -771,11 +771,11 @@ static void MVD_ParseFrame(mvd_t *mvd)
     if (!mvd->demoseeking)
         CM_SetPortalStates(&mvd->cm, data, length);
 
-    SHOWNET(1, "%3u:playerinfo\n", msg_read.readcount);
+    SHOWNET(2, "%3u:playerinfo\n", msg_read.readcount);
     MVD_ParsePacketPlayers(mvd);
-    SHOWNET(1, "%3u:packetentities\n", msg_read.readcount);
+    SHOWNET(2, "%3u:packetentities\n", msg_read.readcount);
     MVD_ParsePacketEntities(mvd);
-    SHOWNET(1, "%3u:frame:%u\n", msg_read.readcount, mvd->framenum);
+    SHOWNET(2, "%3u:frame:%u\n", msg_read.readcount, mvd->framenum);
     MVD_PlayerToEntityStates(mvd);
 
     // update clients now so that effects datagram that
@@ -1071,7 +1071,7 @@ bool MVD_ParseMessage(mvd_t *mvd)
 #if USE_DEBUG
     if (mvd_shownet->integer == 1) {
         Com_LPrintf(PRINT_DEVELOPER, "%u ", msg_read.cursize);
-    } else if (mvd_shownet->integer > 1) {
+    } else if (mvd_shownet->integer >= 2) {
         Com_LPrintf(PRINT_DEVELOPER, "------------------\n");
     }
 #endif
@@ -1085,7 +1085,7 @@ bool MVD_ParseMessage(mvd_t *mvd)
             MVD_Destroyf(mvd, "Read past end of message");
         }
         if (msg_read.readcount == msg_read.cursize) {
-            SHOWNET(1, "%3u:END OF MESSAGE\n", msg_read.readcount);
+            SHOWNET(2, "%3u:END OF MESSAGE\n", msg_read.readcount);
             break;
         }
 
@@ -1093,7 +1093,7 @@ bool MVD_ParseMessage(mvd_t *mvd)
         extrabits = cmd >> SVCMD_BITS;
         cmd &= SVCMD_MASK;
 
-        SHOWNET(1, "%3u:%s\n", msg_read.readcount - 1, MVD_ServerCommandString(cmd));
+        SHOWNET(2, "%3u:%s\n", msg_read.readcount - 1, MVD_ServerCommandString(cmd));
 
         switch (cmd) {
         case mvd_serverdata:

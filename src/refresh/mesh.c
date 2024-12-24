@@ -41,6 +41,7 @@ static vec3_t   shadedir;
 static bool     dotshading;
 
 static float    celscale;
+static float    shadowalpha;
 
 static drawshadow_t drawshadow;
 static mat4_t       m_shadow_model;     // fog hack
@@ -462,8 +463,7 @@ static void draw_celshading(const uint16_t *indices, int num_indices)
 static drawshadow_t cull_shadow(const model_t *model)
 {
     const cplane_t *plane;
-    float radius, d, w;
-    vec3_t point;
+    float radius, w;
 
     if (!gl_shadows->integer)
         return SHADOW_NO;
@@ -484,19 +484,27 @@ static drawshadow_t cull_shadow(const model_t *model)
     if (w < 0.5f)
         return SHADOW_NO;   // too steep
 
-    if (!gl_cull_models->integer)
-        return SHADOW_YES;
+    radius = (model->frames[newframenum].radius * frontlerp + model->frames[oldframenum].radius * backlerp) * glr.entscale;
 
-    // project on plane
-    d = PlaneDiffFast(origin, plane);
-    VectorMA(origin, -d, plane->normal, point);
+    shadowalpha = 0.5f;
 
-    radius = max(model->frames[newframenum].radius, model->frames[oldframenum].radius) / w;
+    // check if faded out
+    if (gl_shadows->integer >= 2 && glr.ent->bottom_z) {
+        float dist = glr.ent->bottom_z - glr.lightpoint.pos[2];
+        dist /= radius * 4.0f;
+        if (dist > 1.0f)
+            return SHADOW_NO;
+        if (dist > 0)
+            shadowalpha *= 1.0f - dist;
+    }
 
-    for (int i = 0; i < 4; i++) {
-        if (PlaneDiff(point, &glr.frustumPlanes[i]) < -radius) {
-            c.spheresCulled++;
-            return SHADOW_NO;   // culled out
+    if (gl_cull_models->integer) {
+        float min_d = -radius / w;
+        for (int i = 0; i < 4; i++) {
+            if (PlaneDiff(glr.lightpoint.pos, &glr.frustumPlanes[i]) < min_d) {
+                c.spheresCulled++;
+                return SHADOW_NO;   // culled out
+            }
         }
     }
 
@@ -554,22 +562,7 @@ static void draw_shadow(const uint16_t *indices, int num_indices)
     if (!drawshadow)
         return;
 
-    float alpha = color[3] * 0.5f;
-
-    if (gl_shadows_fade->integer && glr.ent->bottom_z) {
-        float dist = glr.ent->bottom_z - glr.lightpoint.position[2];
-
-        float scale = max(glr.ent->scale[0], max(glr.ent->scale[1], glr.ent->scale[2]));
-        float radius = LERP2(m_model->frames[newframenum].radius, m_model->frames[oldframenum].radius,
-            backlerp, frontlerp) * 5.0f * (scale ? scale : 1.0f);
-
-        dist = dist / radius;
-
-        if (dist >= 1.0f)
-            return;
-
-        alpha *= 1.0f - dist;
-    }
+    float alpha = color[3] * shadowalpha;
 
     // load shadow projection matrix
     GL_LoadMatrix(m_shadow_model, glr.viewmatrix);

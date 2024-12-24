@@ -326,7 +326,7 @@ typedef struct {
     cplane_t    plane;
     float       s, t;
     float       fraction;
-    vec3_t      position;
+    vec3_t      pos;
 } lightpoint_t;
 
 void BSP_LightPoint(lightpoint_t *point, const vec3_t start, const vec3_t end, const mnode_t *headnode, int nolm_mask);

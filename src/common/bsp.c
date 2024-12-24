@@ -1045,6 +1045,8 @@ void BSP_LightPoint(lightpoint_t *point, const vec3_t start, const vec3_t end, c
     light_mask = nolm_mask;
 
     BSP_RecursiveLightPoint(headnode, 0, 1, start, end);
+
+    LerpVector(start, end, light_point->fraction, light_point->pos);
 }
 
 void BSP_TransformedLightPoint(lightpoint_t *point, const vec3_t start, const vec3_t end,
@@ -1081,6 +1083,8 @@ void BSP_TransformedLightPoint(lightpoint_t *point, const vec3_t start, const ve
 
     // offset plane distance
     point->plane.dist += DotProduct(point->plane.normal, origin);
+
+    LerpVector(start, end, light_point->fraction, light_point->pos);
 }
 
 #endif

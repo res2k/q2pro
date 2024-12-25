@@ -1225,6 +1225,7 @@ static void Draw_Stats_s(void)
     SCR_StatKeyValuei("Boxes culled", c.boxesCulled);
     SCR_StatKeyValuei("Spheres culled", c.spheresCulled);
     SCR_StatKeyValuei("RtBoxes culled", c.rotatedBoxesCulled);
+    SCR_StatKeyValuei("Shadows culled", c.shadowsCulled);
     SCR_StatKeyValuei("Tris drawn", c.trisDrawn);
     SCR_StatKeyValuei("Tex switches", c.texSwitches);
     SCR_StatKeyValuei("Tex uploads", c.texUploads);

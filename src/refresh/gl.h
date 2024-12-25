@@ -221,6 +221,7 @@ typedef struct {
     int boxesCulled;
     int spheresCulled;
     int rotatedBoxesCulled;
+    int shadowsCulled;
     int batchesDrawn2D;
     int uniformUploads;
     int vertexArrayBinds;

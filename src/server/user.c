@@ -107,7 +107,7 @@ static void write_gamestate(void)
     memset(spawnbaselines, 0, sizeof(spawnbaselines));
 
     for (int i = 0; i < sv_client->csr->end; i++) {
-        char* string = sv_client->configstrings[i];
+        const char* string = sv_client->configstrings[i];
         if (!string[0]) {
             continue;
         }

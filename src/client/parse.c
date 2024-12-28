@@ -796,6 +796,8 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
         cls.demo.psFlags = cl.csr.extended ? CL_PS_EXTENDED_MASK_2 : 0;
     }
 
+    cl.max_stats = (cl.game_api >= Q2PROTO_GAME_Q2PRO_EXTENDED_V2) ? MAX_STATS_NEW : MAX_STATS_OLD;
+
     // Load cgame (after we know all the timings)
     CG_Load(cl.gamedir, cl.game_api == Q2PROTO_GAME_RERELEASE);
     cgame->Init();

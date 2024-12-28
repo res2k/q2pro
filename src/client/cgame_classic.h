@@ -26,6 +26,9 @@ typedef struct {
     // Whether server is using "extended" protocol
     bool (*IsExtendedServer)(void);
 
+    // Max allowed stats
+    int (*GetMaxStats)(void);
+
     // Draw single character, colorized & w/ flags
     void (*DrawCharEx)(int x, int y, int flags, int ch, color_t color);
 

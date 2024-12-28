@@ -34,6 +34,11 @@ static bool CGX_IsExtendedServer(void)
     return cl.csr.extended;
 }
 
+static int CGX_GetMaxStats(void)
+{
+    return cl.max_stats;
+}
+
 static color_t apply_scr_alpha(color_t color)
 {
     color.a *= Cvar_ClampValue(scr_alpha, 0, 1);
@@ -51,9 +56,10 @@ static const pmoveParams_t* CGX_GetPmoveParams(void)
 }
 
 static cgame_q2pro_extended_support_ext_t cgame_q2pro_extended_support = {
-    .api_version = 2,
+    .api_version = 3,
 
     .IsExtendedServer = CGX_IsExtendedServer,
+    .GetMaxStats = CGX_GetMaxStats,
     .DrawCharEx = CGX_DrawCharEx,
     .GetPmoveParams = CGX_GetPmoveParams,
 };

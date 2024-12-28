@@ -48,6 +48,7 @@ bool SCR_ParseColor(const char *s, color_t *color);
 static cgame_import_t cgi;
 static cgame_q2pro_extended_support_ext_t cgix;
 static const cs_remap_t *csr;
+static int max_stats;
 
 static cvar_t   *scr_centertime;
 static cvar_t   *scr_draw2d;
@@ -67,6 +68,7 @@ static void CGC_Init(void)
     /* We don't consider rerelease servers here and assume the appropriate
      * cgame is used in that case */
     csr = cgix.IsExtendedServer() ? &cs_remap_q2pro_new : &cs_remap_old;
+    max_stats = cgix.GetMaxStats();
 
     scr_centertime = cgi.cvar("scr_centertime", "2.5", 0);
     scr_draw2d = cgi.cvar("scr_draw2d", "2", 0);
@@ -288,7 +290,7 @@ static void layout_pic(vrect_t hud_vrect, const char **s, const player_state_t *
     // draw a pic from a stat number
     char* token = COM_Parse(s);
     int value = atoi(token);
-    if (value < 0 || value >= MAX_STATS) {
+    if (value < 0 || value >= max_stats) {
         cgi.Com_Error(va("%s: invalid stat index", __func__));
     }
     value = ps->stats[value];

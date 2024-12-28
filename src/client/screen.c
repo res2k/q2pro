@@ -945,8 +945,8 @@ static void SCR_DrawDebugStats(void)
     if (j <= 0)
         return;
 
-    if (j > MAX_STATS)
-        j = MAX_STATS;
+    if (j > cl.max_stats)
+        j = cl.max_stats;
 
     x = CONCHAR_WIDTH;
     y = (scr.hud_height - j * CONCHAR_HEIGHT) / 2;

@@ -1327,11 +1327,6 @@ void CL_GTV_Shutdown(void);
 #endif
 
 //
-// crc.c
-//
-byte COM_BlockSequenceCRCByte(const byte *base, size_t length, int sequence);
-
-//
 // cgame.c
 //
 

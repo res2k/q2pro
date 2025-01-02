@@ -980,7 +980,7 @@ static void GL_Register(void)
     gl_beamstyle = Cvar_Get("gl_beamstyle", "0", 0);
     gl_celshading = Cvar_Get("gl_celshading", "0", 0);
     gl_dotshading = Cvar_Get("gl_dotshading", "0", 0);
-    gl_shadows = Cvar_Get("gl_shadows", "1", CVAR_ARCHIVE);
+    gl_shadows = Cvar_Get("gl_shadows", "2", CVAR_ARCHIVE);
     gl_modulate = Cvar_Get("gl_modulate", "2", CVAR_ARCHIVE);
     gl_modulate->changed = gl_modulate_changed;
     gl_modulate_world = Cvar_Get("gl_modulate_world", "1", 0);

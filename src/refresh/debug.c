@@ -22,7 +22,9 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "shared/list.h"
 #include <assert.h>
 
-#define MAX_DEBUG_LINES     TESS_MAX_VERTICES
+#define DEBUG_VERTEX_SIZE   4 // 3*float coord + 1 u32 color
+#define MAX_DEBUG_VERTICES  (q_countof(tess.vertices) / DEBUG_VERTEX_SIZE)
+#define MAX_DEBUG_LINES     (MAX_DEBUG_VERTICES / 2)
 #define MAX_DEBUG_TEXTS     1024
 
 typedef struct {
@@ -441,7 +443,7 @@ static void GL_DrawDebugLines(void)
     if (gl_config.caps & QGL_CAP_LINE_SMOOTH)
         qglEnable(GL_LINE_SMOOTH);
 
-    static_assert(q_countof(debug_lines) <= q_countof(tess.vertices) / 8, "Too many debug lines");
+    static_assert(q_countof(debug_lines) <= MAX_DEBUG_VERTICES, "Too many debug lines");
 
     dst_vert = tess.vertices;
     numverts = 0;

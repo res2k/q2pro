@@ -20,6 +20,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "../client/client.h"
 #include "../server/server.h"
 #include "shared/list.h"
+#include "common/prompt.h"
 #include <assert.h>
 
 #define DEBUG_VERTEX_SIZE   4 // 3*float coord + 1 u32 color
@@ -53,8 +54,12 @@ static debug_text_t debug_texts[MAX_DEBUG_TEXTS];
 static list_t debug_texts_free;
 static list_t debug_texts_active;
 
+static enum { DEBUG_TEXT_TEXTURE,
+              DEBUG_TEXT_LINES } debug_text_style;
+
 static cvar_t *gl_debug_linewidth;
 static cvar_t *gl_debug_distfrac;
+static cvar_t *gl_debug_text_style;
 
 void R_ClearDebugLines(void)
 {
@@ -388,8 +393,8 @@ static void R_AddDebugTextInternal(const vec3_t origin, const vec3_t angles, con
     t->text[len] = 0;
 }
 
-void R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text,
-                    float size, color_t color, uint32_t time, qboolean depth_test)
+static void R_AddDebugTextTexture(const vec3_t origin, const vec3_t angles, const char *text,
+                                  float size, color_t color, uint32_t time, qboolean depth_test)
 {
     vec3_t down, pos, up;
     const char *s, *p;
@@ -419,6 +424,15 @@ void R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text,
         VectorAdd(pos, down, pos);
         s = p + 1;
     }
+}
+
+void R_AddDebugText(const vec3_t origin, const vec3_t angles, const char *text,
+                    float size, color_t color, uint32_t time, qboolean depth_test)
+{
+    if (debug_text_style == DEBUG_TEXT_LINES)
+        GL_AddDebugTextLines(origin, angles, text, size, color, time, depth_test);
+    else
+        R_AddDebugTextTexture(origin, angles, text, size, color, time, depth_test);
 }
 
 static void GL_DrawDebugLines(void)
@@ -667,12 +681,36 @@ void GL_ExpireDebugObjects(void)
     GL_ExpireDebugTexts();
 }
 
+static void gl_debug_text_style_changed(cvar_t* cvar)
+{
+    if (Q_strcasecmp(cvar->string, "lines") == 0) {
+        debug_text_style = DEBUG_TEXT_LINES;
+    } else if (Q_strcasecmp(cvar->string, "texture") == 0) {
+        debug_text_style = DEBUG_TEXT_TEXTURE;
+    } else {
+        Com_WPrintf("unknown debug text style: %s\n", cvar->string);
+    }
+}
+
+static void gl_debug_text_style_generator(struct genctx_s *gen)
+{
+    Prompt_AddMatch(gen, "lines");
+    Prompt_AddMatch(gen, "texture");
+}
+
 void GL_InitDebugDraw(void)
 {
     R_ClearDebugLines();
 
     gl_debug_linewidth = Cvar_Get("gl_debug_linewidth", "2", 0);
     gl_debug_distfrac = Cvar_Get("gl_debug_distfrac", "0.004", 0);
+
+    gl_debug_text_style = Cvar_Get("gl_debug_text_style", "lines", 0);
+    gl_debug_text_style->changed = gl_debug_text_style_changed;
+    gl_debug_text_style->generator = gl_debug_text_style_generator;
+    gl_debug_text_style_changed(gl_debug_text_style);
+
+    GL_InitDebugTextLines();
 
     Cmd_AddCommand("cleardebuglines", R_ClearDebugLines);
 }

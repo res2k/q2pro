@@ -205,6 +205,7 @@ refresh_src = [
   'src/refresh/texture.c',
   'src/refresh/world.c',
   'src/refresh/debug.c',
+  'src/refresh/debug_text.c',
   'src/refresh/arbfp.h',
   'src/refresh/gl.h',
   'src/refresh/images.h',

@@ -1028,3 +1028,10 @@ void GL_InitDebugDraw(void);
 void GL_ShutdownDebugDraw(void);
 void GL_DrawDebugObjects(void);
 void GL_ExpireDebugObjects(void);
+
+/*
+ * debug_text.c
+ *
+ */
+void GL_InitDebugTextLines(void);
+void GL_AddDebugTextLines(const vec3_t origin, const vec3_t angles, const char *text, float size, color_t color, uint32_t time, qboolean depth_test);

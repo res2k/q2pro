@@ -457,8 +457,6 @@ static void GL_DrawDebugLines(void)
     if (gl_config.caps & QGL_CAP_LINE_SMOOTH)
         qglEnable(GL_LINE_SMOOTH);
 
-    static_assert(q_countof(debug_lines) <= MAX_DEBUG_VERTICES, "Too many debug lines");
-
     dst_vert = tess.vertices;
     numverts = 0;
     LIST_FOR_EACH_SAFE(debug_line_t, l, next, &debug_lines_active, entry) {

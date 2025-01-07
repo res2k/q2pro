@@ -1358,7 +1358,7 @@ CL_GetDemoInfo
 bool CL_GetDemoInfo(const char *path, demoInfo_t *info)
 {
     qhandle_t f;
-    int c, index, clientNum, type;
+    int c, index, clientNum, flags, type;
     const cs_remap_t *csr = &cs_remap_old;
     bool res = false;
 
@@ -1426,12 +1426,20 @@ bool CL_GetDemoInfo(const char *path, demoInfo_t *info)
         if (mvd_protocol != PROTOCOL_VERSION_MVD) {
             goto fail;
         }
-        if (c & (MVF_EXTLIMITS << SVCMD_BITS)) {
+        int protocol_version = MSG_ReadWord();
+        if (!MVD_SUPPORTED(protocol_version)) {
+            goto fail;
+        }
+        if (protocol_version >= PROTOCOL_VERSION_MVD_EXTENDED_LIMITS_2) {
+            flags = MSG_ReadWord();
+        } else {
+            flags = c >> SVCMD_BITS;
+        }
+        if (protocol_version == PROTOCOL_VERSION_MVD_RERELEASE) {
+            csr = &cs_remap_rerelease;
+        } else if (flags & MVF_EXTLIMITS) {
             csr = &cs_remap_q2pro_new;
         }
-        int protocol_version = MSG_ReadWord();
-        if (protocol_version == PROTOCOL_VERSION_MVD_RERELEASE)
-            csr = &cs_remap_rerelease;
         MSG_ReadLong();
         MSG_ReadString(NULL, 0);
         clientNum = MSG_ReadShort();

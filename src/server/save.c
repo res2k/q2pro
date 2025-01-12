@@ -580,7 +580,7 @@ bool SV_AutoSaveBegin(const mapcmd_t *cmd)
     // clear all the client inuse flags before saving so that
     // when the level is re-entered, the clients will spawn
     // at spawn points instead of occupying body shells
-    for (i = 0; i < sv_maxclients->integer; i++) {
+    for (i = 0; i < svs.maxclients; i++) {
         ent = EDICT_NUM(i + 1);
         if (ent->inuse) {
             Q_SetBit(bitmap, i);
@@ -593,7 +593,7 @@ bool SV_AutoSaveBegin(const mapcmd_t *cmd)
         Com_EPrintf("Couldn't write level file.\n");
 
     // we must restore these for clients to transfer over correctly
-    for (i = 0; i < sv_maxclients->integer; i++) {
+    for (i = 0; i < svs.maxclients; i++) {
         ent = EDICT_NUM(i + 1);
         ent->inuse = Q_IsBitSet(bitmap, i);
     }

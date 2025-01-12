@@ -110,7 +110,7 @@ static void PF_Unicast(edict_t *ent, bool reliable, uint32_t dupe_key)
         Com_Error(ERR_DROP, "%s: message buffer overflowed", __func__);
 
     clientNum = NUM_FOR_EDICT(ent) - 1;
-    if (clientNum < 0 || clientNum >= sv_maxclients->integer) {
+    if (clientNum < 0 || clientNum >= svs.maxclients) {
         Com_DWPrintf("%s to a non-client %d\n", __func__, clientNum);
         goto clear;
     }
@@ -232,7 +232,7 @@ static void PF_Client_Print(edict_t *ent, int level, const char *msg)
     }
 
     clientNum = NUM_FOR_EDICT(ent) - 1;
-    if (clientNum < 0 || clientNum >= sv_maxclients->integer) {
+    if (clientNum < 0 || clientNum >= svs.maxclients) {
         Com_DWPrintf("%s to a non-client %d\n", __func__, clientNum);
         return;
     }
@@ -274,7 +274,7 @@ static void PF_Center_Print(edict_t *ent, const char *msg)
     }
 
     n = NUM_FOR_EDICT(ent);
-    if (n < 1 || n > sv_maxclients->integer) {
+    if (n < 1 || n > svs.maxclients) {
         Com_DWPrintf("%s to a non-client %d\n", __func__, n - 1);
         return;
     }
@@ -1152,6 +1152,11 @@ void SV_InitGameProgs(void)
             svs.csr = cs_remap_old;
     }
 
+    // sanitize maxclients
+    if (sv_maxclients->integer != svs.maxclients) {
+        Com_Error(ERR_DROP, "Game library corrupted maxclients value");
+    }
+
     // sanitize edict_size
     unsigned min_size = sizeof(edict_t);
     unsigned max_size = INT_MAX / svs.csr.max_edicts;
@@ -1161,7 +1166,7 @@ void SV_InitGameProgs(void)
     }
 
     // sanitize max_edicts
-    if (ge->max_edicts <= sv_maxclients->integer || ge->max_edicts > svs.csr.max_edicts) {
+    if (ge->max_edicts <= svs.maxclients || ge->max_edicts > svs.csr.max_edicts) {
         Com_Error(ERR_DROP, "Game library returned bad number of max_edicts");
     }
 

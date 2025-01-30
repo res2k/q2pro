@@ -194,6 +194,7 @@ typedef struct {
     int     max_texture_size;
     int     ssbo_align;
     float   max_anisotropy;
+    bool    webgl;
 } glConfig_t;
 
 extern glStatic_t gl_static;

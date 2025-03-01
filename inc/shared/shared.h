@@ -879,11 +879,11 @@ typedef struct cvar_s {
 // ------ new stuff ------
 #if USE_NEW_GAME_API
     char        *default_string;
-#endif
 #if USE_CLIENT || USE_SERVER
     xchanged_t      changed;
     xgenerator_t    generator;
     struct cvar_s   *hashNext;
+#endif
 #endif
 } cvar_t;
 

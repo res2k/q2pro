@@ -861,6 +861,7 @@ void CL_DrawBeam(const vec3_t start, const vec3_t end, float model_length, qhand
             ent.angles[1] = angles[1] + 180.0f;
             ent.angles[2] = Com_SlowRand() % 360;
         } else {
+            ent.flags = RF_NOSHADOW;
             ent.angles[0] = angles[0];
             ent.angles[1] = angles[1];
             ent.angles[2] = Com_SlowRand() % 360;
@@ -1068,6 +1069,7 @@ static void CL_AddPlayerBeams(void)
                 ent.angles[1] = angles[1] + 180.0f;
                 ent.angles[2] = Com_SlowRand() % 360;
             } else {
+                ent.flags = RF_NOSHADOW;
                 ent.angles[0] = angles[0];
                 ent.angles[1] = angles[1];
                 ent.angles[2] = Com_SlowRand() % 360;

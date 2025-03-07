@@ -946,10 +946,8 @@ static void AL_AddMergeLoopSounds(void)
     sfx_t       *sfx;
     sfxcache_t  *sc;
 
-    if (cls.state != ca_active || sv_paused->integer || !s_ambient->integer)
+    if (!S_BuildSoundList(al_loop_sounds))
         return;
-
-    S_BuildSoundList(al_loop_sounds);
 
     // for each unique sound, poll each source nearby
     // and see which one contributes the most.

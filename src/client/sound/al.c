@@ -587,6 +587,11 @@ static void al_merge_looping_changed(cvar_t *self)
     }
 }
 
+static void s_volume_changed(cvar_t *self)
+{
+    qalListenerf(AL_GAIN, self->value);
+}
+
 static bool AL_Init(void)
 {
     int i;
@@ -634,11 +639,17 @@ static bool AL_Init(void)
 
     s_numchannels = i;
 
+    s_volume->changed = s_volume_changed;
+    s_volume_changed(s_volume);
+
     al_merge_looping = Cvar_Get("al_merge_looping", "1", 0);
     al_merge_looping->changed = al_merge_looping_changed;
 
     s_loop_points = qalIsExtensionPresent("AL_SOFT_loop_points");
     s_source_spatialize = qalIsExtensionPresent("AL_SOFT_source_spatialize");
+
+    // init distance model
+    qalDistanceModel(AL_LINEAR_DISTANCE_CLAMPED);
 
     // init stream source
     qalSourcef(s_stream, AL_ROLLOFF_FACTOR, 0.0f);
@@ -723,6 +734,7 @@ static void AL_Shutdown(void)
 
     s_underwater_flag = false;
     s_underwater_gain_hf->changed = NULL;
+    s_volume->changed = NULL;
     al_merge_looping->changed = NULL;
 
     SCR_UnregisterStat("al_reverb");
@@ -1192,8 +1204,6 @@ static void AL_Update(void)
     AL_CopyVector(listener_forward, orientation);
     AL_CopyVector(listener_up, orientation + 3);
     qalListenerfv(AL_ORIENTATION, orientation);
-    qalListenerf(AL_GAIN, s_volume->value);
-    qalDistanceModel(AL_LINEAR_DISTANCE_CLAMPED);
 
     AL_UpdateUnderWater();
     

@@ -1112,15 +1112,23 @@ static void AL_AddLoopSounds(void)
     }
 }
 
+#define MAX_STREAM_BUFFERS  32
+
 static void AL_StreamUpdate(void)
 {
     ALint num_buffers = 0;
     qalGetSourcei(s_stream, AL_BUFFERS_PROCESSED, &num_buffers);
-    while (num_buffers-- > 0) {
-        ALuint buffer = 0;
-        qalSourceUnqueueBuffers(s_stream, 1, &buffer);
-        qalDeleteBuffers(1, &buffer);
-        s_stream_buffers--;
+
+    while (num_buffers > 0) {
+        ALuint buffers[MAX_STREAM_BUFFERS];
+        ALsizei n = min(num_buffers, q_countof(buffers));
+        Q_assert(s_stream_buffers >= n);
+
+        qalSourceUnqueueBuffers(s_stream, n, buffers);
+        qalDeleteBuffers(n, buffers);
+
+        s_stream_buffers -= n;
+        num_buffers -= n;
     }
 }
 
@@ -1133,7 +1141,7 @@ static void AL_StreamStop(void)
 
 static int AL_NeedRawSamples(void)
 {
-    return s_stream_buffers < 32 ? MAX_RAW_SAMPLES : 0;
+    return s_stream_buffers < MAX_STREAM_BUFFERS ? MAX_RAW_SAMPLES : 0;
 }
 
 static bool AL_RawSamples(int samples, int rate, int width, int channels, const byte *data, float volume)

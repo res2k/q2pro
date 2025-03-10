@@ -430,8 +430,7 @@ void GL_DrawBspModel(mmodel_t *model)
         VectorSubtract(glr.fd.vieworg, ent->origin, transformed);
     }
 
-    if (!gl_backend->use_per_pixel_lighting())
-        GL_TransformLights(model);
+    GL_TransformLights(model);
 
     GL_RotateForEntity(gl_static.use_bmodel_skies);
 

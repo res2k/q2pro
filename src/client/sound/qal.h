@@ -77,5 +77,5 @@ QALAPI LPALGENAUXILIARYEFFECTSLOTS qalGenAuxiliaryEffectSlots;
 QALAPI LPALDELETEAUXILIARYEFFECTSLOTS qalDeleteAuxiliaryEffectSlots;
 QALAPI LPALAUXILIARYEFFECTSLOTI qalAuxiliaryEffectSloti;
 
-bool QAL_Init(void);
+int QAL_Init(void);
 void QAL_Shutdown(void);

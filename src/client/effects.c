@@ -85,44 +85,44 @@ void CL_AddLightStyles(void)
     clightstyle_t   *ls;
     bool update_from = ofs != cl_lastlightstyleoffset;
 
-    for (i = 0, ls = cl_lightstyles; i < MAX_LIGHTSTYLES; i++, ls++) {
-        float value;
-        
-        if (!ls->length)
-            value = 1.0f;
-        else if (cl_lerp_lightstyles->integer)
-        {
-            // Paril: lightstyle lerping - a bit uglier than I'd like
-            // but this should allow styles to change at 100 ms intervals
-            // like vanilla.
-            // TODO: check what happens if styles are changed on non-100ms
-            // intervals.. my intuition tells me that that will cause a jump.
-            if (update_from)
-            {
-                if (cl_lastlightstyleoffset != -1)
-                    ls->from = ls->to;
+    if (cl_lerp_lightstyles->integer) {
+        for (i = 0, ls = cl_lightstyles; i < MAX_LIGHTSTYLES; i++, ls++) {
+            float value = 1.0f;
 
-                ls->to = ls->length ? ls->map[ofs % ls->length] : 1.0f;
+            if (ls->length > 1) {
+                // Paril: lightstyle lerping - a bit uglier than I'd like
+                // but this should allow styles to change at 100 ms intervals
+                // like vanilla.
+                // TODO: check what happens if styles are changed on non-100ms
+                // intervals.. my intuition tells me that that will cause a jump.
+                if (update_from)
+                {
+                    if (cl_lastlightstyleoffset != -1)
+                        ls->from = ls->to;
 
-                if (cl_lastlightstyleoffset == -1)
-                    ls->from = ls->to;
+                    ls->to = ls->length ? ls->map[ofs % ls->length] : 1.0f;
 
-                if (ls->from != ls->to)
-                    ls->endtime = cl.time + 100;
-            }
-            
-            if (ls->endtime <= cl.time)
-                value = ls->to;
-            else
-            {
-                float frac = 1.0f - ((float) (ls->endtime - cl.time) / 100.f);
-                value = LERP(ls->from, ls->to, frac);
-            }
+                    if (cl_lastlightstyleoffset == -1)
+                        ls->from = ls->to;
+
+                    if (ls->from != ls->to)
+                        ls->endtime = cl.time + 100;
+                }
+
+                if (ls->endtime > cl.time) {
+                    float frac = 1.0f - ((float) (ls->endtime - cl.time) / 100.f);
+                    value = LERP(ls->from, ls->to, frac);
+                }
+            } else if (ls->length)
+                value = ls->map[0];
+
+            V_AddLightStyle(i, value);
         }
-        else
-            value = ls->length ? ls->map[ofs % ls->length] : 1.0f;
-
-        V_AddLightStyle(i, value);
+    } else {
+        for (i = 0, ls = cl_lightstyles; i < MAX_LIGHTSTYLES; i++, ls++) {
+            float value = ls->length ? ls->map[ofs % ls->length] : 1.0f;
+            V_AddLightStyle(i, value);
+        }
     }
 
     if (update_from)

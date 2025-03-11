@@ -204,6 +204,7 @@ int QAL_Init(void)
                 *(void **)func->dest = func->builtin;
     } else {
         for (i = 0; i < q_countof(al_drivers); i++) {
+            Com_DPrintf("Trying %s\n", al_drivers[i]);
             Sys_LoadLibrary(al_drivers[i], NULL, &handle);
             if (handle)
                 break;

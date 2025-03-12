@@ -232,7 +232,7 @@ void CL_MuzzleFlash(void)
     VectorMA(dl->origin, 18, fv, dl->origin);
     VectorMA(dl->origin, 16, rv, dl->origin);
     dl->radius = 100 * (2 - mz.silenced) + (Q_rand() & 31);
-    dl->die = cl.time + cl_muzzlelight_time->integer;
+    dl->die = cl.time + Cvar_ClampInteger(cl_muzzlelight_time, 0, 1000);
 
     volume = 1.0f - 0.8f * mz.silenced;
 
@@ -454,7 +454,7 @@ void CL_MuzzleFlash2(void)
     dl = CL_AllocDlight(mz.entity);
     VectorCopy(origin,  dl->origin);
     dl->radius = 200 + (Q_rand() & 31);
-    dl->die = cl.time + 16;
+    dl->die = cl.time + Cvar_ClampInteger(cl_muzzlelight_time, 0, 1000);
 
     switch (mz.weapon) {
     case MZ2_INFANTRY_MACHINEGUN_1:

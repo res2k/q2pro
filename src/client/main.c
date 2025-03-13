@@ -3102,6 +3102,7 @@ typedef enum {
     SYNC_MAXFPS,
     SYNC_SLEEP_10,
     SYNC_SLEEP_60,
+    ASYNC_VIDEO,
     ASYNC_FULL
 } sync_mode_t;
 
@@ -3111,6 +3112,7 @@ static const char *const sync_names[] = {
     "SYNC_MAXFPS",
     "SYNC_SLEEP_10",
     "SYNC_SLEEP_60",
+    "ASYNC_VIDEO",
     "ASYNC_FULL"
 };
 #endif
@@ -3203,8 +3205,12 @@ void CL_UpdateFrameTimes(void)
     } else if (cl_async->integer > 0) {
         // run physics and refresh separately
         phys_msec = fps_to_clamped_msec(cl_maxfps, MIN_PHYS_HZ, MAX_PHYS_HZ, &cl_maxfps_modified);
-        ref_msec = fps_to_clamped_msec(r_maxfps, MIN_REF_HZ, MAX_REF_HZ, &r_maxfps_modified);
-        sync_mode = ASYNC_FULL;
+        if (cl_async->integer > 1 && r_config.flags & QVF_VIDEOSYNC) {
+            sync_mode = ASYNC_VIDEO;
+        } else {
+            ref_msec = fps_to_clamped_msec(r_maxfps, MIN_REF_HZ, MAX_REF_HZ, &r_maxfps_modified);
+            sync_mode = ASYNC_FULL;
+        }
     } else {
         // everything ticks in sync with refresh
         main_msec = fps_to_clamped_msec(cl_maxfps, MIN_PHYS_HZ, MAX_PHYS_HZ, &cl_maxfps_modified);
@@ -3271,10 +3277,10 @@ unsigned CL_Frame(unsigned msec)
             return main_msec - main_extra;
         }
         break;
+    case ASYNC_VIDEO:
     case ASYNC_FULL:
         // run physics and refresh separately
         phys_extra += main_extra;
-        ref_extra += main_extra;
 
         if (phys_extra < phys_msec) {
             phys_frame = false;
@@ -3282,10 +3288,15 @@ unsigned CL_Frame(unsigned msec)
             phys_extra = phys_msec;
         }
 
-        if (ref_extra < ref_msec) {
-            ref_frame = false;
-        } else if (ref_extra > ref_msec * 4) {
-            ref_extra = ref_msec;
+        if (sync_mode == ASYNC_VIDEO) {
+            ref_frame = R_VideoSync();
+        } else {
+            ref_extra += main_extra;
+            if (ref_extra < ref_msec) {
+                ref_frame = false;
+            } else if (ref_extra > ref_msec * 4) {
+                ref_extra = ref_msec;
+            }
         }
         break;
     case SYNC_MAXFPS:

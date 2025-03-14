@@ -344,7 +344,6 @@ typedef struct {
         ex_flash,
         ex_mflash,
         ex_poly,
-        ex_poly2,
         ex_light,
         ex_marker
     } type;
@@ -591,16 +590,6 @@ static void CL_AddExplosions(void)
                 else
                     ent->skinnum = 6;
             }
-            break;
-        case ex_poly2:
-            if (f >= ex->frames - 1) {
-                ex->type = ex_free;
-                break;
-            }
-
-            ent->alpha = (5.0f - frac) / 5.0f;
-            ent->skinnum = 0;
-            ent->flags |= RF_TRANSLUCENT;
             break;
         case ex_marker: {
             frac = (cl.time - ex->start) / (cl_compass_time->value * 1000);

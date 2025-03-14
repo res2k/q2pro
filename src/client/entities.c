@@ -1094,12 +1094,9 @@ static void CL_AddPacketEntities(void)
             if (effects & EF_ANIM_ALLFAST) {
                 CL_BfgParticles(&ent);
                 i = 200;
-            } else if (cl.csr.extended) {
-                i = LERP(
-                    bfg_lightramp[Q_clip(ent.frame, 0, 5)],
-                    bfg_lightramp[Q_clip(ent.oldframe, 0, 5)],
-                    ent.backlerp
-                );
+            } else if (cl.csr.extended || cl_smooth_explosions->integer) {
+                i = bfg_lightramp[Q_clip(ent.oldframe, 0, 5)] * ent.backlerp +
+                    bfg_lightramp[Q_clip(ent.frame,    0, 5)] * (1.0f - ent.backlerp);
             } else {
                 i = bfg_lightramp[Q_clip(s1->frame, 0, 5)];
             }

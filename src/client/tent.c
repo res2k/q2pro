@@ -574,11 +574,16 @@ static void CL_AddExplosions(void)
                 break;
             }
 
-            ent->alpha = ((ex->frames - 1) - frac) / (ex->frames - 1);
-            ent->alpha = 1.0f - ent->alpha;
-            ent->alpha *= ent->alpha * ent->alpha;
-            ent->alpha = 1.0f - ent->alpha;
-            ent->flags |= RF_TRANSLUCENT;
+            if (cl.csr.extended || cl_smooth_explosions->integer) {
+                ent->alpha = ((ex->frames - 1) - frac) / (ex->frames - 1);
+                ent->alpha = 1.0f - ent->alpha;
+                ent->alpha *= ent->alpha * ent->alpha;
+                ent->alpha = 1.0f - ent->alpha;
+                ent->flags |= RF_TRANSLUCENT;
+            } else {
+                ent->alpha = (16.0f - (float)f) / 16.0f;
+                ent->alpha = max(ent->alpha, 0.0f);
+            }
 
             if (f < 10) {
                 ent->skinnum = (f >> 1);

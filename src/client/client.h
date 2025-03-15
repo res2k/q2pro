@@ -141,13 +141,13 @@ typedef struct {
 #define CL_FRAMEDIV     cl.frametime.div
 #if USE_FPS
 #define CL_FRAMESYNC    !(cl.frame.number % cl.frametime.div)
-#define CL_KEYPS        &cl.keyframe.ps
-#define CL_OLDKEYPS     &cl.oldkeyframe.ps
+#define CL_KEYPS        (&cl.keyframe.ps)
+#define CL_OLDKEYPS     (&cl.oldkeyframe.ps)
 #define CL_KEYLERPFRAC  cl.keylerpfrac
 #else
 #define CL_FRAMESYNC    1
-#define CL_KEYPS        &cl.frame.ps
-#define CL_OLDKEYPS     &cl.oldframe.ps
+#define CL_KEYPS        (&cl.frame.ps)
+#define CL_OLDKEYPS     (&cl.oldframe.ps)
 #define CL_KEYLERPFRAC  cl.lerpfrac
 #endif
 

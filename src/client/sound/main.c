@@ -838,26 +838,6 @@ int S_BuildSoundList(int *sounds)
     return count;
 }
 
-float S_GetEntityLoopVolume(const entity_state_t *ent)
-{
-    if (ent->loop_volume)
-        return ent->loop_volume;
-
-    return 1.0f;
-}
-
-float S_GetEntityLoopDistMult(const entity_state_t *ent)
-{
-    if (ent->loop_attenuation) {
-        if (ent->loop_attenuation == ATTN_LOOP_NONE)
-            return 0;
-        if (ent->loop_attenuation != ATTN_STATIC)
-            return ent->loop_attenuation * SOUND_LOOPATTENUATE_MULT;
-    }
-
-    return SOUND_LOOPATTENUATE;
-}
-
 int32_t volume_modified = 0;
 
 /*

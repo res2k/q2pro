@@ -1199,7 +1199,11 @@ static void AL_Update(void)
     if (!s_active)
         return;
 
-    s_paintedtime = cl.time;
+    // handle time wraparound. FIXME: get rid of this?
+    i = cls.realtime & MASK(30);
+    if (i < s_paintedtime)
+        S_StopAllSounds();
+    s_paintedtime = i;
 
     // set listener parameters
     qalListener3f(AL_POSITION, AL_UnpackVector(listener_origin));

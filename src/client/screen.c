@@ -1532,6 +1532,7 @@ void SCR_BeginLoadingPlaque(void)
     }
 
     S_StopAllSounds();
+    OGG_Update();
 
     if (cls.disable_screen) {
         return;

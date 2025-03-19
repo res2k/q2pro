@@ -768,9 +768,14 @@ void CL_Disconnect(error_type_t type)
     cls.state = ca_disconnected;
     cls.userinfo_modified = 0;
 
+    // start menu track, or stop music
+    if (type == ERR_DROP || type == ERR_DISCONNECT) {
+        OGG_Play();
+    }
+
     if (type == ERR_DISCONNECT) {
         UI_OpenMenu(UIMENU_DEFAULT);
-        OGG_PlayMenu();
+        OGG_Play();
     } else {
         UI_OpenMenu(UIMENU_NONE);
         Cbuf_ClearDeferred(&cmd_buffer);
@@ -2391,7 +2396,7 @@ void CL_RestartFilesystem(bool total)
 
     if (cls_state == ca_disconnected) {
         UI_OpenMenu(UIMENU_DEFAULT);
-        OGG_PlayMenu();
+        OGG_Play();
     } else if (cls_state >= ca_loading && cls_state <= ca_active) {
         CL_LoadState(LOAD_MAP);
         CL_PrepRefresh();
@@ -2450,7 +2455,7 @@ void CL_RestartRefresh(bool total)
 
     if (cls_state == ca_disconnected) {
         UI_OpenMenu(UIMENU_DEFAULT);
-        OGG_PlayMenu();
+        OGG_Play();
     } else if (cls_state >= ca_loading && cls_state <= ca_active) {
         CL_LoadState(LOAD_MAP);
         CL_PrepRefresh();
@@ -3490,6 +3495,8 @@ void CL_Init(void)
 
     CL_InitLocal();
     CL_InitRefresh();
+
+    OGG_Init();
     S_Init();   // sound must be initialized after window is created
 
     IN_Init();
@@ -3499,7 +3506,6 @@ void CL_Init(void)
 #endif
 
     SCR_InitCinematics();
-    OGG_Init();
 
     CL_LoadDownloadIgnores();
     CL_LoadStuffTextWhiteList();
@@ -3508,7 +3514,7 @@ void CL_Init(void)
 
     UI_OpenMenu(UIMENU_DEFAULT);
 
-    OGG_PlayMenu();
+    OGG_Play();
 
     Con_PostInit();
     Con_RunConsole();

@@ -1104,7 +1104,7 @@ static void AL_AddLoopSounds(void)
     }
 }
 
-#define MAX_STREAM_BUFFERS  32
+#define MAX_STREAM_BUFFERS  128
 
 static void AL_StreamUpdate(void)
 {

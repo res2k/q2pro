@@ -317,7 +317,7 @@ void CL_ClientCommand(const char *string)
         return;
     }
 
-    Com_DDPrintf("%s: %s\n", __func__, string);
+    Com_DDPrintf("%s: %s\n", __func__, Com_MakePrintable(string));
 
     q2proto_clc_message_t message = {.type = Q2P_CLC_STRINGCMD};
     message.stringcmd.cmd = q2proto_make_string(string);

@@ -283,23 +283,29 @@ void OGG_Play(void)
     Q_strlcpy(ogg.autotrack, s, sizeof(ogg.autotrack));
 
     if (!force && ogg_shuffle->integer && trackcount) {
-        if (trackindex == 0)
-            shuffle();
-        s = tracklist[trackindex];
-        trackindex = (trackindex + 1) % trackcount;
+        for (int i = 0; i < trackcount; i++) {
+            if (trackindex == 0)
+                shuffle();
+            s = tracklist[trackindex];
+            trackindex = (trackindex + 1) % trackcount;
+            // don't restart the current track if we're
+            // currently playing it
+            if (ogg.fmt_ctx && strcmp(s, currenttrack) == 0) {
+                return;
+            }
+            if (ogg_play(ogg_open(s, true)))
+                break;
+        }
+    } else {
+        // don't restart the current track if we're
+        // currently playing it
+        if (ogg.fmt_ctx && strcmp(s, currenttrack) == 0) {
+            return;
+        }
+        ogg_play(ogg_open(s, true));
     }
 
-    // don't restart the current track if we're
-    // currently playing it
-    if (ogg.fmt_ctx && strcmp(s, currenttrack) == 0) {
-        return;
-    }
-    
     Q_strlcpy(currenttrack, s, sizeof(currenttrack));
-
-    ogg_close(false);
-
-    ogg_play(ogg_open(s, true));
 
     if (s_api)
         s_api->drop_raw_samples();

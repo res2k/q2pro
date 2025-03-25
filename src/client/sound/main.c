@@ -276,9 +276,6 @@ void S_Activate(void)
     Com_DDDPrintf("%s: %d\n", __func__, active);
     s_active = active;
 
-    if (!active)
-        s_api->drop_raw_samples();
-
     s_api->activate();
 }
 
@@ -795,7 +792,7 @@ void S_StopAllSounds(void)
 
 void S_RawSamples(int samples, int rate, int width, int channels, const byte *data)
 {
-    if (s_api)
+    if (s_started && s_active)
         s_api->raw_samples(samples, rate, width, channels, data, 1.0f);
 }
 

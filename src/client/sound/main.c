@@ -30,6 +30,7 @@ int         s_numchannels, s_maxchannels;
 
 sndstarted_t    s_started;
 bool            s_active;
+bool            s_supports_float;
 const sndapi_t  *s_api;
 
 vec3_t      listener_origin;
@@ -250,6 +251,7 @@ void S_Shutdown(void)
 
     s_started = SS_NOT;
     s_active = false;
+    s_supports_float = false;
 
     s_auto_focus->changed = NULL;
 
@@ -790,7 +792,7 @@ void S_StopAllSounds(void)
     memset(s_channels, 0, sizeof(*s_channels) * s_numchannels);
 }
 
-void S_RawSamples(int samples, int rate, int width, int channels, const byte *data)
+void S_RawSamples(int samples, int rate, int width, int channels, const void *data)
 {
     if (s_started && s_active)
         s_api->raw_samples(samples, rate, width, channels, data, 1.0f);
@@ -801,6 +803,11 @@ int S_GetSampleRate(void)
     if (s_api && s_api->get_sample_rate)
         return s_api->get_sample_rate();
     return 0;
+}
+
+bool S_SupportsFloat(void)
+{
+    return s_supports_float;
 }
 
 // =======================================================================

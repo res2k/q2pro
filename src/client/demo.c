@@ -1049,7 +1049,7 @@ void CL_EmitDemoSnapshot(void)
     write_current_fog();
 
     if (cls.demo.buffer.overflowed) {
-        Com_WPrintf("%s: message buffer overflowed\n", __func__);
+        Com_DWPrintf("%s: message buffer overflowed\n", __func__);
     } else {
         snap = Z_Malloc(sizeof(*snap) + cls.demo.buffer.cursize - 1);
         snap->framenum = cls.demo.frames_read;

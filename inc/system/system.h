@@ -76,6 +76,7 @@ typedef bool (*sys_getinstalledgamepath_func_t)(rerelease_mode_t rr_mode, char *
 extern const sys_getinstalledgamepath_func_t gamepath_funcs[];
 
 void    Sys_DebugBreak(void);
+bool    Sys_IsMainThread(void);
 
 #if USE_AC_CLIENT
 bool    Sys_GetAntiCheatAPI(void);

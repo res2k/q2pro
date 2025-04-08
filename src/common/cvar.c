@@ -828,13 +828,12 @@ static void Cvar_List_c(genctx_t *ctx, int argnum)
 
 static void Cvar_List_f(void)
 {
-    cvar_t    *var;
-    int        i, total;
-    bool verbose = false, modified = false, latched = false;
-    int mask = 0;
-    char *wildcard = NULL;
-    char buffer[5];
-    int c;
+    cvar_t  *var;
+    int     i, total;
+    bool    verbose = false, modified = false, latched = false;
+    int     mask = 0;
+    char    *wildcard = NULL;
+    int     c;
 
     while ((c = Cmd_ParseOptions(o_cvarlist)) != -1) {
         switch (c) {
@@ -890,7 +889,6 @@ static void Cvar_List_f(void)
     if (cmd_optind < Cmd_Argc())
         wildcard = Cmd_Argv(cmd_optind);
 
-    buffer[sizeof(buffer) - 1] = 0;
     i = 0;
     for (var = cvar_vars, total = 0; var; var = var->next, total++) {
         if (latched && !var->latched_string) {
@@ -908,7 +906,8 @@ static void Cvar_List_f(void)
         }
 
         if (verbose) {
-            memset(buffer, '-', sizeof(buffer) - 1);
+            char buffer[4];
+            memset(buffer, '-', sizeof(buffer));
 
             if (var->flags & CVAR_CHEAT)
                 buffer[0] = 'C';
@@ -930,7 +929,7 @@ static void Cvar_List_f(void)
             else if (var->flags & (CVAR_CUSTOM | CVAR_WEAK))
                 buffer[3] = '?';
 
-            Com_Printf("%s ", buffer);
+            Com_Printf("%.4s ", buffer);
         }
 
         Com_Printf("%s \"%s\"\n", var->name, var->string);

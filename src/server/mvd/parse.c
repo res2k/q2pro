@@ -126,7 +126,7 @@ static void MVD_ParseMulticast(mvd_t *mvd, multicast_t to, bool reliable, int ex
 {
     mvd_client_t    *client;
     client_t        *cl;
-    byte            mask[VIS_MAX_BYTES];
+    visrow_t        mask;
     const mleaf_t   *leaf1, *leaf2;
     vec3_t          org;
     byte            *data;
@@ -149,7 +149,7 @@ static void MVD_ParseMulticast(mvd_t *mvd, multicast_t to, bool reliable, int ex
 
     if (to) {
         leaf1 = CM_LeafNum(&mvd->cm, leafnum);
-        BSP_ClusterVis(mvd->cm.cache, mask, leaf1->cluster, MULTICAST_PVS - to);
+        BSP_ClusterVis(mvd->cm.cache, &mask, leaf1->cluster, MULTICAST_PVS - to);
     }
 
     // send the data to all relevent clients
@@ -171,7 +171,7 @@ static void MVD_ParseMulticast(mvd_t *mvd, multicast_t to, bool reliable, int ex
                 continue;
             if (leaf2->cluster == -1)
                 continue;
-            if (!Q_IsBitSet(mask, leaf2->cluster))
+            if (!Q_IsBitSet(mask.b, leaf2->cluster))
                 continue;
         }
 
@@ -422,7 +422,7 @@ static void MVD_ParseSound(mvd_t *mvd, int extrabits)
     vec3_t      origin, org;
     mvd_client_t        *client;
     client_t    *cl;
-    byte        mask[VIS_MAX_BYTES];
+    visrow_t    mask;
     const mleaf_t       *leaf1, *leaf2;
     message_packet_t    *msg;
     edict_t     *entity;
@@ -486,7 +486,7 @@ static void MVD_ParseSound(mvd_t *mvd, int extrabits)
     leaf1 = NULL;
     if (!(extrabits & 1)) {
         leaf1 = CM_PointLeaf(&mvd->cm, origin);
-        BSP_ClusterVis(mvd->cm.cache, mask, leaf1->cluster, DVIS_PHS);
+        BSP_ClusterVis(mvd->cm.cache, &mask, leaf1->cluster, DVIS_PHS);
     }
 
     FOR_EACH_MVDCL(client, mvd) {
@@ -505,7 +505,7 @@ static void MVD_ParseSound(mvd_t *mvd, int extrabits)
                 continue;
             if (leaf2->cluster == -1)
                 continue;
-            if (!Q_IsBitSet(mask, leaf2->cluster))
+            if (!Q_IsBitSet(mask.b, leaf2->cluster))
                 continue;
         }
 

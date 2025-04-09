@@ -61,15 +61,15 @@ typedef struct {
 #define q_member_sizeof(t, m) (sizeof(((t *) 0)->m ))
 
 #define KEY_FIXED_STRING(name) \
-	.key = #name, .type = JSMN_STRING, .offset = q_offsetof(KEY_TYPE, name), .len = q_member_sizeof(KEY_TYPE, name)
+	.key = #name, .type = JSMN_STRING, .offset = offsetof(KEY_TYPE, name), .len = q_member_sizeof(KEY_TYPE, name)
 #define KEY_DYNAMIC_STRING(name) \
-	.key = #name, .type = JSMN_STRING, .offset = q_offsetof(KEY_TYPE, name), .len = 0
+	.key = #name, .type = JSMN_STRING, .offset = offsetof(KEY_TYPE, name), .len = 0
 #define KEY_SKIP(name) \
 	.key = #name, .type = JSMN_UNDEFINED
 #define KEY_U8(name) \
-	.key = #name, .type = JSMN_PRIMITIVE, .offset = q_offsetof(KEY_TYPE, name), .primitive = PRIM_U8
+	.key = #name, .type = JSMN_PRIMITIVE, .offset = offsetof(KEY_TYPE, name), .primitive = PRIM_U8
 #define KEY_BOOLEAN(name) \
-	.key = #name, .type = JSMN_PRIMITIVE, .offset = q_offsetof(KEY_TYPE, name), .primitive = PRIM_BOOLEAN
+	.key = #name, .type = JSMN_PRIMITIVE, .offset = offsetof(KEY_TYPE, name), .primitive = PRIM_BOOLEAN
 
 #define KEY_TYPE mapdb_episode_t
 static const mapdb_key_t episode_keys[] = {

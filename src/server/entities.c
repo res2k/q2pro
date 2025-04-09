@@ -743,8 +743,8 @@ void SV_BuildClientFrame(client_t *client)
             }
 
             // beams just check one point for PHS
-            // remaster uses different sound culling rules
             bool beam_cull = ent->s.renderfx & RF_BEAM;
+            // remaster uses different sound culling rules
             bool sound_cull = ent->s.sound;
 
             if (!SV_EntityVisible(client, svent, (beam_cull || sound_cull || (ent->s.renderfx & RF_CASTSHADOW)) ? clientphs : clientpvs))
@@ -762,7 +762,7 @@ void SV_BuildClientFrame(client_t *client)
                 // Paril TODO: is this a good idea? seems weird to remove
                 // visual effects based on distance if there's no model and
                 // no sound...
-                if (Distance(org, ent->s.origin) > 400)
+                if (DistanceSquared(org, ent->s.origin) > 400 * 400)
                     continue;
             }
         }

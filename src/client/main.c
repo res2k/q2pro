@@ -3200,6 +3200,7 @@ void CL_UpdateFrameTimes(void)
 
     phys_msec = ref_msec = main_msec = 0;
     ref_extra = phys_extra = main_extra = 0;
+    cls.frametime = 0.0f;
 
     if (com_timedemo->integer) {
         // timedemo just runs at full speed
@@ -3326,7 +3327,7 @@ unsigned CL_Frame(unsigned msec)
                    phys_frame, phys_extra);
 
     // decide the simulation time
-    cls.frametime = main_extra * 0.001f;
+    cls.frametime += main_extra * 0.001f;
 
     if (cls.frametime > 1.0f / 5)
         cls.frametime = 1.0f / 5;
@@ -3375,11 +3376,6 @@ unsigned CL_Frame(unsigned msec)
     // predict all unacknowledged movements
     CL_PredictMovement();
 
-    // update weapon wheel stuff
-    CL_Wheel_Update();
-
-    Con_RunConsole();
-
     SCR_RunCinematic();
 
     // Update hit marker status from cgame
@@ -3388,6 +3384,8 @@ unsigned CL_Frame(unsigned msec)
     UI_Frame(main_extra);
 
     if (ref_frame) {
+        Con_RunConsole();
+
         // update the screen
         if (host_speeds->integer)
             time_before_ref = Sys_Milliseconds();
@@ -3396,6 +3394,8 @@ unsigned CL_Frame(unsigned msec)
 
         if (host_speeds->integer)
             time_after_ref = Sys_Milliseconds();
+
+        cls.frametime = 0.0f;
 
         ref_extra -= ref_msec;
         R_FRAMES++;

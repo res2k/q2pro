@@ -19,13 +19,6 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "client.h"
 
-typedef struct {
-    const char  *name;
-    uint32_t    size;
-    uint16_t    start;
-    uint16_t    crop;
-} cin_crop_t;
-
 static cvar_t   *scr_viewsize;
 static cvar_t   *scr_showpause;
 #if USE_DEBUG
@@ -87,15 +80,6 @@ static cvar_t   *scr_safe_zone;
 const color_t colorTable[8] = {
     { .u32 = COLOR_U32_BLACK }, { .u32 = COLOR_U32_RED }, { .u32 = COLOR_U32_GREEN }, { .u32 = COLOR_U32_YELLOW },
     { .u32 = COLOR_U32_BLUE }, { .u32 = COLOR_U32_CYAN }, { .u32 = COLOR_U32_MAGENTA }, { .u32 = COLOR_U32_WHITE }
-};
-
-static const cin_crop_t cin_crop[] = {
-    { "ntro.cin",   82836235, 727, 30 },
-    { "end.cin",    19311290,   0, 30 },
-    { "rintro.cin", 38434032,   0, 24 },
-    { "rend.cin",   22580919,   0, 24 },
-    { "xin.cin",    13226649,   0, 32 },
-    { "xout.cin",   11194445,   0, 32 },
 };
 
 cl_scr_t scr;
@@ -246,22 +230,6 @@ bool SCR_ParseColor(const char *s, color_t *color)
 
     *color = colorTable[i];
     return true;
-}
-
-int SCR_GetCinematicCrop(unsigned framenum, int64_t filesize)
-{
-    const cin_crop_t *c;
-    int i;
-
-    for (i = 0, c = cin_crop; i < q_countof(cin_crop); i++, c++) {
-        if (!Q_stricmp(cl.mapname, c->name)) {
-            if (framenum >= c->start && filesize == c->size)
-                return c->crop * 2;
-            break;
-        }
-    }
-
-    return 0;
 }
 
 /*

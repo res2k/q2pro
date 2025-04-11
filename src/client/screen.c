@@ -1071,6 +1071,7 @@ static void SCR_TimeRefresh_f(void)
 
     start = Sys_Milliseconds();
 
+    cl.refdef.frametime = 0.0f;
     if (Cmd_Argc() == 2) {
         // run without page flipping
         R_BeginFrame();

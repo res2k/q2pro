@@ -16,21 +16,21 @@ Goals:
 Supported features include (from Q2PRO):
 
 * unified OpenGL renderer with support for wide range of OpenGL versions
-* enhanced console command completion
-* persistent and searchable console command history
+* enhanced console with persistent command history and autocompletion
 * rendering / physics / packet rate separation
+* syncing to GPU for reduced input lag with vsync on
 * ZIP packfiles (.pkz)
-* JPEG/PNG textures
+* JPEG/PNG textures and screenshots
 * MD3 and MD5 (re-release) models
 * Ogg Vorbis music and Ogg Theora cinematics
+* compatibility with re-release assets
 * fast and secure HTTP downloads
 * multichannel sound using OpenAL
 * stereo WAV files support
-* forward and backward seeking in demos
-* recording from demos
-* server side multiview demos
+* seeking in demos, recording from demos, server side multiview demos
 * live game broadcasting capabilities
 * network protocol extensions for larger maps
+* eliminates frame overflows (even for legacy clients)
 * won't crash if game data is corrupted
 
 New features that differ from Q2PRO:

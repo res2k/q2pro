@@ -665,9 +665,8 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
     GL_LoadUniforms();
     GL_LoadLights();
 
-    // avoid drawing hidden faces for transparent gun by pre-filling depth buffer
-    // muzzle flashes are excluded by checking for RF_FULLBRIGHT bit
-    if ((glr.ent->flags & (RF_TRANSLUCENT | RF_WEAPONMODEL | RF_FULLBRIGHT)) == (RF_TRANSLUCENT | RF_WEAPONMODEL)) {
+    // avoid drawing hidden faces by pre-filling depth buffer
+    if (glr.ent->flags & RF_TRANSLUCENT) {
         if (gls.currentva) {
             GL_StateBits(GLS_DEFAULT);
             GL_ArrayBits(GLA_VERTEX);

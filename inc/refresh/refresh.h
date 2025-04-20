@@ -67,6 +67,8 @@ typedef struct entity_s {
     qhandle_t   skin;           // NULL for inline skin
     vec3_t      scale;
     float       bottom_z; // for shadows
+
+    struct entity_s *next;
 } entity_t;
 
 typedef struct {

@@ -149,8 +149,14 @@ typedef struct {
     mat4_t          entmatrix;
     mat4_t          skymatrix[2];
     lightpoint_t    lightpoint;
-    int             num_beams;
-    int             num_flares;
+    struct {
+        entity_t    *opaque;
+        entity_t    *beams;
+        entity_t    *flares;
+        entity_t    *bmodels;
+        entity_t    *alpha_back;
+        entity_t    *alpha_front;
+    } ents;
     glStateBits_t   fog_bits, fog_bits_sky;
     glStateBits_t   ppl_bits;
     uint64_t        ppl_dlight_bits;

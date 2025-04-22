@@ -828,7 +828,8 @@ static pp_flags_t GL_BindFramebuffer(void)
         glr.framebuffer_height = glr.fd.height;
         gl_waterwarp_modified = gl_waterwarp->modified_count;
         gl_bloom_modified = gl_bloom->modified_count;
-        GL_UpdateBlurParams();
+        if (gl_bloom->integer)
+            gl_backend->update_blur();
     }
 
     if (!flags || !glr.framebuffer_ok)

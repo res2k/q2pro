@@ -765,6 +765,7 @@ typedef struct {
 
     void (*load_matrix)(GLenum mode, const GLfloat *matrix, const GLfloat *view);
     void (*load_uniforms)(void);
+    void (*update_blur)(void);
 
     void (*state_bits)(glStateBits_t bits);
     void (*array_bits)(glArrayBits_t bits);
@@ -918,7 +919,6 @@ void GL_Setup3D(void);
 void GL_ClearState(void);
 void GL_InitState(void);
 void GL_ShutdownState(void);
-void GL_UpdateBlurParams(void);
 
 /*
  * gl_draw.c

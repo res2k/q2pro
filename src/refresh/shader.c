@@ -1164,13 +1164,9 @@ static void shader_clear_state(void)
     shader_use_program(GLS_DEFAULT);
 }
 
-void GL_UpdateBlurParams(void)
+static void shader_update_blur(void)
 {
-    if (!gl_static.programs)
-        return;
-
     float sigma = Cvar_ClampValue(gl_bloom_sigma, 1, MAX_SIGMA) * glr.fd.height / 2160;
-
     if (gl_static.bloom_sigma == sigma)
         return;
 
@@ -1194,7 +1190,8 @@ void GL_UpdateBlurParams(void)
 
 static void gl_bloom_sigma_changed(cvar_t *self)
 {
-    GL_UpdateBlurParams();
+    if (gl_bloom->integer)
+        shader_update_blur();
 }
 
 static void shader_init(void)
@@ -1289,6 +1286,7 @@ const glbackend_t backend_shader = {
 
     .load_matrix = shader_load_matrix,
     .load_uniforms = shader_load_uniforms,
+    .update_blur = shader_update_blur,
 
     .state_bits = shader_state_bits,
     .array_bits = shader_array_bits,

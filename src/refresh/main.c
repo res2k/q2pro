@@ -796,6 +796,7 @@ static void GL_DrawBloom(bool waterwarp)
     GL_PostProcess(bits, glr.fd.x, glr.fd.y, glr.fd.width, glr.fd.height);
 }
 
+static int32_t gl_waterwarp_modified = 0;
 static int32_t gl_bloom_modified = 0;
 
 typedef enum {
@@ -821,11 +822,13 @@ static pp_flags_t GL_BindFramebuffer(void)
     if (flags)
         resized = glr.fd.width != glr.framebuffer_width || glr.fd.height != glr.framebuffer_height;
 
-    if (resized || gl_bloom->modified_count != gl_bloom_modified) {
-        glr.framebuffer_ok = GL_InitFramebuffers();
-        glr.framebuffer_width = glr.fd.width;
+    if (resized || gl_waterwarp->modified_count != gl_waterwarp_modified || gl_bloom->modified_count != gl_bloom_modified) {
+        glr.framebuffer_ok     = GL_InitFramebuffers();
+        glr.framebuffer_width  = glr.fd.width;
         glr.framebuffer_height = glr.fd.height;
+        gl_waterwarp_modified = gl_waterwarp->modified_count;
         gl_bloom_modified = gl_bloom->modified_count;
+        GL_UpdateBlurParams();
     }
 
     if (!flags || !glr.framebuffer_ok)

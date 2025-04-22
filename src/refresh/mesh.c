@@ -665,8 +665,9 @@ static void draw_alias_mesh(const uint16_t *indices, int num_indices,
     GL_LoadUniforms();
     GL_LoadLights();
 
-    // avoid drawing hidden faces by pre-filling depth buffer
-    if (glr.ent->flags & RF_TRANSLUCENT) {
+    // avoid drawing hidden faces by pre-filling depth buffer, but not for
+    // explosions and muzzleflashes
+    if ((glr.ent->flags & (RF_FULLBRIGHT | RF_TRANSLUCENT)) == RF_TRANSLUCENT) {
         if (gls.currentva) {
             GL_StateBits(GLS_DEFAULT);
             GL_ArrayBits(GLA_VERTEX);

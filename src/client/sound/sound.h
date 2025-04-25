@@ -183,6 +183,7 @@ extern cvar_t       *s_num_channels;
 
 #define S_GetEntityLoopVolume(ent)      ((ent)->loop_volume ? (ent)->loop_volume : 1.0f)
 #define S_GetEntityLoopDistMult(ent)    Com_GetEntityLoopDistMult((ent)->loop_attenuation)
+#define S_GetEntityLoopStereoPan(ent)   !(cl.csr.extended && (ent)->renderfx & RF_NO_STEREO)
 
 sfx_t *S_SfxForHandle(qhandle_t hSfx);
 sfxcache_t *S_LoadSound(sfx_t *s);

@@ -37,7 +37,6 @@ New features that differ from Q2PRO:
 
 * Support for weapon wheels and carousel from re-release (+wheel / +wheel2)
 * Reverb support (enabled by default; `al_reverb` cvar)
-* Music tweaks (songs don't restart during loading or when transitioning to a level with the same song; main menu music)
 * Per-pixel lighting (enabled by default; `gl_per_pixel_lighting` cvar. Requires `gl_shaders`. Still a WIP and may reduce performance. No shadow mapping implemented yet.)
 * Defer commands on map (when commands are entered after a `map` cmd, they are deferred until the map is loaded)
 * Archive natsort (re-release uses natsort on pak, as well as always loading `pakN` first; this order is maintained in Q2REPRO)
@@ -45,7 +44,7 @@ New features that differ from Q2PRO:
 * MapDB support (can load `mapdb.json` and display levels + episodes in Single Player menu)
 * KFont support (only used for cgame currently)
 * Minor gl_shadow visual tweaks
-* Light style interpolation with full game support (`cl_lerp_lightstyles` cvar)
+* Light style interpolation on by default (`cl_lerp_lightstyles` cvar)
 * Shadow light support (only for lighting, no shadowing yet; `cl_shadowlights` can be set to 0 to disable these)
 * 40hz tick rate, can be controlled with `sv_tick_rate` like re-release
 * POI support (for compass, etc)
@@ -58,7 +57,7 @@ New features that differ from Q2PRO:
 * Damage markers, hit markers
 * OpenAL is now the default & only supported audio output in our builds, but you can compile software audio if you want
 
-For building Q2REPRO, consult the INSTALL.md file.
+For building Q2REPRO, consult the BUILDING.md file.
 
 For information on using and configuring Q2REPRO, refer to client and server
 manuals available in doc/ subdirectory.

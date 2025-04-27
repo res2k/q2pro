@@ -363,54 +363,6 @@ static bool emit_packet_entities(client_t               *client,
 
 /*
 ==================
-SV_WriteFrameToClient_Default
-==================
-*/
-bool SV_WriteFrameToClient_Default(client_t *client, unsigned maxsize)
-{
-    client_frame_t  *frame, *oldframe;
-    q2proto_packed_player_state_t *oldstate;
-    int             lastframe;
-
-    // this is the frame we are creating
-    frame = &client->frames[client->framenum & UPDATE_MASK];
-
-    // this is the frame we are delta'ing from
-    oldframe = get_last_frame(client);
-    if (oldframe) {
-        oldstate = &oldframe->ps;
-        lastframe = client->lastframe;
-    } else {
-        oldstate = NULL;
-        lastframe = -1;
-    }
-
-    q2proto_svc_message_t message = {.type = Q2P_SVC_FRAME, .frame = {0}};
-    message.frame.serverframe = client->framenum;
-    message.frame.deltaframe = lastframe;
-    message.frame.suppress_count = client->suppress_count;
-    message.frame.q2pro_frame_flags = client->frameflags;
-
-    message.frame.areabits_len = frame->areabytes;
-    message.frame.areabits = frame->areabits;
-
-    make_playerstate_delta(client, oldstate, &frame->ps, &message.frame.playerstate, 0);
-    if ((oldframe ? oldframe->clientNum : 0) != frame->clientNum) {
-        message.frame.playerstate.clientnum = frame->clientNum;
-        message.frame.playerstate.delta_bits |= Q2P_PSD_CLIENTNUM;
-    }
-
-    q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
-
-    bool ret = emit_packet_entities(client, oldframe, frame, 0, maxsize);
-
-    client->suppress_count = 0;
-    client->frameflags = 0;
-    return ret;
-}
-
-/*
-==================
 SV_WriteFrameToClient_Enhanced
 ==================
 */

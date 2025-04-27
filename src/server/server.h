@@ -768,7 +768,6 @@ static inline void SV_CheckEntityNumber(edict_t *ent, int e, const char *func)
 #define SV_CheckEntityNumber(ent, e) SV_CheckEntityNumber(ent, e, __func__)
 
 void SV_BuildClientFrame(client_t *client);
-bool SV_WriteFrameToClient_Default(client_t *client, unsigned maxsize);
 bool SV_WriteFrameToClient_Enhanced(client_t *client, unsigned maxsize);
 
 //

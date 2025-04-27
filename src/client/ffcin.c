@@ -677,7 +677,7 @@ SCR_PlayCinematic
 void SCR_PlayCinematic(const char *name)
 {
     // make sure CD isn't playing music
-    OGG_Stop(true);
+    OGG_Stop();
 
     if (!COM_CompareExtension(name, ".pcx")) {
         cin.static_pic = R_RegisterTempPic(name);

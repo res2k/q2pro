@@ -47,7 +47,6 @@ static cvar_t   *ogg_menu_track;
 static void     **tracklist;
 static int      trackcount;
 static int      trackindex;
-static char     currenttrack[MAX_QPATH];
 
 static char     extensions[MAX_QPATH];
 static int      supported;
@@ -78,15 +77,12 @@ static void init_formats(void)
     Com_DPrintf("Supported music formats: %s\n", extensions);
 }
 
-static void ogg_close(bool clear_track)
+static void ogg_close(void)
 {
     avcodec_free_context(&ogg.dec_ctx);
     avformat_close_input(&ogg.fmt_ctx);
 
     memset(&ogg, 0, sizeof(ogg));
-
-    if (clear_track)
-        currenttrack[0] = '\0';
 }
 
 static AVFormatContext *ogg_open(const char *name, bool autoplay)
@@ -233,7 +229,7 @@ static bool ogg_play(AVFormatContext *fmt_ctx)
     ogg.fmt_ctx = fmt_ctx;
 
     if (!ogg_try_play()) {
-        ogg_close(true);
+        ogg_close();
         return false;
     }
 
@@ -262,7 +258,7 @@ void OGG_Play(void)
         s = ogg_menu_track->string;
 
     if (!*s || !strcmp(s, "0")) {
-        OGG_Stop(true);
+        OGG_Stop();
         return;
     }
 
@@ -275,7 +271,7 @@ void OGG_Play(void)
 
     // drop samples if we were playing something
     if (ogg.fmt_ctx)
-        OGG_Stop(false);
+        OGG_Stop();
 
     // don't start new track if auto playback disabled
     if (!ogg_enable->integer)
@@ -289,33 +285,21 @@ void OGG_Play(void)
                 shuffle();
             s = tracklist[trackindex];
             trackindex = (trackindex + 1) % trackcount;
-            // don't restart the current track if we're
-            // currently playing it
-            if (ogg.fmt_ctx && strcmp(s, currenttrack) == 0) {
-                return;
-            }
             if (ogg_play(ogg_open(s, true)))
                 break;
         }
     } else {
-        // don't restart the current track if we're
-        // currently playing it
-        if (ogg.fmt_ctx && strcmp(s, currenttrack) == 0) {
-            return;
-        }
         ogg_play(ogg_open(s, true));
     }
-
-    Q_strlcpy(currenttrack, s, sizeof(currenttrack));
 
     if (s_api)
         s_api->drop_raw_samples();
 }
 
-void OGG_Stop(bool clear_track)
+void OGG_Stop(void)
 {
     Com_DPrintf("Stopping music playback\n");
-    ogg_close(clear_track);
+    ogg_close();
 
     av_frame_unref(ogg_frame_in);
     av_frame_unref(ogg_frame_out);
@@ -401,7 +385,7 @@ static bool decode_next_frame(void)
         return true;
 
     // play next file
-    ogg_close(false);
+    ogg_close();
     OGG_Play();
 
     return ogg.dec_ctx && decode_frame() >= 0;
@@ -595,7 +579,7 @@ void OGG_Update(void)
     int ret = convert_audio();
     if (ret < 0) {
         Com_EPrintf("Error converting audio: %s\n", av_err2str(ret));
-        OGG_Stop(false);
+        OGG_Stop();
     }
 }
 
@@ -628,9 +612,9 @@ static void OGG_Play_f(void)
         return;
 
     if (!strcmp(Cmd_Argv(3), "soft"))
-        ogg_close(false);
+        ogg_close();
     else
-        OGG_Stop(false);
+        OGG_Stop();
 
     ogg_manual_play = ogg_play(fmt_ctx);
 }
@@ -706,7 +690,7 @@ static void OGG_Cmd_f(void)
     else if (!strcmp(cmd, "play"))
         OGG_Play_f();
     else if (!strcmp(cmd, "stop"))
-        OGG_Stop(true);
+        OGG_Stop();
     else if (!strcmp(cmd, "next"))
         OGG_Next_f();
     else if (!strcmp(cmd, "pause") || !strcmp(cmd, "toggle"))
@@ -730,7 +714,7 @@ static void ogg_enable_changed(cvar_t *self)
     if (self->integer)
         OGG_Play();
     else
-        OGG_Stop(true);
+        OGG_Stop();
 }
 
 static void ogg_volume_changed(cvar_t *self)
@@ -749,16 +733,6 @@ static const cmdreg_t c_ogg[] = {
     { NULL }
 };
 
-void OGG_Restart(void)
-{
-    if (*currenttrack) {
-        ogg_play(ogg_open(currenttrack, true));
-
-        if (s_api)
-            s_api->drop_raw_samples();
-    }
-}
-
 void OGG_Init(void)
 {
     ogg_enable = Cvar_Get("ogg_enable", "1", 0);
@@ -775,8 +749,6 @@ void OGG_Init(void)
 
     OGG_LoadTrackList();
 
-    OGG_Restart();
-
     Q_assert(ogg_pkt = av_packet_alloc());
     Q_assert(ogg_frame_in = av_frame_alloc());
     Q_assert(ogg_frame_out = av_frame_alloc());
@@ -785,7 +757,7 @@ void OGG_Init(void)
 
 void OGG_Shutdown(void)
 {
-    ogg_close(false);
+    ogg_close();
 
     av_packet_free(&ogg_pkt);
     av_frame_free(&ogg_frame_in);

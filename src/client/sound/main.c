@@ -240,7 +240,7 @@ void S_Shutdown(void)
 
     S_StopAllSounds();
     S_FreeAllSounds();
-    OGG_Stop(false);
+    OGG_Stop();
 
     Z_Free(s_channels);
     s_channels = NULL;

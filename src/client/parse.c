@@ -515,7 +515,7 @@ static void CL_ParseConfigstring(const q2proto_svc_configstring_t *configstring)
         Q_SetBit(cl.dcs, configstring->index);
     }
 
-    // do something apropriate
+    // do something appropriate
     CL_UpdateConfigstring(configstring->index);
 }
 
@@ -770,7 +770,7 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
     if (cinematic) {
         SCR_PlayCinematic(levelname);
     } else {
-        // seperate the printfs so the server message can have a color
+        // separate the printfs so the server message can have a color
         Con_Printf(
             "\n\n"
             "\35\36\36\36\36\36\36\36\36\36\36\36"

@@ -318,11 +318,19 @@ typedef struct {
  *
  * Unlike GetGameAPI(), passed game_import_ex_t * is valid as long as game
  * library is loaded. Pointed to structure can be used directly without making
- * a copy of it. If copying is neccessary, no more than structsize bytes must
+ * a copy of it. If copying is necessary, no more than structsize bytes must
  * be copied.
  *
  * New fields can be safely added at the end of game_import_ex_t and
  * game_export_ex_t structures, provided GAME_API_VERSION_EX is also bumped.
+ *
+ * Game is not required to implement all entry points in game_export_ex_t.
+ * Non-implemented entry points must be set to NULL. Server, however, must
+ * implement all entry points in game_import_ex_t for advertised API version.
+ *
+ * Only upstream Q2PRO engine may define new extended API versions. Mods should
+ * never do this on their own, but may implement private extensions obtainable
+ * via GetExtension() callback.
  *
  * API version history:
  * 1 - Initial release.
@@ -368,7 +376,7 @@ typedef struct {
     qboolean    (*CanSave)(void);
     void        (*PrepFrame)(void);
     void        (*RestartFilesystem)(void); // called when fs_restart is issued
-    qboolean    (*CustomizeEntityToClient)(game3_edict_t *client, game3_edict_t *ent, game3_customize_entity_t *temp);
+    qboolean    (*CustomizeEntityToClient)(game3_edict_t *client, game3_edict_t *ent, game3_customize_entity_t *temp); // if true is returned, `temp' must be initialized
     qboolean    (*EntityVisibleToClient)(game3_edict_t *client, game3_edict_t *ent);
 } game3_export_ex_t;
 

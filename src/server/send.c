@@ -284,7 +284,7 @@ void SV_Multicast(const vec3_t origin, multicast_t to, bool reliable)
     if (reliable)
         flags |= MSG_RELIABLE;
 
-    // send the data to all relevent clients
+    // send the data to all relevant clients
     FOR_EACH_CLIENT(client) {
         if (client->state < cs_primed) {
             continue;

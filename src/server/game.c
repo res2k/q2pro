@@ -480,7 +480,7 @@ static qboolean PF_inPHS(const vec3_t p1, const vec3_t p2, bool portals)
 ==================
 SV_StartSound
 
-Each entity can have eight independant sound sources, like voice,
+Each entity can have eight independent sound sources, like voice,
 weapon, feet, etc.
 
 If channel & 8, the sound will be sent to everyone, not just
@@ -687,7 +687,7 @@ static void PF_WriteEntity(const edict_t *entity)
 static cvar_t *PF_cvar(const char *name, const char *value, int flags)
 {
     if (flags & CVAR_EXTENDED_MASK) {
-        Com_WPrintf("Game attemped to set extended flags on '%s', masked out.\n", name);
+        Com_WPrintf("Game attempted to set extended flags on '%s', masked out.\n", name);
         flags &= ~CVAR_EXTENDED_MASK;
     }
 

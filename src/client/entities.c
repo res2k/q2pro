@@ -516,7 +516,7 @@ void CL_CheckEntityPresent(int entnum, const char *what)
 /*
 ==========================================================================
 
-INTERPOLATE BETWEEN FRAMES TO GET RENDERING PARMS
+INTERPOLATE BETWEEN FRAMES TO GET RENDERING PARAMS
 
 ==========================================================================
 */

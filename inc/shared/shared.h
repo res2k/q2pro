@@ -673,7 +673,7 @@ size_t COM_ParseToken(const char **data_p, char *buffer, size_t size, int flags)
 char *COM_ParseEx(const char **data_p, int flags);
 #define COM_Parse(p) COM_ParseEx(p, PARSE_FLAG_NONE)
 
-// data is an in/out parm, returns a parsed out token
+// data is an in/out param, returns a parsed out token
 size_t COM_Compress(char *data);
 
 int SortStrcmp(const void *p1, const void *p2);
@@ -1205,10 +1205,10 @@ typedef struct {
 typedef uint64_t effects_t;
 
 // entity_state_t->renderfx flags
-#define RF_MINLIGHT         BIT(0)      // allways have some light (viewmodel)
+#define RF_MINLIGHT         BIT(0)      // always have some light (viewmodel)
 #define RF_VIEWERMODEL      BIT(1)      // don't draw through eyes, only mirrors
 #define RF_WEAPONMODEL      BIT(2)      // only draw through eyes
-#define RF_FULLBRIGHT       BIT(3)      // allways draw full intensity
+#define RF_FULLBRIGHT       BIT(3)      // always draw full intensity
 #define RF_DEPTHHACK        BIT(4)      // for view weapon Z crunching
 #define RF_TRANSLUCENT      BIT(5)
 #define RF_FRAMELERP        BIT(6)
@@ -1246,7 +1246,7 @@ typedef uint64_t effects_t;
 typedef uint32_t renderfx_t;
 
 // player_state_t->refdef flags
-#define RDF_UNDERWATER      BIT(0)      // warp the screen as apropriate
+#define RDF_UNDERWATER      BIT(0)      // warp the screen as appropriate
 #define RDF_NOWORLDMODEL    BIT(1)      // used for player configuration screen
 
 //ROGUE
@@ -1305,7 +1305,7 @@ enum {
 // temp entity events
 //
 // Temp entity events are for things that happen
-// at a location seperate from any existing entity.
+// at a location separate from any existing entity.
 // Temporary entity messages are explicitly constructed
 // and broadcast.
 typedef enum {
@@ -1398,7 +1398,7 @@ enum {
 
 // sound channels
 // channel 0 never willingly overrides
-// other channels (1-7) allways override a playing sound on that channel
+// other channels (1-7) always override a playing sound on that channel
 enum {
     CHAN_AUTO,
     CHAN_WEAPON,
@@ -1692,7 +1692,7 @@ extern const cs_remap_t     cs_remap_q2pro_new;
 //==============================================
 
 // entity_state_t->event values
-// ertity events are for effects that take place reletive
+// entity events are for effects that take place relative
 // to an existing entities origin.  Very network efficient.
 // All muzzle flashes really should be converted to events...
 enum {
@@ -1771,7 +1771,7 @@ typedef struct entity_state_s {
 
 // player_state_t is the information needed in addition to pmove_state_t
 // to rendered a view.  There will only be 10 player_state_t sent each second,
-// but the number of pmove_state_t changes will be reletive to client
+// but the number of pmove_state_t changes will be relative to client
 // frame rates
 typedef struct player_state_s {
     pmove_state_t   pmove;  // for prediction

@@ -1142,8 +1142,13 @@ void SV_InitGameProgs(void)
     ge->PreInit(); // FIXME: When to call PreInit(), when Init()?
     ge->Init();
 
-    g_restart_fs = (game_q2pro_restart_filesystem_t *)ge->GetExtension(game_q2pro_restart_filesystem_ext);
-    g_customize_entity = (game_q2pro_customize_entity_t *)ge->GetExtension(game_q2pro_customize_entity_ext);
+    if (ge->GetExtension) {
+        g_restart_fs = (game_q2pro_restart_filesystem_t *)ge->GetExtension(game_q2pro_restart_filesystem_ext);
+        g_customize_entity = (game_q2pro_customize_entity_t *)ge->GetExtension(game_q2pro_customize_entity_ext);
+    } else {
+        g_restart_fs = NULL;
+        g_customize_entity = NULL;
+    }
 
     if (svs.game_api == Q2PROTO_GAME_VANILLA) {
         if ((g_features->integer & GMF_PROTOCOL_EXTENSIONS) != 0)

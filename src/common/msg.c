@@ -2349,7 +2349,7 @@ static void MSG_ReadColor(vec3_t color)
 
 static void MSG_ReadFog(player_fogchange_t *fog_change)
 {
-    fog_bits_t bits = MSG_ReadByte();
+    q2pro_fog_bits_t bits = MSG_ReadByte();
 
     if (bits & Q2PRO_FOG_BIT_COLOR) {
         MSG_ReadColor(fog_change->linear.color);

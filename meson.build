@@ -632,7 +632,7 @@ if get_option('game-abi-hack').require(x86 and cc.get_id() == 'gcc' and cc.has_a
   engine_args += '-mstackrealign'
 endif
 
-executable('q2pro', common_src, client_src, refresh_src,
+executable('q2repro', common_src, client_src, refresh_src,
   dependencies:          common_deps + client_deps,
   include_directories:   ['inc', 'q2proto/inc'],
   gnu_symbol_visibility: 'hidden',
@@ -643,7 +643,7 @@ executable('q2pro', common_src, client_src, refresh_src,
   install_dir:           bindir,
 )
 
-executable('q2proded', common_src, server_src,
+executable('q2reproded', common_src, server_src,
   dependencies:          common_deps + server_deps,
   include_directories:   ['inc', 'q2proto/inc'],
   gnu_symbol_visibility: 'hidden',

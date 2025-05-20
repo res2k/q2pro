@@ -18,6 +18,7 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 
 #include "shared/shared.h"
 #include "cgame_classic.h"
+#include "client/client.h"
 
 #include "common/cvar.h"
 #include "common/game3_convert.h"
@@ -733,7 +734,7 @@ static void SCR_ExecuteLayoutString(vrect_t hud_vrect, const char *s, int32_t pl
 }
 
 // The status bar is a small layout program that is based on the stats array
-static void SCR_DrawStats(vrect_t hud_vrect, int32_t playernum, const player_state_t *ps)
+static void draw_stats(vrect_t hud_vrect, int32_t playernum, const player_state_t *ps)
 {
     if (scr_draw2d->integer <= 1)
         return;
@@ -857,7 +858,7 @@ static void CGC_DrawHUD (int32_t isplit, const cg_server_data_t *data, vrect_t h
 {
     // Note: isplit is ignored, due to missing split screen support
 
-    SCR_DrawStats(hud_vrect, playernum, ps);
+    draw_stats(hud_vrect, playernum, ps);
 
     SCR_DrawLayout(hud_vrect, data, playernum, ps);
 
@@ -924,6 +925,17 @@ static void CGC_ClearCenterprint(int32_t isplit)
     scr_centerstring[0] = 0;
 }
 
+static void CGC_NotifyMessage(int32_t isplit, const char *msg, bool is_chat)
+{
+    Con_SkipNotify(false);
+    if (is_chat)
+        Con_SetColor(COLOR_INDEX_ALT);
+    Con_Print(msg);
+    if (is_chat)
+        Con_SetColor(COLOR_INDEX_NONE);
+    Con_SkipNotify(true);
+}
+
 const char cgame_q2pro_extended_support_ext[] = "q2pro:extended_support";
 
 cgame_export_t cgame_classic = {
@@ -944,6 +956,7 @@ cgame_export_t cgame_classic = {
 
     .ParseCenterPrint = CGC_ParseCenterPrint,
     .ClearCenterprint = CGC_ClearCenterprint,
+    .NotifyMessage = CGC_NotifyMessage,
 };
 
 cgame_export_t *GetClassicCGameAPI(cgame_import_t *import)

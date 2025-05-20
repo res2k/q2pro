@@ -711,6 +711,8 @@ static void CL_ParseServerData(const q2proto_svc_serverdata_t *serverdata)
         else if (cl.game_api >= Q2PROTO_GAME_Q2PRO_EXTENDED)
             cl.csr = cs_remap_q2pro_new;
         cl.psFlags |= MSG_PS_RERELEASE | MSG_PS_EXTENSIONS;
+        if (cl.game_api == Q2PROTO_GAME_Q2PRO_EXTENDED_V2)
+            cl.psFlags |= MSG_PS_EXTENSIONS_2;
         cl.esFlags |= MSG_ES_RERELEASE | CL_ES_EXTENDED_MASK;
         set_server_fps(serverdata->q2repro.server_fps);
         /* Rerelease game assumes client & server framerate is in sync,

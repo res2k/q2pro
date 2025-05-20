@@ -29,26 +29,37 @@ static contents_t (* current_pmove_pointcontents)(const vec3_t point);
 static int pm_clipmask;
 static csurface_v3_t trace3_result_surface;
 
-static game3_trace_t wrap_pmove_trace(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end)
+static game3_trace_t convert_trace(const trace_t* trace)
 {
-    trace_t trace = current_pmove_trace(start, mins, maxs, end, NULL, pm_clipmask);
     game3_trace_t trace3;
-    trace3.allsolid = trace.allsolid;
-    trace3.startsolid = trace.startsolid;
-    trace3.fraction = trace.fraction;
-    VectorCopy(trace.endpos, trace3.endpos);
-    trace3.plane = trace.plane;
-    Q_strlcpy(trace3_result_surface.name, trace.surface->name, sizeof(trace3_result_surface.name));
-    trace3_result_surface.flags = trace.surface->flags;
-    trace3_result_surface.value = trace.surface->value;
+    trace3.allsolid = trace->allsolid;
+    trace3.startsolid = trace->startsolid;
+    trace3.fraction = trace->fraction;
+    VectorCopy(trace->endpos, trace3.endpos);
+    trace3.plane = trace->plane;
+    Q_strlcpy(trace3_result_surface.name, trace->surface->name, sizeof(trace3_result_surface.name));
+    trace3_result_surface.flags = trace->surface->flags;
+    trace3_result_surface.value = trace->surface->value;
     trace3.surface = &trace3_result_surface;
-    trace3.contents = trace.contents;
+    trace3.contents = trace->contents;
     /* This looks wrong, but is actually okay:
      * Any entities by "client" traces aren't sensibly useable, anyway, as clients don't keep
      * track of edicts; the only thing you can do is distinguish NULL and non-NULL values.
      * To do that, cast is fine ... */
-    trace3.ent = (game3_edict_t*)trace.ent;
+    trace3.ent = (game3_edict_t*)trace->ent;
     return trace3;
+}
+
+static game3_trace_t wrap_pmove_trace_old(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end)
+{
+    trace_t trace = current_pmove_trace(start, mins, maxs, end, NULL, pm_clipmask);
+    return convert_trace(&trace);
+}
+
+static game3_trace_t wrap_pmove_trace_new(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int contentmask)
+{
+    trace_t trace = current_pmove_trace(start, mins, maxs, end, NULL, contentmask ? contentmask : pm_clipmask);
+    return convert_trace(&trace);
 }
 
 static int wrap_pmove_pointcontents(const vec3_t point)
@@ -82,7 +93,7 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
 
         ConvertToGame3_usercmd(&game3_pmove.cmd, &pmove->cmd);
         game3_pmove.snapinitial = pmove->snapinitial;
-        game3_pmove.trace = wrap_pmove_trace;
+        game3_pmove.trace = wrap_pmove_trace_new;
         // "Classic" pmove doesn't actually use clip(), so no need to set it
         game3_pmove.pointcontents = wrap_pmove_pointcontents;
 
@@ -107,7 +118,7 @@ void Pmove(pmove_t *pmove, const pmoveParams_t *params)
 
         ConvertToGame3_usercmd(&game3_pmove.cmd, &pmove->cmd);
         game3_pmove.snapinitial = pmove->snapinitial;
-        game3_pmove.trace = wrap_pmove_trace;
+        game3_pmove.trace = wrap_pmove_trace_old;
         // "Classic" pmove doesn't actually use clip(), so no need to set it
         game3_pmove.pointcontents = wrap_pmove_pointcontents;
 

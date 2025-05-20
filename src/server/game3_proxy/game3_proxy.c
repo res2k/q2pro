@@ -240,7 +240,7 @@ static void wrap_Pmove_import(void *pmove)
     const pmoveParams_t *pmp = sv_client ? &sv_client->pmp : &svs.pmp;
 
     if (IS_NEW_GAME_API)
-        game3_PmoveNew(pmove, NULL, pmp);
+        game3_PmoveNew(pmove, &((game3_pmove_new_t*)pmove)->groundplane, pmp);
     else
         game3_PmoveOld(pmove, NULL, pmp);
 }

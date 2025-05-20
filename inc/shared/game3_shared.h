@@ -238,11 +238,12 @@ typedef struct {
     vec3_t      mins, maxs;         // bounding box size
 
     game3_edict_t   *groundentity;
+    cplane_t        groundplane;
     int             watertype;
     int             waterlevel;
 
     // callbacks to test the world
-    game3_trace_t (* q_gameabi trace)(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end);
+    game3_trace_t (* q_gameabi trace)(const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int contentmask);
     int         (*pointcontents)(const vec3_t point);
 } game3_pmove_new_t;
 #endif

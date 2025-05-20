@@ -345,38 +345,6 @@ static void apply_playerstate(const q2proto_svc_playerstate_t *playerstate,
         to->pmove.viewheight = playerstate->pm_viewheight;
 }
 
-static void apply_playerfog_change(const player_fogchange_t *fog_change)
-{
-    if (fog_change->bits == 0)
-        return;
-
-    unsigned new_bits = 0, color_bits = 0, hf_start_color_bits = 0, hf_end_color_bits = 0;
-    if (fog_change->bits & Q2PRO_FOG_BIT_DENSITY)
-        new_bits |= Q2P_FOG_DENSITY_SKYFACTOR;
-    if (fog_change->bits & Q2PRO_FOG_BIT_COLOR)
-        color_bits |= BIT(0) | BIT(1) | BIT(2);
-    
-    if (fog_change->bits & Q2PRO_FOG_BIT_HEIGHT_DENSITY)
-        new_bits |= Q2P_HEIGHTFOG_DENSITY;
-    if (fog_change->bits & Q2PRO_FOG_BIT_HEIGHT_FALLOFF)
-        new_bits |= Q2P_HEIGHTFOG_FALLOFF;
-
-    if (fog_change->bits & Q2PRO_FOG_BIT_HEIGHT_START_COLOR)
-        hf_start_color_bits |= BIT(0) | BIT(1) | BIT(2);
-    if (fog_change->bits & Q2PRO_FOG_BIT_HEIGHT_START_DIST)
-        new_bits |= Q2P_HEIGHTFOG_START_DIST;
-
-    if (fog_change->bits & Q2PRO_FOG_BIT_HEIGHT_END_COLOR)
-        hf_end_color_bits |= BIT(0) | BIT(1) | BIT(2);
-    if (fog_change->bits & Q2PRO_FOG_BIT_HEIGHT_END_DIST)
-        new_bits |= Q2P_HEIGHTFOG_END_DIST;
-
-    cl_fog_params_t fog_params;
-    fog_params.linear = fog_change->linear;
-    fog_params.height = fog_change->height;
-    V_FogParamsChanged(new_bits, color_bits, hf_start_color_bits, hf_end_color_bits, &fog_params, CL_FRAMETIME);
-}
-
 static void CL_ParseFrame(const q2proto_svc_frame_t *frame_msg)
 {
     int                     currentframe, deltaframe, suppressed;
@@ -452,7 +420,6 @@ static void CL_ParseFrame(const q2proto_svc_frame_t *frame_msg)
     }
     frame.areabytes = frame_msg->areabits_len;
 
-    player_fogchange_t fog_change = {0};
     // parse playerstate
     apply_playerstate(&frame_msg->playerstate, from, &frame.ps);
     if(frame_msg->playerstate.delta_bits & Q2P_PSD_CLIENTNUM) {
@@ -462,8 +429,6 @@ static void CL_ParseFrame(const q2proto_svc_frame_t *frame_msg)
     } else {
         frame.clientNum = cl.clientNum;
     }
-
-    apply_playerfog_change(&fog_change);
 
     SHOWNET(3, "%3u:packetentities\n", msg_read.readcount);
 

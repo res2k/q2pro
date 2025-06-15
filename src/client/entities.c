@@ -281,7 +281,7 @@ static void set_active_state(void)
     cls.state = ca_active;
     Cbuf_ExecuteDeferred(&cmd_buffer);
 
-    cl.serverdelta = Q_align_down(cl.frame.number, CL_FRAMEDIV);
+    cl.serverdelta = cl.frame.number ? Q_align_down(cl.frame.number, CL_FRAMEDIV) : 0;
     cl.time = cl.servertime = 0; // set time, needed for demos
 #if USE_FPS
     cl.keytime = cl.keyservertime = 0;
@@ -425,7 +425,7 @@ void CL_DeltaFrame(void)
     if (framenum < 0)
         Com_Error(ERR_DROP, "%s: server time went backwards", __func__);
 
-    if (framenum > INT_MAX / CL_FRAMETIME)
+    if (CL_FRAMETIME && framenum > INT_MAX / CL_FRAMETIME)
         Com_Error(ERR_DROP, "%s: server time overflowed", __func__);
 
     cl.servertime = framenum * CL_FRAMETIME;

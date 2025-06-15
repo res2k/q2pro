@@ -335,8 +335,8 @@ static int compress_message(client_t *client)
     if (err != Q2P_ERR_SUCCESS)
     {
         if (err != Q2P_ERR_ALREADY_COMPRESSED)
-            Com_WPrintf("Error %d compressing %zu bytes message for %s\n",
-                        err, uncompressed_size, client->name);
+            Com_WPrintf("Error %s compressing %zu bytes message for %s\n",
+                        q2proto_error_string(err), uncompressed_size, client->name);
         msg_write.cursize = uncompressed_size;
         return 0;
     }
@@ -929,7 +929,7 @@ static void write_pending_download(client_t *client)
         q2proto_server_write(&client->q2proto_ctx, (uintptr_t)&client->io_data, &message);
         MSG_FlushTo(buf);
     } else if (download_err != Q2P_ERR_NOT_ENOUGH_PACKET_SPACE) {
-        Com_WPrintf("%s: failed downloading data to %s: %d\n", __func__, client->name, download_err);
+        Com_WPrintf("%s: failed downloading data to %s: %s\n", __func__, client->name, q2proto_error_string(download_err));
     }
 
     if (download_err == Q2P_ERR_DOWNLOAD_COMPLETE) {

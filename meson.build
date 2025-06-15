@@ -45,6 +45,7 @@ common_src = [
   'q2proto/src/q2proto_client.c',
   'q2proto/src/q2proto_coords.c',
   'q2proto/src/q2proto_crc.c',
+  'q2proto/src/q2proto_error.c',
   'q2proto/src/q2proto_internal_common.c',
   'q2proto/src/q2proto_internal_debug.c',
   'q2proto/src/q2proto_internal_download.c',

@@ -488,7 +488,7 @@ void CL_CheckForResend(void)
     return;
 
 fail:
-    Com_Error(ERR_DISCONNECT, "Could not get connect string (%d)", err);
+    Com_Error(ERR_DISCONNECT, "Could not get connect string (%s)", q2proto_error_string(err));
 }
 
 static void CL_RecentIP_g(genctx_t *ctx)
@@ -1300,7 +1300,7 @@ static void CL_ConnectionlessPacket(void)
         q2proto_error_t parse_err;
         parse_err = q2proto_parse_challenge(Cmd_Args(), accepted_protocols, num_accepted_protocols, &challenge);
         if (parse_err != Q2P_ERR_SUCCESS) {
-            Com_DPrintf("Challenge parse error %d.  Ignored.\n", parse_err);
+            Com_DPrintf("Challenge parse error %s.  Ignored.\n", q2proto_error_string(parse_err));
             return;
         }
 

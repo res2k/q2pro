@@ -1012,7 +1012,7 @@ static void SVC_DirectConnect(void)
             reject_printf("Unsupported protocol %d.\n", parsed_connect.protocol);
             return;
         } else {
-            reject_printf("'connect' parse error %d.\n", parse_err);
+            reject_printf("'connect' parse error %s.\n", q2proto_error_string(parse_err));
             return;
         }
     }
@@ -1070,7 +1070,7 @@ static void SVC_DirectConnect(void)
 
     q2proto_error_t err = q2proto_init_servercontext(&newcl->q2proto_ctx, &svs.server_info, &parsed_connect);
     if (err != Q2P_ERR_SUCCESS) {
-        Com_EPrintf("failed to initialize connection context: %d\n", err);
+        Com_EPrintf("failed to initialize connection context: %s\n", q2proto_error_string(err));
         return;
     }
 

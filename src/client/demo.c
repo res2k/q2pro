@@ -513,7 +513,7 @@ static void CL_Record_f(void)
 
     q2proto_error_t err = q2proto_init_servercontext_demo(&cls.demo.q2proto_context, &cls.demo.server_info, &size);
     if (err != Q2P_ERR_SUCCESS) {
-        Com_EPrintf("Failed to start demo recording: %d.\n", err);
+        Com_EPrintf("Failed to start demo recording: %s.\n", q2proto_error_string(err));
         return;
     }
     demo_q2protoio_ioarg.max_msg_len = size;
@@ -912,7 +912,7 @@ static void CL_PlayDemo_f(void)
     connect_info.q2pro_nctype = cls.netchan.type;
     q2proto_error_t err = q2proto_init_servercontext(&cls.demo.q2proto_context, &cls.demo.server_info, &connect_info);
     if (err != Q2P_ERR_SUCCESS) {
-        Com_Error(ERR_DISCONNECT, "Couldn't init demo context: %d", err);
+        Com_Error(ERR_DISCONNECT, "Couldn't init demo context: %s", q2proto_error_string(err));
         return;
     }
     SZ_InitWrite(&cls.demo.buffer, demo_buffer, MAX_MSGLEN);

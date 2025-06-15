@@ -104,7 +104,7 @@ static int write_server_file(savetype_t autosave)
     return 0;
 }
 
-static int write_level_file(void)
+static int write_level_file(bool transition)
 {
     char        name[MAX_OSPATH];
     int         i, ret;
@@ -155,7 +155,7 @@ static int write_level_file(void)
 
     // write game level
     size_t json_size = 0;
-    char *level_json = ge->WriteLevelJson(false, &json_size); // FIXME: transition flag
+    char *level_json = ge->WriteLevelJson(transition, &json_size);
     if (!level_json)
         return -1;
 
@@ -572,9 +572,6 @@ bool SV_AutoSaveBegin(const mapcmd_t *cmd)
     if (no_save_games())
         return false;
 
-    if (!ge->CanSave())
-        return false;
-
     memset(bitmap, 0, sizeof(bitmap));
 
     // clear all the client inuse flags before saving so that
@@ -589,7 +586,7 @@ bool SV_AutoSaveBegin(const mapcmd_t *cmd)
     }
 
     // save the map just exited
-    if (write_level_file())
+    if (write_level_file(true))
         Com_EPrintf("Couldn't write level file.\n");
 
     // we must restore these for clients to transfer over correctly
@@ -765,7 +762,7 @@ static void SV_Savegame_f(void)
     // archive current level, including all client edicts.
     // when the level is reloaded, they will be shells awaiting
     // a connecting client
-    if (write_level_file()) {
+    if (write_level_file(false)) {
         Com_Printf("Couldn't write level file.\n");
         return;
     }

@@ -1040,11 +1040,13 @@ void Nav_Load(const char *map_name)
 
     nav_data.ctx = Nav_AllocCtx();
 
-    return;
+    goto cleanup;
 
 fail:
     Com_EPrintf("Couldn't load bot navigation file (%s): %s\n", nav_data.filename, Com_GetLastError());
     Nav_Unload();
+cleanup:
+    FS_CloseFile(f);
 }
 
 void Nav_Unload(void)

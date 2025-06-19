@@ -449,14 +449,22 @@ void q2protodbg_shownet(uintptr_t io_arg, int level, int offset, const char *msg
 {
     if (cl_shownet->integer > level)
     {
+        q2protoio_ioarg_t *io_data = (q2protoio_ioarg_t *)io_arg;
         char buf[256];
         va_list argptr;
+
+    #if USE_ZLIB
+        bool is_deflate = io_arg == IOARG_INFLATE;
+    #else
+        bool is_deflate = false;
+    #endif
+        const char *offset_suffix = is_deflate ? "[z]" : "";
 
         va_start(argptr, msg);
         Q_vsnprintf(buf, sizeof(buf), msg, argptr);
         va_end(argptr);
 
-        Com_LPrintf(PRINT_DEVELOPER, "%3u:%s\n", msg_read.readcount + offset, buf);
+        Com_LPrintf(PRINT_DEVELOPER, "%3u%s:%s\n", io_data->sz_read->readcount + offset, offset_suffix, buf);
     }
 }
 #endif

@@ -430,8 +430,6 @@ static void CL_ParseFrame(const q2proto_svc_frame_t *frame_msg)
         frame.clientNum = cl.clientNum;
     }
 
-    SHOWNET(3, "%3u:packetentities\n", msg_read.readcount);
-
     // parse packetentities
     CL_ParsePacketEntities(oldframe, &frame);
 

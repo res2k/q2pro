@@ -130,11 +130,13 @@ void CL_Carousel_Draw(void)
 
         if (weap->ammo_index >= 0) {
             int count = cgame->GetWeaponWheelAmmoCount(&cl.frame.ps, weap->ammo_index);
-            color_t color = count <= weap->quantity_warn ? COLOR_RED : COLOR_WHITE;
+            color_t color;
+            if (count <= weap->quantity_warn)
+                color = selected ? COLOR_RGB(255, 83, 83) : COLOR_RED;
+            else
+                color = selected ? COLOR_RGB(255, 255, 83) : COLOR_WHITE;
 
-            R_SetScale(1.0f);
-            SCR_DrawString((carousel_x + 12) / scr.hud_scale, (carousel_y + 2) / scr.hud_scale, UI_DROPSHADOW | UI_CENTER, color, va("%i", count));
-            R_SetScale(scr.hud_scale);
+            SCR_DrawString(carousel_x + (CAROUSEL_ICON_SIZE / 2), carousel_y + CAROUSEL_ICON_SIZE + 2, UI_DROPSHADOW | UI_CENTER, color, va("%i", count));
         }
     }
 }

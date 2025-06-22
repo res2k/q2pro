@@ -310,6 +310,20 @@ void CL_Wheel_Close(bool released)
         CL_ClientCommand(va("use_index_only %i\n", cl.wheel.slots[cl.wheel.selected].item_index));
 }
 
+static int get_wheel_draw_size(void)
+{
+    // Find an integer fraction (or multiple) of the original wheel size to choose draw size
+    int wheel_draw_size;
+    if (scr.wheel_size >= scr.hud_height) {
+        int wheel_size_div = (scr.wheel_size + scr.wheel_size - 1) / scr.hud_height;
+        wheel_draw_size = scr.wheel_size / wheel_size_div;
+    } else {
+        int wheel_size_mul = scr.hud_height / scr.wheel_size;
+        wheel_draw_size = scr.wheel_size * wheel_size_mul;
+    }
+    return wheel_draw_size;
+}
+
 void CL_Wheel_Input(int x, int y)
 {
     if (cl.wheel.state == WHEEL_CLOSED)
@@ -332,7 +346,7 @@ void CL_Wheel_Input(int x, int y)
     
     // clamp position & calculate dir
     cl.wheel.distance = Vector2Length(cl.wheel.position);
-    float inner_size = scr.wheel_size * 0.64f;
+    float inner_size = get_wheel_draw_size() / scr.hud_scale * 0.64f;
 
     Vector2Clear(cl.wheel.dir);
 
@@ -410,39 +424,43 @@ void CL_Wheel_Draw(void)
     if (cl.wheel.state != WHEEL_OPEN && cl.wheel.timer == 0.0f)
         return;
     
-    int center_x = (r_config.width / 2);
+    int center_x = (scr.hud_width / 2);
 
     if (cl.wheel.is_powerup_wheel)
-        center_x -= (r_config.width / 4);
+        center_x -= (scr.hud_width / 4);
     else
-        center_x += (r_config.width / 4);
+        center_x += (scr.hud_width / 4);
 
-    int center_y = r_config.height / 2;
+    int center_y = scr.hud_height / 2;
 
-    R_SetScale(1);
     float t = 1.0f - cl.wheel.timer;
     float tween = 0.5f - (cos((t * t) * M_PIf) * 0.5f);
     float wheel_alpha = 1.0f - tween;
     color_t base_color = COLOR_SETA_F(COLOR_WHITE, wheel_alpha);
+    int wheel_draw_size = get_wheel_draw_size();
 
-    R_DrawPic(center_x - (scr.wheel_size / 2), center_y - (scr.wheel_size / 2), base_color, scr.wheel_circle);
+    R_DrawStretchPic(center_x - (wheel_draw_size / 2), center_y - (wheel_draw_size / 2), wheel_draw_size, wheel_draw_size, base_color, scr.wheel_circle);
 
-    for (int i = 0; i < cl.wheel.num_slots; i++) {
+    for (int i_ = 0; i_ < cl.wheel.num_slots * 2; i_++) {
+        int i = i_ % cl.wheel.num_slots;
+        bool select_pass = i_ >= cl.wheel.num_slots;
         const cl_wheel_slot_t *slot = &cl.wheel.slots[i];
 
         if (!slot->has_item)
             continue;
 
-        vec2_t p;
-        Vector2Scale(slot->dir, (scr.wheel_size / 2) * 0.525f, p);
-
         bool selected = cl.wheel.selected == i;
+        if (select_pass != selected) continue;
+
+        vec2_t p;
+        Vector2Scale(slot->dir, (wheel_draw_size / 2) * 0.525f, p);
+
         bool active = selected;
 
-        float scale = 1.5f;
+        float scale = 1.f;
 
         if (selected)
-            scale = 2.5f;
+            scale = 2.f;
 
         int size = 12 * scale;
         float alpha = 1.0f;
@@ -478,9 +496,14 @@ void CL_Wheel_Draw(void)
             }
         }
 
+        color_t count_color;
+        if (selected)
+            count_color = warn_low ? COLOR_RGB(255, 62, 33) : COLOR_RGB(255, 248, 134);
+        else
+            count_color = warn_low ? COLOR_RED : COLOR_WHITE;
+
         if (count != -1) {
-            color_t color = warn_low ? COLOR_RED : COLOR_WHITE;
-            SCR_DrawString(center_x + p[0] + size, center_y + p[1] + size, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(color, wheel_alpha), va("%i", count));
+            SCR_DrawString(center_x + p[0] + size, center_y + p[1] + size, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(count_color, wheel_alpha), va("%i", count));
         }
 
         if (selected) {
@@ -490,9 +513,7 @@ void CL_Wheel_Draw(void)
             // make sure they get reset of language is changed.
             Loc_Localize(cl.configstrings[cl.csr.items + slot->item_index], false, NULL, 0, localized, sizeof(localized));
 
-            R_SetScale(0.5f);
-            SCR_DrawString(center_x * 0.5f, (center_y - (scr.wheel_size / 8)) * 0.5f, UI_CENTER | UI_DROPSHADOW, base_color, localized);
-            R_SetScale(1);
+            SCR_DrawString(center_x, center_y - (wheel_draw_size / 8), UI_CENTER | UI_DROPSHADOW, base_color, localized);
 
             int ammo_index;
 
@@ -500,9 +521,7 @@ void CL_Wheel_Draw(void)
                 ammo_index = cl.wheel_data.powerups[slot->data_id].ammo_index;
 
                 if (!cl.wheel_data.powerups[slot->data_id].is_toggle) {
-                    R_SetScale(0.25f);
-                    SCR_DrawString(center_x * 0.25f, (center_y * 0.25f), UI_CENTER | UI_DROPSHADOW, base_color, va("%i", cgame->GetPowerupWheelCount(&cl.frame.ps, slot->data_id)));
-                    R_SetScale(1);
+                    SCR_DrawString(center_x, center_y, UI_CENTER | UI_DROPSHADOW, base_color, va("%i", cgame->GetPowerupWheelCount(&cl.frame.ps, slot->data_id)));
                 }
             } else {
                 ammo_index = cl.wheel_data.weapons[slot->data_id].ammo_index;
@@ -513,16 +532,18 @@ void CL_Wheel_Draw(void)
 
                 R_DrawStretchPicShadowAlpha(center_x - (24 * 3) / 2, center_y - ((24 * 3) / 2), (24 * 3), (24 * 3), ammo->icons.wheel, 2, wheel_alpha);
 
-                R_SetScale(0.25f);
-                color_t color = warn_low ? COLOR_RED : COLOR_WHITE;
-                SCR_DrawString(center_x * 0.25f, (center_y * 0.25f) + 16, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(color, wheel_alpha), va("%i", count));
-                R_SetScale(1);
+                SCR_DrawString(center_x, center_y + 32, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(count_color, wheel_alpha), va("%i", count));
             }
         }
     }
 
-    R_DrawPic(center_x + (int) cl.wheel.position[0] - (scr.wheel_button_size / 2), center_y + (int) cl.wheel.position[1] - (scr.wheel_button_size / 2),
-              COLOR_SETA_F(COLOR_WHITE, wheel_alpha * 0.5f), scr.wheel_button);
+    R_SetScale(1);
+    int wheel_button_draw_size = (int)(scr.wheel_button_size / scr.hud_scale);
+    R_DrawStretchPic((int)((center_x / scr.hud_scale) + cl.wheel.position[0] - (wheel_button_draw_size / 2)),
+                     (int)((center_y / scr.hud_scale) + cl.wheel.position[1] - (wheel_button_draw_size / 2)),
+                     wheel_button_draw_size,
+                     wheel_button_draw_size,
+                     COLOR_SETA_F(COLOR_WHITE, wheel_alpha * 0.5f), scr.wheel_button);
 }
 
 void CL_Wheel_Precache(void)

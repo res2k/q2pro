@@ -437,7 +437,7 @@ void R_DrawStretchChar(int x, int y, int w, int h, int flags, int c, color_t col
     draw_char(x, y, w, h, flags, c & 255, color, IMG_ForHandle(font));
 }
 
-int R_DrawString(int x, int y, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font)
+int R_DrawStringStretch(int x, int y, int scale, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font)
 {
     const image_t *image = IMG_ForHandle(font);
 
@@ -450,13 +450,13 @@ int R_DrawString(int x, int y, int flags, size_t maxlen, const char *s, color_t 
         byte c = *s++;
 
         if ((flags & UI_MULTILINE) && c == '\n') {
-            y += CONCHAR_HEIGHT + (1.0 / draw.scale);
+            y += CONCHAR_HEIGHT * scale + (1.0 / draw.scale);
             x = sx;
             continue;
         }
 
-        draw_char(x, y, CONCHAR_WIDTH, CONCHAR_HEIGHT, flags, c, color, image);
-        x += CONCHAR_WIDTH;
+        draw_char(x, y, CONCHAR_WIDTH * scale, CONCHAR_HEIGHT * scale, flags, c, color, image);
+        x += CONCHAR_WIDTH * scale;
     }
 
     return x;

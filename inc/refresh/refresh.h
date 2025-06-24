@@ -234,8 +234,14 @@ float   R_ClampScale(cvar_t *var);
 void    R_SetScale(float scale);
 void    R_DrawChar(int x, int y, int flags, int ch, color_t color, qhandle_t font);
 void    R_DrawStretchChar(int x, int y, int w, int h, int flags, int ch, color_t color, qhandle_t font);
-int     R_DrawString(int x, int y, int flags, size_t maxChars,
-                     const char *string, color_t color, qhandle_t font);  // returns advanced x coord
+int     R_DrawStringStretch(int x, int y, int scale, int flags, size_t maxChars,
+                            const char *string, color_t color, qhandle_t font);  // returns advanced x coord
+static inline int R_DrawString(int x, int y, int flags, size_t maxChars,
+                               const char *string, color_t color, qhandle_t font)
+{
+    return R_DrawStringStretch(x, y, 1, flags, maxChars, string, color, font);
+}
+
 
 // kfont stuff
 typedef struct {

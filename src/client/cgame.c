@@ -301,8 +301,7 @@ static bool CG_CL_GetTextInput(const char **msg, bool *is_team)
 
 static int32_t CG_CL_GetWarnAmmoCount(int32_t weapon_id)
 {
-    // FIXME: Where to get this?
-    return 0;
+    return cl.wheel_data.weapons[weapon_id].quantity_warn;
 }
 
 #define NUM_LOC_STRINGS     8

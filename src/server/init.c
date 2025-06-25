@@ -242,7 +242,7 @@ static server_state_t get_server_state(const char *s)
 {
     s = COM_FileExtension(s);
 
-    if (!Q_stricmp(s, ".pcx"))
+    if (!Q_stricmp(s, ".pcx") || !Q_stricmp(s, ".png"))
         return ss_pic;
 
     if (!Q_stricmp(s, ".cin"))

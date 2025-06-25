@@ -751,7 +751,7 @@ void SCR_PlayCinematic(const char *name)
     // make sure CD isn't playing music
     OGG_Stop();
 
-    if (!Q_stricmp(ext, ".pcx")) {
+    if (!Q_stricmp(ext, ".pcx") || !Q_stricmp(ext, ".png")) {
         cin.static_pic = R_RegisterTempPic(name);
         if (!cin.static_pic) {
             SCR_FinishCinematic();

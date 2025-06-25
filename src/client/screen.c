@@ -94,11 +94,11 @@ UTILS
 
 /*
 ==============
-SCR_DrawStringEx
+SCR_DrawStringStretch
 ==============
 */
-int SCR_DrawStringEx(int x, int y, int flags, size_t maxlen,
-                     const char *s, color_t color, qhandle_t font)
+int SCR_DrawStringStretch(int x, int y, int scale, int flags, size_t maxlen,
+                          const char *s, color_t color, qhandle_t font)
 {
     size_t len = strlen(s);
 
@@ -107,22 +107,22 @@ int SCR_DrawStringEx(int x, int y, int flags, size_t maxlen,
     }
 
     if ((flags & UI_CENTER) == UI_CENTER) {
-        x -= len * CONCHAR_WIDTH / 2;
+        x -= (len * CONCHAR_WIDTH * scale) / 2;
     } else if (flags & UI_RIGHT) {
-        x -= len * CONCHAR_WIDTH;
+        x -= len * CONCHAR_WIDTH * scale;
     }
 
-    return R_DrawString(x, y, flags, maxlen, s, color, font);
+    return R_DrawStringStretch(x, y, scale, flags, maxlen, s, color, font);
 }
 
 
 /*
 ==============
-SCR_DrawStringMulti
+SCR_DrawStringMultiStretch
 ==============
 */
-void SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen,
-                         const char *s, color_t color, qhandle_t font)
+void SCR_DrawStringMultiStretch(int x, int y, int scale, int flags, size_t maxlen,
+                                const char *s, color_t color, qhandle_t font)
 {
     char    *p;
     size_t  len;
@@ -132,22 +132,22 @@ void SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen,
     while (*s && maxlen) {
         p = strchr(s, '\n');
         if (!p) {
-            last_x = SCR_DrawStringEx(x, y, flags, maxlen, s, color, font);
+            last_x = SCR_DrawStringStretch(x, y, scale, flags, maxlen, s, color, font);
             last_y = y;
             break;
         }
 
         len = min(p - s, maxlen);
-        last_x = SCR_DrawStringEx(x, y, flags, len, s, color, font);
+        last_x = SCR_DrawStringStretch(x, y, scale, flags, len, s, color, font);
         last_y = y;
         maxlen -= len;
 
-        y += CONCHAR_HEIGHT;
+        y += CONCHAR_HEIGHT * scale;
         s = p + 1;
     }
 
     if (flags & UI_DRAWCURSOR && com_localTime & BIT(8))
-        R_DrawChar(last_x, last_y, flags, 11, color, font);
+        R_DrawStretchChar(last_x, last_y, CONCHAR_WIDTH * scale, CONCHAR_HEIGHT * scale, flags, 11, color, font);
 }
 
 

@@ -1246,8 +1246,17 @@ void    SCR_AddNetgraph(void);
 float   SCR_FadeAlpha(unsigned startTime, unsigned visTime, unsigned fadeTime);
 #define SCR_DrawString(x, y, flags, color, string) \
     SCR_DrawStringEx(x, y, flags, MAX_STRING_CHARS, string, color, scr.font_pic)
-int     SCR_DrawStringEx(int x, int y, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font);
-void    SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font);
+int     SCR_DrawStringStretch(int x, int y, int scale, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font);
+void    SCR_DrawStringMultiStretch(int x, int y, int scale, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font);
+
+static inline int SCR_DrawStringEx(int x, int y, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font)
+{
+    return SCR_DrawStringStretch(x, y, 1, flags, maxlen, s, color, font);
+}
+static inline void SCR_DrawStringMulti(int x, int y, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font)
+{
+    SCR_DrawStringMultiStretch(x, y, 1, flags, maxlen, s, color, font);
+}
 
 void    SCR_ClearChatHUD_f(void);
 void    SCR_AddToChatHUD(const char *text);

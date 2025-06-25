@@ -345,6 +345,54 @@ static void SV_GameMap_f(void)
     SV_Map(false);
 }
 
+/* endgame: Called by game when a campaign is complete.
+ * Shows credits in KEX.
+ * Display a static image here. */
+static void SV_Endgame_f(void)
+{
+    if (Cmd_Argc() != 2) {
+        Com_Printf("Usage: %s <victory image>\n", Cmd_Argv(0));
+        return;
+    }
+
+    const char *arg = Cmd_Argv(1);
+    size_t arg_len = strlen(arg);
+
+    const char *image_name = NULL;
+
+    // First try to take a nice high-res image from pics/ach
+    const char *ach_image = NULL;
+    char ach_id[MAX_QPATH];
+    if(arg_len >= 4
+       && !strncmp(arg, "victor", 6)
+       && !strncmp(arg + arg_len - 4, ".pcx", 4)) {
+        Q_strnlcpy(ach_id, arg + 6, arg_len - 10, sizeof(arg_len));
+        if (!strcmp(ach_id, "y")) { // Quake II campaign
+            ach_image = "end";
+        } else if (!strcmp(ach_id, "r")) { // rogue
+            ach_image = "rogue";
+        } else if (!strcmp(ach_id, "x")) { // xatrix
+            ach_image = "xatrix";
+        } else if (!strcmp(ach_id, "ymg")) { // CotM
+            ach_image = "mg2";
+        } else {
+            ach_image = ach_id;
+        }
+    }
+    if (ach_image && FS_FileExists(va("pics/ach/ACH_%s.png", ach_image)))
+        image_name = va("ach/ACH_%s.png", ach_image);
+
+    // Fall back to a PCX
+    if (!image_name && FS_FileExists(va("pics/%s", arg)))
+        image_name = arg;
+
+    // Default fallback
+    if (!image_name)
+        image_name = "victory.pcx";
+
+    Cbuf_AddText(&cmd_buffer, va("gamemap \"%s\"", image_name));
+}
+
 static bool is_in_safe_state(void)
 {
     // if we're not running an online game this doesn't matter
@@ -1793,6 +1841,7 @@ static const cmdreg_t c_server[] = {
     { "map", SV_Map_f, SV_Map_c },
     { "demomap", SV_DemoMap_f, SV_DemoMap_c },
     { "gamemap", SV_GameMap_f, SV_Map_c },
+    { "endgame", SV_Endgame_f },
     { "dumpents", SV_DumpEnts_f },
     { "setmaster", SV_SetMaster_f },
     { "listmasters", SV_ListMasters_f },

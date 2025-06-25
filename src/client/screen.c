@@ -150,6 +150,40 @@ void SCR_DrawStringMultiStretch(int x, int y, int scale, int flags, size_t maxle
         R_DrawStretchChar(last_x, last_y, CONCHAR_WIDTH * scale, CONCHAR_HEIGHT * scale, flags, 11, color, font);
 }
 
+static int SCR_DrawKStringStretch(int x, int y, int scale, int flags, size_t maxlen, const char *s, color_t color, const kfont_t *kfont)
+{
+    while (*s && maxlen--) {
+        x += R_DrawKFontChar(x, y, scale, flags, *s++, color, kfont);
+    }
+    return x;
+}
+
+void SCR_DrawKStringMultiStretch(int x, int y, int scale, int flags, size_t maxlen, const char *s, color_t color, const kfont_t *kfont)
+{
+    int     last_x = x;
+    int     last_y = y;
+
+    while (*s && maxlen) {
+        const char *p = strchr(s, '\n');
+        if (!p) {
+            last_x = SCR_DrawKStringStretch(x, y, scale, flags, maxlen, s, color, kfont);
+            last_y = y;
+            break;
+        }
+
+        int len = min(p - s, maxlen);
+        last_x = SCR_DrawKStringStretch(x, y, scale, flags, len, s, color, kfont);
+        last_y = y;
+        maxlen -= len;
+
+        y += CONCHAR_HEIGHT * scale;
+        s = p + 1;
+    }
+
+    if (flags & UI_DRAWCURSOR && com_localTime & BIT(8))
+        R_DrawKFontChar(last_x, last_y, scale, flags, 11, color, kfont);
+}
+
 
 /*
 =================

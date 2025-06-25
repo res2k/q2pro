@@ -1248,6 +1248,7 @@ float   SCR_FadeAlpha(unsigned startTime, unsigned visTime, unsigned fadeTime);
     SCR_DrawStringEx(x, y, flags, MAX_STRING_CHARS, string, color, scr.font_pic)
 int     SCR_DrawStringStretch(int x, int y, int scale, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font);
 void    SCR_DrawStringMultiStretch(int x, int y, int scale, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font);
+void    SCR_DrawKStringMultiStretch(int x, int y, int scale, int flags, size_t maxlen, const char *s, color_t color, const kfont_t *kfont);
 
 static inline int SCR_DrawStringEx(int x, int y, int flags, size_t maxlen, const char *s, color_t color, qhandle_t font)
 {

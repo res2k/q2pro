@@ -243,26 +243,45 @@ static float CG_SCR_FontLineHeight(int scale)
     return scr.kfont.line_height;
 }
 
+static int CG_MeasureKFontWidth(const char *str, size_t maxlen)
+{
+    int x = 0;
+    for (const char *r = str; *r && maxlen > 0; r++, maxlen--) {
+        const kfont_char_t *ch = SCR_KFontLookup(&scr.kfont, *r);
+
+        if (ch)
+            x += ch->w;
+    }
+    return x;
+}
+
 static cg_vec2_t CG_SCR_MeasureFontString(const char *str, int scale)
 {
     // TODO: 'str' may contain UTF-8, handle that.
-    // FIXME: can contain line breaks
-    int x, y = CG_SCR_FontLineHeight(scale);
+    size_t maxlen = strlen(str);
+    int num_lines = 1;
+    int max_width = 0;
 
-    if (!scr.kfont.pic)
-        x = strlen(str) * CONCHAR_WIDTH * scale;
-    else {
-        x = 0;
-
-        for (const char *r = str; *r; r++) {
-            const kfont_char_t *ch = SCR_KFontLookup(&scr.kfont, *r);
-
-            if (ch)
-                x += ch->w;
+    while (*str) {
+        const char *p = strchr(str, '\n');
+        if (!p) {
+            int line_width = scr.kfont.pic ? CG_MeasureKFontWidth(str, maxlen) : maxlen * CONCHAR_WIDTH * scale;
+            if (line_width > max_width)
+                max_width = line_width;
+            break;
         }
+
+        size_t len = min(p - str, maxlen);
+        int line_width = scr.kfont.pic ? CG_MeasureKFontWidth(str, len) : len * CONCHAR_WIDTH * scale;
+        if (line_width > max_width)
+            max_width = line_width;
+        maxlen -= len;
+
+        ++num_lines;
+        str = p + 1;
     }
 
-    return (cg_vec2_t) { x, y };
+    return (cg_vec2_t) { max_width, num_lines * CG_SCR_FontLineHeight(scale) };
 }
 
 static void CG_SCR_DrawFontString(const char *str, int x, int y, int scale, const rgba_t *color, bool shadow, text_align_t align)
@@ -280,16 +299,10 @@ static void CG_SCR_DrawFontString(const char *str, int x, int y, int scale, cons
     color_t draw_color = apply_scr_alpha(*color);
 
     // TODO: 'str' may contain UTF-8, handle that.
-    // FIXME: can contain line breaks
     if (!scr.kfont.pic) {
-        while (*str) {
-            R_DrawStretchChar(draw_x, y, CONCHAR_WIDTH * scale, CONCHAR_HEIGHT * scale, draw_flags, *str++, draw_color, scr.font_pic);
-            draw_x += CONCHAR_WIDTH * scale;
-        }
+        SCR_DrawStringMultiStretch(draw_x, y, scale, draw_flags, strlen(str), str, draw_color, scr.font_pic);
     } else {
-        while (*str) {
-            draw_x += R_DrawKFontChar(draw_x, y, scale, draw_flags, *str++, draw_color, &scr.kfont);
-        }
+        SCR_DrawKStringMultiStretch(draw_x, y, scale, draw_flags, strlen(str), str, draw_color, &scr.kfont);
     }
 }
 

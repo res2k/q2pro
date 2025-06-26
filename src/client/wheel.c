@@ -105,6 +105,7 @@ static void CL_Carousel_Open(void)
 }
 
 #define CAROUSEL_ICON_SIZE (24 + 2)
+#define CAROUSEL_PAD       2
 
 static void R_DrawStretchPicShadowAlpha(int x, int y, int w, int h, qhandle_t pic, int shadow_offset, float alpha)
 {
@@ -123,12 +124,12 @@ void CL_Carousel_Draw(void)
     if (cl.carousel.state != WHEEL_OPEN)
         return;
 
-    int carousel_w = cl.carousel.num_slots * CAROUSEL_ICON_SIZE;
+    int carousel_w = cl.carousel.num_slots * (CAROUSEL_ICON_SIZE + CAROUSEL_PAD);
     int center_x = scr.hud_width / 2;
     int carousel_x = center_x - (carousel_w / 2);
     int carousel_y = (int) (scr.hud_height * wc_screen_frac_y->value);
     
-    for (int i = 0; i < cl.carousel.num_slots; i++, carousel_x += CAROUSEL_ICON_SIZE) {
+    for (int i = 0; i < cl.carousel.num_slots; i++, carousel_x += CAROUSEL_ICON_SIZE + CAROUSEL_PAD) {
         bool selected = cl.carousel.selected == cl.carousel.slots[i].item_index;
         const cl_wheel_weapon_t *weap = &cl.wheel_data.weapons[cl.carousel.slots[i].data_id];
         const cl_wheel_icon_t *icons = &weap->icons;

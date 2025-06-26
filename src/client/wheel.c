@@ -313,12 +313,16 @@ void CL_Wheel_Close(bool released)
 static int get_wheel_draw_size(void)
 {
     // Find an integer fraction (or multiple) of the original wheel size to choose draw size
+    /* The rerelease weapon wheel image (which we're using) has a 74 pixels padding of fully
+     * transparent pixels, ignore those then calculating scaling */
+    const int wheel_padding = 74;
+    const int wheel_content_size = scr.wheel_size - wheel_padding;
     int wheel_draw_size;
-    if (scr.wheel_size >= scr.hud_height) {
-        int wheel_size_div = (scr.wheel_size + scr.wheel_size - 1) / scr.hud_height;
+    if (wheel_content_size >= scr.hud_height) {
+        int wheel_size_div = (2 * wheel_content_size - 1) / scr.hud_height;
         wheel_draw_size = scr.wheel_size / wheel_size_div;
     } else {
-        int wheel_size_mul = scr.hud_height / scr.wheel_size;
+        int wheel_size_mul = scr.hud_height / wheel_content_size;
         wheel_draw_size = scr.wheel_size * wheel_size_mul;
     }
     return wheel_draw_size;

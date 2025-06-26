@@ -19,9 +19,28 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 #include "client.h"
 #include "common/loc.h"
 
+/* Draw item/ammo count for carousel and weapons/items wheel.
+ * Notably, the count should be drawn a bit smaller than usual
+ * text, but never below 100% */
+static void draw_count(cvar_t *scale_cvar, int x, int y, float scale, int flags, color_t color, int value)
+{
+    // Compute an integer text scale factor
+    int scale_factor = ((1.f / scr.hud_scale) * scale_cvar->value * scale) + 0.5f;
+    if (scale_factor < 1)
+        scale_factor = 1;
+
+    R_SetScale(1.f / scale_factor);
+
+    float coord_scale = 1.f / (scale_factor * scr.hud_scale);
+    SCR_DrawString(x * coord_scale, y * coord_scale, flags, color, va("%i", value));
+
+    R_SetScale(scr.hud_scale);
+}
+
 static cvar_t *wc_screen_frac_y;
 static cvar_t *wc_timeout;
 static cvar_t *wc_lock_time;
+static cvar_t *wc_ammo_scale;
 
 static void CL_Carousel_Close(void)
 {
@@ -136,7 +155,7 @@ void CL_Carousel_Draw(void)
             else
                 color = selected ? COLOR_RGB(255, 255, 83) : COLOR_WHITE;
 
-            SCR_DrawString(carousel_x + (CAROUSEL_ICON_SIZE / 2), carousel_y + CAROUSEL_ICON_SIZE + 2, UI_DROPSHADOW | UI_CENTER, color, va("%i", count));
+            draw_count(wc_ammo_scale, carousel_x + (CAROUSEL_ICON_SIZE / 2), carousel_y + CAROUSEL_ICON_SIZE + 2, 1, UI_DROPSHADOW | UI_CENTER, color, count);
         }
     }
 }
@@ -218,6 +237,7 @@ void CL_Wheel_WeapNext(void) { CL_Wheel_Cycle(1); }
 void CL_Wheel_WeapPrev(void) { CL_Wheel_Cycle(-1); }
 
 static cvar_t *ww_timer_speed;
+static cvar_t *ww_ammo_scale;
 
 static int wheel_slot_compare(const void *a, const void *b)
 {
@@ -491,7 +511,7 @@ static void draw_wheel_slot(int slot_idx, int center_x, int center_y, int wheel_
     color_t count_color = slot_count_color(selected, warn_low);
 
     if (count != -1) {
-        SCR_DrawString(center_x + p[0] + size, center_y + p[1] + size, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(count_color, wheel_alpha), va("%i", count));
+        draw_count(ww_ammo_scale, center_x + p[0] + size, center_y + p[1] + size, scale, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(count_color, wheel_alpha), count);
     }
 
     // We may need it later
@@ -592,8 +612,10 @@ void CL_Wheel_Init(void)
     wc_screen_frac_y = Cvar_Get("wc_screen_frac_y", "0.72", 0);
     wc_timeout = Cvar_Get("wc_timeout", "400", 0);
     wc_lock_time = Cvar_Get("wc_lock_time", "300", 0);
+    wc_ammo_scale = Cvar_Get("wc_ammo_scale", "0.66", 0);
 
     ww_timer_speed = Cvar_Get("ww_timer_speed", "3", 0);
+    ww_ammo_scale = Cvar_Get("ww_ammo_scale", "0.66", 0);
 
     cl.wheel.timescale = 1.0f;
 }

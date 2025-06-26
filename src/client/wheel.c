@@ -419,6 +419,83 @@ void CL_Wheel_Update(void)
     }
 }
 
+static color_t slot_count_color(bool selected, bool warn_low)
+{
+    color_t count_color;
+    if (selected) {
+        // "Selected" color is based off the tint for "selected" wheel icons in rerelease
+        count_color = warn_low ? COLOR_RGB(255, 62, 33) : COLOR_RGB(255, 248, 134);
+    } else
+        count_color = warn_low ? COLOR_RED : COLOR_WHITE;
+    return count_color;
+}
+
+static void draw_wheel_slot(int slot_idx, int center_x, int center_y, int wheel_draw_size, float wheel_alpha, int *out_slot_count, bool *out_warn_low)
+{
+    const cl_wheel_slot_t *slot = &cl.wheel.slots[slot_idx];
+
+    if (!slot->has_item)
+        return;
+
+    bool selected = cl.wheel.selected == slot_idx;
+
+    vec2_t p;
+    Vector2Scale(slot->dir, (wheel_draw_size / 2) * 0.525f, p);
+
+    bool active = selected;
+
+    float scale = 1.f;
+
+    if (selected)
+        scale = 2.f;
+
+    int size = 12 * scale;
+    float alpha = 1.0f;
+
+    // powerup activated
+    if (slot->is_powerup) {
+        if (cl.wheel_data.powerups[slot->data_id].is_toggle) {
+            if (cgame->GetPowerupWheelCount(&cl.frame.ps, slot->data_id) == 2)
+                active = true;
+
+            if (cl.wheel_data.powerups[slot->data_id].ammo_index != -1 &&
+                !slot->has_ammo)
+                alpha = 0.5f;
+        }
+    }
+
+    alpha *= wheel_alpha;
+
+    R_DrawStretchPicShadowAlpha(center_x + p[0] - size, center_y + p[1] - size, size * 2, size * 2, active ? slot->icons->selected : slot->icons->wheel, 4, alpha);
+
+    int count = -1;
+    bool warn_low = false;
+
+    if (slot->is_powerup) {
+        if (!cl.wheel_data.powerups[slot->data_id].is_toggle)
+            count = cgame->GetPowerupWheelCount(&cl.frame.ps, slot->data_id);
+        else if (cl.wheel_data.powerups[slot->data_id].ammo_index != -1)
+            count = cgame->GetWeaponWheelAmmoCount(&cl.frame.ps, cl.wheel_data.powerups[slot->data_id].ammo_index);
+    } else {
+        if (cl.wheel_data.weapons[slot->data_id].ammo_index != -1) {
+            count = cgame->GetWeaponWheelAmmoCount(&cl.frame.ps, cl.wheel_data.weapons[slot->data_id].ammo_index);
+            warn_low = count <= cl.wheel_data.weapons[slot->data_id].quantity_warn;
+        }
+    }
+
+    color_t count_color = slot_count_color(selected, warn_low);
+
+    if (count != -1) {
+        SCR_DrawString(center_x + p[0] + size, center_y + p[1] + size, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(count_color, wheel_alpha), va("%i", count));
+    }
+
+    // We may need it later
+    if (out_slot_count)
+        *out_slot_count = count;
+    if (out_warn_low)
+        *out_warn_low = warn_low;
+}
+
 void CL_Wheel_Draw(void)
 {
     if (cl.wheel.state != WHEEL_OPEN && cl.wheel.timer == 0.0f)
@@ -441,99 +518,47 @@ void CL_Wheel_Draw(void)
 
     R_DrawStretchPic(center_x - (wheel_draw_size / 2), center_y - (wheel_draw_size / 2), wheel_draw_size, wheel_draw_size, base_color, scr.wheel_circle);
 
-    for (int i_ = 0; i_ < cl.wheel.num_slots * 2; i_++) {
-        int i = i_ % cl.wheel.num_slots;
-        bool select_pass = i_ >= cl.wheel.num_slots;
-        const cl_wheel_slot_t *slot = &cl.wheel.slots[i];
+    // Draw all wheel slots, _except_ the current selected one
+    for (int i = 0; i < cl.wheel.num_slots; i++) {
+        if (i == cl.wheel.selected) continue;
 
-        if (!slot->has_item)
-            continue;
+        draw_wheel_slot(i, center_x, center_y, wheel_draw_size, wheel_alpha, NULL, NULL);
+    }
 
-        bool selected = cl.wheel.selected == i;
-        if (select_pass != selected) continue;
-
-        vec2_t p;
-        Vector2Scale(slot->dir, (wheel_draw_size / 2) * 0.525f, p);
-
-        bool active = selected;
-
-        float scale = 1.f;
-
-        if (selected)
-            scale = 2.f;
-
-        int size = 12 * scale;
-        float alpha = 1.0f;
-        
-        // powerup activated
-        if (slot->is_powerup) {
-            if (cl.wheel_data.powerups[slot->data_id].is_toggle) {
-                if (cgame->GetPowerupWheelCount(&cl.frame.ps, slot->data_id) == 2)
-                    active = true;
-
-                if (cl.wheel_data.powerups[slot->data_id].ammo_index != -1 &&
-                    !slot->has_ammo)
-                    alpha = 0.5f;
-            }
-        }
-
-        alpha *= wheel_alpha;
-
-        R_DrawStretchPicShadowAlpha(center_x + p[0] - size, center_y + p[1] - size, size * 2, size * 2, active ? slot->icons->selected : slot->icons->wheel, 4, alpha);
-
+    if (cl.wheel.selected >= 0 && cl.wheel.selected < cl.wheel.num_slots) {
+        // Draw the selected wheel slot last; If things overlap, at least the selection appears on top
         int count = -1;
         bool warn_low = false;
+        draw_wheel_slot(cl.wheel.selected, center_x, center_y, wheel_draw_size, wheel_alpha, &count, &warn_low);
+
+        const cl_wheel_slot_t *slot = &cl.wheel.slots[cl.wheel.selected];
+        char localized[CS_MAX_STRING_LENGTH];
+
+        // TODO: cache localized item names in cl somewhere.
+        // make sure they get reset of language is changed.
+        Loc_Localize(cl.configstrings[cl.csr.items + slot->item_index], false, NULL, 0, localized, sizeof(localized));
+
+        SCR_DrawString(center_x, center_y - (wheel_draw_size / 8), UI_CENTER | UI_DROPSHADOW, base_color, localized);
+
+        int ammo_index;
 
         if (slot->is_powerup) {
-            if (!cl.wheel_data.powerups[slot->data_id].is_toggle)
-                count = cgame->GetPowerupWheelCount(&cl.frame.ps, slot->data_id);
-            else if (cl.wheel_data.powerups[slot->data_id].ammo_index != -1)
-                count = cgame->GetWeaponWheelAmmoCount(&cl.frame.ps, cl.wheel_data.powerups[slot->data_id].ammo_index);
+            ammo_index = cl.wheel_data.powerups[slot->data_id].ammo_index;
+
+            if (!cl.wheel_data.powerups[slot->data_id].is_toggle) {
+                SCR_DrawString(center_x, center_y, UI_CENTER | UI_DROPSHADOW, base_color, va("%i", cgame->GetPowerupWheelCount(&cl.frame.ps, slot->data_id)));
+            }
         } else {
-            if (cl.wheel_data.weapons[slot->data_id].ammo_index != -1) {
-                count = cgame->GetWeaponWheelAmmoCount(&cl.frame.ps, cl.wheel_data.weapons[slot->data_id].ammo_index);
-                warn_low = count <= cl.wheel_data.weapons[slot->data_id].quantity_warn;
-            }
+            ammo_index = cl.wheel_data.weapons[slot->data_id].ammo_index;
         }
 
-        color_t count_color;
-        if (selected)
-            count_color = warn_low ? COLOR_RGB(255, 62, 33) : COLOR_RGB(255, 248, 134);
-        else
-            count_color = warn_low ? COLOR_RED : COLOR_WHITE;
+        if (ammo_index != -1) {
+            const cl_wheel_ammo_t *ammo = &cl.wheel_data.ammo[ammo_index];
 
-        if (count != -1) {
-            SCR_DrawString(center_x + p[0] + size, center_y + p[1] + size, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(count_color, wheel_alpha), va("%i", count));
-        }
+            R_DrawStretchPicShadowAlpha(center_x - (24 * 3) / 2, center_y - ((24 * 3) / 2), (24 * 3), (24 * 3), ammo->icons.wheel, 2, wheel_alpha);
 
-        if (selected) {
-            char localized[CS_MAX_STRING_LENGTH];
-
-            // TODO: cache localized item names in cl somewhere.
-            // make sure they get reset of language is changed.
-            Loc_Localize(cl.configstrings[cl.csr.items + slot->item_index], false, NULL, 0, localized, sizeof(localized));
-
-            SCR_DrawString(center_x, center_y - (wheel_draw_size / 8), UI_CENTER | UI_DROPSHADOW, base_color, localized);
-
-            int ammo_index;
-
-            if (slot->is_powerup) {
-                ammo_index = cl.wheel_data.powerups[slot->data_id].ammo_index;
-
-                if (!cl.wheel_data.powerups[slot->data_id].is_toggle) {
-                    SCR_DrawString(center_x, center_y, UI_CENTER | UI_DROPSHADOW, base_color, va("%i", cgame->GetPowerupWheelCount(&cl.frame.ps, slot->data_id)));
-                }
-            } else {
-                ammo_index = cl.wheel_data.weapons[slot->data_id].ammo_index;
-            }
-
-            if (ammo_index != -1) {
-                const cl_wheel_ammo_t *ammo = &cl.wheel_data.ammo[ammo_index];
-
-                R_DrawStretchPicShadowAlpha(center_x - (24 * 3) / 2, center_y - ((24 * 3) / 2), (24 * 3), (24 * 3), ammo->icons.wheel, 2, wheel_alpha);
-
-                SCR_DrawString(center_x, center_y + 32, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(count_color, wheel_alpha), va("%i", count));
-            }
+            color_t color = slot_count_color(false, warn_low); // don't use selected color inside the wheel
+            SCR_DrawString(center_x, center_y + 32, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(color, wheel_alpha), va("%i", count));
         }
     }
 

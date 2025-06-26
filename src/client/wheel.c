@@ -22,13 +22,14 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 /* Draw item/ammo count for carousel and weapons/items wheel.
  * Notably, the count should be drawn a bit smaller than usual
  * text, but never below 100% */
-static void draw_count(cvar_t *scale_cvar, int x, int y, float scale, int flags, color_t color, int value)
+static void draw_count(int x, int y, float scale, int flags, color_t color, int value)
 {
     // Compute an integer text scale factor
-    int scale_factor = ((1.f / scr.hud_scale) * scale_cvar->value * scale) + 0.5f;
+    int scale_factor = ((1.f / scr.hud_scale) * scale) + 0.5f;
     if (scale_factor < 1)
         scale_factor = 1;
 
+    // Scale manually, as SCR_DrawStringStretch() can't scale below 100%
     R_SetScale(1.f / scale_factor);
 
     float coord_scale = 1.f / (scale_factor * scr.hud_scale);
@@ -156,7 +157,7 @@ void CL_Carousel_Draw(void)
             else
                 color = selected ? COLOR_RGB(255, 255, 83) : COLOR_WHITE;
 
-            draw_count(wc_ammo_scale, carousel_x + (CAROUSEL_ICON_SIZE / 2), carousel_y + CAROUSEL_ICON_SIZE + 2, 1, UI_DROPSHADOW | UI_CENTER, color, count);
+            draw_count(carousel_x + (CAROUSEL_ICON_SIZE / 2), carousel_y + CAROUSEL_ICON_SIZE + 2, wc_ammo_scale->value, UI_DROPSHADOW | UI_CENTER, color, count);
         }
     }
 }
@@ -513,7 +514,7 @@ static void draw_wheel_slot(int slot_idx, int center_x, int center_y, int wheel_
 
     int min_count = slot->is_powerup ? 2 : 0;
     if (count != -1 && count >= min_count) {
-        draw_count(ww_ammo_scale, center_x + p[0] + size, center_y + p[1] + size, scale, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(count_color, wheel_alpha), count);
+        draw_count(center_x + p[0] + size, center_y + p[1] + size, ww_ammo_scale->value * scale, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(count_color, wheel_alpha), count);
     }
 
     // We may need it later

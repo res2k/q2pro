@@ -511,7 +511,8 @@ static void draw_wheel_slot(int slot_idx, int center_x, int center_y, int wheel_
 
     color_t count_color = slot_count_color(selected, warn_low);
 
-    if (count != -1) {
+    int min_count = slot->is_powerup ? 2 : 0;
+    if (count != -1 && count >= min_count) {
         draw_count(ww_ammo_scale, center_x + p[0] + size, center_y + p[1] + size, scale, UI_CENTER | UI_DROPSHADOW, COLOR_SETA_F(count_color, wheel_alpha), count);
     }
 

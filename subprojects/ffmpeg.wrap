@@ -1,6 +1,6 @@
 [wrap-git]
 url=https://gitlab.freedesktop.org/gstreamer/meson-ports/ffmpeg.git
-revision=meson-7.1
+revision=4a217803625d0252f55a3b0b4ba6e640fd2d6276
 depth=1
 
 [provide]

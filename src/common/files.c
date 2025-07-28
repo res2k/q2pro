@@ -2288,7 +2288,7 @@ static pack_t *load_builtin_file(void)
 
     num_files = q_countof(builtin_files) - 1;
     if (num_files < 1) {
-        Com_SetLastError("No files");
+        Com_DWPrintf("%s: no builtin files\n", __func__);
         goto fail1;
     }
     if (num_files > MAX_FILES_IN_PACK) {
@@ -3663,6 +3663,8 @@ static void add_builtin_content(void)
     searchpath_t *search;
 
     pack = load_builtin_file();
+    if (!pack)
+        return;
     search = FS_Malloc(sizeof(*search));
     search->mode = FS_PATH_BASE | FS_DIR_BASE;
     search->filename[0] = 0;

@@ -3658,7 +3658,6 @@ static void free_game_paths(void)
 // add builtin stuff
 static void add_builtin_content(void)
 {
-#if USE_ZLIB
     pack_t *pack;
     searchpath_t *search;
 
@@ -3671,7 +3670,6 @@ static void add_builtin_content(void)
     search->pack = pack_get(pack);
     search->next = fs_searchpaths;
     fs_searchpaths = search;
-#endif
 }
 
 // game needs this for localized map messages

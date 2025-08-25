@@ -62,10 +62,10 @@ static int write_server_file(savetype_t autosave)
     // write the mapcmd
     MSG_WriteString(sv.mapcmd);
 
-    // write all CVAR_LATCH cvars
-    // these will be things like coop, skill, deathmatch, etc
+    // write all CVAR_LATCH cvars - these will be things like coop, skill, deathmatch, etc
+    // also write all CVAR_SERVERINFO vars - they mainly serve to provide some troubleshooting info
     for (var = cvar_vars; var; var = var->next) {
-        if (!(var->flags & CVAR_LATCH))
+        if (!(var->flags & (CVAR_LATCH | CVAR_SERVERINFO)))
             continue;
         if (var->flags & CVAR_PRIVATE)
             continue;
@@ -452,7 +452,11 @@ static int read_server_file(void)
         if (MSG_ReadString(string, sizeof(string)) >= sizeof(string))
             Com_Error(ERR_DROP, "Savegame cvar value too long");
 
-        Cvar_UserSet(name, string);
+        /* we store cvars with either CVAR_LATCH or CVAR_SERVERINFO,
+         * but only restore those with CVAR_LATCH */
+        cvar_t *cvar = Cvar_FindVar(name);
+        if (!cvar || cvar->flags & CVAR_LATCH)
+            Cvar_UserSet(name, string);
     }
 
     // start a new game fresh with new cvars
